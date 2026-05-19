@@ -374,7 +374,7 @@ Sé concreto y usa alimentos fáciles de conseguir en Colombia.`;
                   <div key={item.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:8,flexWrap:"wrap"}}>
                     <button onClick={()=>toggleFood(item.name)} style={{background:"rgba(239,68,68,0.15)",border:"none",borderRadius:6,color:"#ef4444",padding:"2px 8px",fontSize:11,cursor:"pointer"}}>✕</button>
                     <span style={{fontSize:13,fontWeight:500,flex:1,minWidth:80}}>{item.name}</span>
-                    <div style={{display:"flex",gap:4"}}>
+                    <div style={{display:"flex",gap:4}}>
                       {PORTIONS.map(p=>(
                         <button key={p.val} onClick={()=>setPortion(item.name,p.val)} style={{
                           padding:"3px 7px",borderRadius:6,border:"none",fontSize:11,cursor:"pointer",fontWeight:item.portion===p.val?700:400,
