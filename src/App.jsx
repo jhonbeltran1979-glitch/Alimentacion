@@ -269,7 +269,9 @@ export default function App(){
   const saveDay=()=>{
     const today=new Date().toLocaleDateString("es-CO");
     const entry={date:today,items,scores,totals};
-    const updated=[entry,...history.slice(0,6)];
+    // Reemplaza si ya existe entrada de hoy, sino agrega al inicio
+    const filtered=history.filter(e=>e.date!==today);
+    const updated=[entry,...filtered.slice(0,6)];
     setHistory(updated);
     localStorage.setItem("vt_hx",JSON.stringify(updated));
     setSaveMsg("✓ Guardado");setTimeout(()=>setSaveMsg(""),2000);
@@ -307,8 +309,9 @@ Sé concreto y usa alimentos fáciles de conseguir en Colombia.`;
     setLoading(false);
   };
 
+  const normalize=s=>s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
   const allFoods=Object.values(FOOD_CATEGORIES).flat();
-  const filtered=searchQ?allFoods.filter(f=>f.toLowerCase().includes(searchQ.toLowerCase())):null;
+  const filtered=searchQ?allFoods.filter(f=>normalize(f).includes(normalize(searchQ))):null;
 
   const TABS=[{id:"log",icon:"🥗",label:"Registro"},{id:"dashboard",icon:"📊",label:"Dashboard"},{id:"analysis",icon:"🤖",label:"Análisis IA"},{id:"history",icon:"📅",label:"Historial"}];
 
@@ -390,7 +393,7 @@ Sé concreto y usa alimentos fáciles de conseguir en Colombia.`;
             {filtered?(
               <div style={{background:C.card,borderRadius:12,border:`1px solid ${C.border}`,marginBottom:16,overflow:"hidden"}}>
                 {filtered.length===0
-                  ?<p style={{color:C.muted,padding:16,margin:0,fontSize:13}}>Sin resultados — usa "Agregar alimento" para agregarlo manualmente</p>
+                  ?<div style={{padding:16}}><p style={{color:C.muted,margin:"0 0 12px",fontSize:13}}>"{searchQ}" no está en la lista.</p><button onClick={()=>{setCustomName(searchQ);setShowCustom(true);setSearchQ("");}} style={{width:"100%",padding:"10px",background:"rgba(0,212,170,0.1)",border:"1px solid #00d4aa",borderRadius:10,color:"#00d4aa",fontSize:13,cursor:"pointer",fontWeight:600}}>➕ Agregar "{searchQ}" manualmente</button></div>
                   :filtered.map(f=>(
                     <div key={f} onClick={()=>toggleFood(f)} style={{padding:"10px 16px",cursor:"pointer",fontSize:13,
                       background:getItem(f)?"rgba(0,212,170,0.1)":"transparent",
@@ -518,27 +521,50 @@ Sé concreto y usa alimentos fáciles de conseguir en Colombia.`;
                 <div style={{fontSize:48,marginBottom:12}}>📅</div>
                 <p style={{color:C.muted,fontSize:14}}>Aún no tienes días guardados.<br/>Registra tu alimentación y presiona "Guardar día".</p>
               </div>
-            ):history.map((entry,i)=>(
-              <div key={i} style={{background:C.card,borderRadius:16,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:12}}>
-                  <div style={{fontSize:14,fontWeight:700}}>{entry.date}</div>
-                  <div style={{fontSize:12,color:C.muted}}>{entry.items?.length||entry.foods?.length||0} alimentos</div>
+            ):(
+              <>
+                {/* Botón limpiar todo */}
+                <div style={{display:"flex",justifyContent:"flex-end",marginBottom:12}}>
+                  <button onClick={()=>{
+                    if(window.confirm("¿Borrar todo el historial?")){
+                      setHistory([]);localStorage.removeItem("vt_hx");
+                    }
+                  }} style={{padding:"6px 14px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:8,color:"#ef4444",fontSize:12,cursor:"pointer",fontWeight:600}}>
+                    🗑️ Limpiar historial
+                  </button>
                 </div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
-                  {OBJ_META.map(obj=>(
-                    <div key={obj.key} style={{textAlign:"center"}}>
-                      <div style={{fontSize:14,fontWeight:800,color:obj.color,fontFamily:"monospace"}}>{entry.scores?.[obj.key]||0}%</div>
-                      <div style={{fontSize:9,color:C.muted}}>{obj.icon} {obj.key}</div>
+
+                {history.map((entry,i)=>(
+                  <div key={i} style={{background:C.card,borderRadius:16,border:`1px solid ${C.border}`,padding:16,marginBottom:12}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                      <div style={{fontSize:14,fontWeight:700}}>{entry.date}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:10}}>
+                        <div style={{fontSize:12,color:C.muted}}>{entry.items?.length||entry.foods?.length||0} alimentos</div>
+                        <button onClick={()=>{
+                          const updated=history.filter((_,idx)=>idx!==i);
+                          setHistory(updated);localStorage.setItem("vt_hx",JSON.stringify(updated));
+                        }} style={{padding:"3px 9px",background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:6,color:"#ef4444",fontSize:11,cursor:"pointer"}}>
+                          ✕ Borrar
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {(entry.items||entry.foods||[]).slice(0,8).map((f,i)=>(
-                    <span key={i} style={{fontSize:10,padding:"3px 8px",borderRadius:99,background:C.border,color:C.muted}}>{typeof f==="object"?f.name:f}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:8,marginBottom:12}}>
+                      {OBJ_META.map(obj=>(
+                        <div key={obj.key} style={{textAlign:"center"}}>
+                          <div style={{fontSize:14,fontWeight:800,color:obj.color,fontFamily:"monospace"}}>{entry.scores?.[obj.key]||0}%</div>
+                          <div style={{fontSize:9,color:C.muted}}>{obj.icon} {obj.key}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                      {(entry.items||entry.foods||[]).slice(0,8).map((f,idx)=>(
+                        <span key={idx} style={{fontSize:10,padding:"3px 8px",borderRadius:99,background:C.border,color:C.muted}}>{typeof f==="object"?f.name:f}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
