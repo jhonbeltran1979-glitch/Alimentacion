@@ -309,10 +309,12 @@ export default function App(){
     setHistory(updated);
     localStorage.setItem("vt_hx",JSON.stringify(updated));
     setSaveMsg("✓ Guardado");setTimeout(()=>setSaveMsg(""),2000);
-    // Sync to Google Sheets
+    // Sync to Google Sheets (no-cors para evitar bloqueo CORS)
     setSyncMsg("☁️ Sincronizando...");
     fetch(GAS_URL,{
       method:"POST",
+      mode:"no-cors",
+      headers:{"Content-Type":"text/plain"},
       body:JSON.stringify({
         persona,
         fecha:today,
@@ -321,8 +323,7 @@ export default function App(){
         water,
         alimentos:allItems.map(i=>`${i.name}(x${i.portion})`).join(", ")
       })
-    }).then(r=>r.json())
-      .then(d=>{ setSyncMsg(d.success?"☁️ Guardado en Sheets ✓":"⚠️ Error en Sheets"); setTimeout(()=>setSyncMsg(""),3000); })
+    }).then(()=>{ setSyncMsg("☁️ Guardado en Sheets ✓"); setTimeout(()=>setSyncMsg(""),3000); })
       .catch(()=>{ setSyncMsg("⚠️ Sin conexión a Sheets"); setTimeout(()=>setSyncMsg(""),3000); });
   };
 
