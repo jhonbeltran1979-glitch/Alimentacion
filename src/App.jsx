@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect } from "react";
+const API_KEY = "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";
+
+
 
 // ─── THEME ───────────────────────────────────────────────────────────────────
 const T = {
@@ -263,7 +266,7 @@ async function analyzePhoto(base64, mediaType, profile) {
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01"},
     body:JSON.stringify({
       model:"claude-sonnet-4-20250514",
       max_tokens:900,
@@ -309,7 +312,7 @@ async function generateMonthReport(profile, allMeals) {
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01"},
     body:JSON.stringify({
       model:"claude-sonnet-4-20250514",
       max_tokens:1200,
