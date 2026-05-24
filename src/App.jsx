@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
 const API_KEY = "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";
 
 
@@ -260,48 +261,29 @@ async function analyzePhoto(base64, mediaType, profile) {
     anemia: "Presta especial atención al hierro, vitamina B12 y vitamina C.",
     hipertension: "Presta especial atención al sodio y potasio.",
     embarazo: "Presta especial atención al ácido fólico, calcio y hierro.",
-    sano: "",
-    otro: "",
+    sano: "", otro: "",
   }[profile.condition] || "";
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-20250514",
-      max_tokens:900,
-      messages:[{
-        role:"user",
-        content:[
-          { type:"image", source:{ type:"base64", media_type:mediaType, data:base64 } },
-          { type:"text", text:`Eres nutricionista experto colombiano. Analiza esta foto de comida para ${profile.name}.
+  const prompt = `Eres nutricionista experto colombiano. Analiza esta foto de comida para ${profile.name}.
 Condición de salud: ${profile.condition}. ${condTip}
 Objetivos: ${profile.goals?.join(", ")}.
-
 Responde SOLO con JSON válido sin markdown:
-{
-  "alimentos": ["arroz", "pollo", "ensalada"],
-  "descripcion": "descripción corta en 1 oración",
-  "calorias_aprox": 450,
-  "score_nutricional": 72,
-  "semaforo": "verde",
-  "positivo": "qué tiene de bueno específicamente para este usuario",
-  "mejora": "qué agregarle o cambiarle considerando su condición",
-  "alerta": "advertencia específica si aplica para su condición o vacío",
-  "proteina_nivel": "alta",
-  "carbs_nivel": "media",
-  "grasas_nivel": "baja",
-  "fibra_nivel": "alta",
-  "tip_del_dia": "consejo práctico y concreto para mañana"
-}
-semaforo: verde (score≥70), amarillo (50-69), rojo (<50)` }
-        ]
-      }]
+{"alimentos":["arroz","pollo","ensalada"],"descripcion":"descripción corta","calorias_aprox":450,"score_nutricional":72,"semaforo":"verde","positivo":"lo bueno para este usuario","mejora":"cómo mejorar","alerta":"advertencia o vacío","proteina_nivel":"alta","carbs_nivel":"media","grasas_nivel":"baja","fibra_nivel":"alta","tip_del_dia":"consejo para mañana"}
+semaforo: verde(≥70), amarillo(50-69), rojo(<50)`;
+
+  const res = await fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({
+      action: "analyze_photo",
+      imageBase64: base64,
+      mediaType: mediaType,
+      prompt: prompt,
     })
   });
   const data = await res.json();
-  const raw = data.content?.[0]?.text || "{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  if (!data.success) throw new Error(data.error || "Error del servidor");
+  return data.result;
 }
 
 async function generateMonthReport(profile, allMeals) {
@@ -310,47 +292,18 @@ async function generateMonthReport(profile, allMeals) {
   ).join("\n");
   const avg = Math.round(allMeals.reduce((a,b)=>a+(b.score||0),0)/allMeals.length);
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01"},
-    body:JSON.stringify({
-      model:"claude-sonnet-4-20250514",
-      max_tokens:1200,
-      messages:[{
-        role:"user",
-        content:`Eres nutricionista. Analiza el mes alimenticio de ${profile.name}.
-Condición: ${profile.condition}. Objetivos: ${profile.goals?.join(", ")}.
-Promedio score: ${avg}%. Total comidas: ${allMeals.length}.
+  const prompt = `Eres nutricionista. Analiza el mes de ${profile.name}. Condición: ${profile.condition}. Objetivos: ${profile.goals?.join(", ")}. Promedio: ${avg}%. Comidas: ${allMeals.length}.
+REGISTRO: ${lines}
+Responde SOLO con JSON: {"score_mes":${avg},"titulo":"Tu mes en resumen","resumen":"2 oraciones","logro_principal":"...","reto_principal":"...","deficiencias":[{"nutriente":"Vitamina D","impacto":"...","solucion":"alimento colombiano"},{"nutriente":"Fibra","impacto":"...","solucion":"..."},{"nutriente":"Omega-3","impacto":"...","solucion":"..."}],"patron_semanal":"...","metas":["Meta 1","Meta 2","Meta 3"],"receta_semana":"receta colombiana"}`;
 
-REGISTRO:
-${lines}
-
-Responde SOLO con JSON válido:
-{
-  "score_mes": ${avg},
-  "titulo": "Tu mes en resumen",
-  "resumen": "2 oraciones evaluando el mes",
-  "logro_principal": "lo que mejor hizo este mes",
-  "reto_principal": "lo que más falló",
-  "deficiencias": [
-    {"nutriente":"Vitamina D","impacto":"explica cómo lo afecta específicamente","solucion":"alimento colombiano concreto"},
-    {"nutriente":"Fibra","impacto":"...","solucion":"..."},
-    {"nutriente":"Omega-3","impacto":"...","solucion":"..."}
-  ],
-  "patron_semanal": "descripción de patrón (ej: lunes y martes bien, fines de semana mal)",
-  "metas": [
-    "Meta 1 concreta para el próximo mes",
-    "Meta 2 concreta",
-    "Meta 3 concreta"
-  ],
-  "receta_semana": "Una receta colombiana específica que solucione las deficiencias principales"
-}`
-      }]
-    })
+  const res = await fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action: "month_report", prompt: prompt })
   });
   const data = await res.json();
-  const raw = data.content?.[0]?.text || "{}";
-  return JSON.parse(raw.replace(/```json|```/g,"").trim());
+  if (!data.success) throw new Error(data.error || "Error del servidor");
+  return data.result;
 }
 
 function PhotoModal({ meal, profile, onClose, onSave }) {
