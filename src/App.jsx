@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/TU_DEPLOYMENT_URL_AQUI/exec";
 
 // ─── NUTRIENTES Y ALIMENTOS ──────────────────────────────────────────────────
 const NUTRIENT_MAP = {
@@ -340,34 +340,61 @@ export default function App() {
     localStorage.setItem(storageKey(perfil,"water_date"), today);
   };
 
-  // ── Analizar foto ─────────────────────────────────────────────
+  // ── Analizar foto (comprime con canvas → GET para evitar CORS) ──
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoAnalyzing(true);
     setPhotoResult(null);
     try {
-      const toBase64 = f => new Promise((res,rej)=>{
-        const r = new FileReader();
-        r.onload = ()=> res(r.result.split(",")[1]);
-        r.onerror = rej;
-        r.readAsDataURL(f);
+      // Comprimir imagen a max 400px y calidad 0.5 para que quepa en GET
+      const compressImage = (f) => new Promise((res, rej) => {
+        const img = new Image();
+        const url = URL.createObjectURL(f);
+        img.onload = () => {
+          const MAX = 400;
+          const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+          const canvas = document.createElement("canvas");
+          canvas.width  = Math.round(img.width  * ratio);
+          canvas.height = Math.round(img.height * ratio);
+          canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          // Devuelve solo el base64 sin el prefijo "data:..."
+          res(canvas.toDataURL("image/jpeg", 0.5).split(",")[1]);
+        };
+        img.onerror = rej;
+        img.src = url;
       });
-      const b64 = await toBase64(file);
-      const mediaType = file.type || "image/jpeg";
-      const result = await apiPost({ action:"analizar_foto", imageData:b64, mediaType });
+
+      const b64 = await compressImage(file);
+
+      // Enviar via GET (sin preflight CORS)
+      const result = await apiGet({
+        action: "analizar_foto",
+        imageData: encodeURIComponent(b64),
+        mediaType: "image/jpeg"
+      });
+
       if (result.ok) {
         setPhotoResult(result);
         if (result.alimentos?.length) {
           result.alimentos.forEach(al => {
             Object.values(FOOD_CATEGORIES).forEach(cat => {
-              const match = cat.items.find(i => i.toLowerCase().includes(al.toLowerCase()) || al.toLowerCase().includes(i.toLowerCase()));
-              if (match && !selected.includes(match)) setSelected(prev => [...prev, match]);
+              const match = cat.items.find(i =>
+                i.toLowerCase().includes(al.toLowerCase()) ||
+                al.toLowerCase().includes(i.toLowerCase())
+              );
+              if (match && !selected.includes(match))
+                setSelected(prev => [...prev, match]);
             });
           });
         }
+      } else {
+        setPhotoResult({ ok:false, recomendacion: result.error || "Error al analizar", semaforo:"rojo", alimentos:[] });
       }
-    } catch (_) {}
+    } catch (err) {
+      setPhotoResult({ ok:false, recomendacion:"Error de conexión. Selecciona alimentos manualmente.", semaforo:"rojo", alimentos:[] });
+    }
     setPhotoAnalyzing(false);
     e.target.value = "";
   };
