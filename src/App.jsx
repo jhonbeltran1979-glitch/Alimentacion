@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
-const CLAUDE_API_KEY = "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";
+const CLAUDE_API_KEY = "const CLAUDE_API_KEY = "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";";
 
 // ─── NUTRIENTES Y ALIMENTOS ──────────────────────────────────────────────────
 const NUTRIENT_MAP = {
