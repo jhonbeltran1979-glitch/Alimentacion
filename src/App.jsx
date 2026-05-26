@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
-const CLAUDE_API_KEY  = "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"; // pega tu sk-ant-...
+const CLAUDE_API_KEY  = "TU_ANTHROPIC_API_KEY_AQUI"; // pega tu sk-ant-...
 
 // ─── NUTRIENTES Y ALIMENTOS ──────────────────────────────────────────────────
 const NUTRIENT_MAP = {
@@ -103,7 +103,7 @@ async function analizarConClaude(base64, mediaType) {
       "anthropic-dangerous-direct-browser-access": "true",
     },
     body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 512,
       messages: [{
         role: "user",
@@ -117,11 +117,12 @@ verde=muy nutritiva, amarillo=puede mejorar, rojo=poco nutritiva.` }
     })
   });
   const data = await res.json();
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
   if (data.content?.[0]?.text) {
     const clean = data.content[0].text.trim().replace(/```json|```/g,"").trim();
     return JSON.parse(clean);
   }
-  throw new Error("Sin respuesta de Claude");
+  throw new Error("Respuesta vacía: " + JSON.stringify(data));
 }
 
 const storageKey = (perfil, key) => `vt_${perfil}_${key}`;
