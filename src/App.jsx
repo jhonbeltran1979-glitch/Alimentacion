@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/TU_DEPLOYMENT_URL_AQUI/exec";
 
 // ─── NUTRIENTES Y ALIMENTOS ──────────────────────────────────────────────────
 const NUTRIENT_MAP = {
@@ -99,19 +99,24 @@ function calcScores(selectedFoods) {
 }
 
 // ─── API ──────────────────────────────────────────────────────────────────────
+// Apps Script + CORS: registros simples via GET (sin preflight),
+// foto via POST (base64 no cabe en URL).
+async function apiGet(params) {
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`${APPS_SCRIPT_URL}?${qs}`, { redirect: "follow" });
+  const text = await res.text();
+  try { return JSON.parse(text); } catch(_) { return { ok: false, registros: [] }; }
+}
+
+// Solo para analizar foto (POST necesario por tamaño de base64)
 async function apiPost(body) {
   const res = await fetch(APPS_SCRIPT_URL, {
     method: "POST",
+    redirect: "follow",
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" }
   });
-  return res.json();
-}
-
-async function apiGet(params) {
-  const qs = new URLSearchParams(params).toString();
-  const res = await fetch(`${APPS_SCRIPT_URL}?${qs}`);
-  return res.json();
+  const text = await res.text();
+  try { return JSON.parse(text); } catch(_) { return { ok: false, error: text }; }
 }
 
 // ─── STORAGE KEYS ────────────────────────────────────────────────────────────
@@ -283,17 +288,17 @@ export default function App() {
     );
   };
 
-  // ── Guardar en Sheets ─────────────────────────────────────────
+  // ── Guardar en Sheets (via GET para evitar CORS) ─────────────
   const handleSave = async () => {
     if (selected.length === 0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
     setSaving(true);
     try {
-      const res = await apiPost({
+      const res = await apiGet({
         action: "guardar",
         perfil,
         fecha: today,
-        comida: MEALS[meal].replace(/[^\w\s]/g,"").trim(),
-        alimentos: selected,
+        comida: encodeURIComponent(MEALS[meal].replace(/[^\w\s]/g,"").trim()),
+        alimentos: encodeURIComponent(JSON.stringify(selected)),
         score_total: scores.total,
         score_inmunidad: scores.immunity,
         score_energia: scores.energy,
@@ -301,7 +306,7 @@ export default function App() {
         score_vitalidad: scores.vitality,
         agua_vasos: water,
         racha_dias: streak,
-        notas: photoResult?.recomendacion || ""
+        notas: encodeURIComponent(photoResult?.recomendacion || "")
       });
 
       if (res.ok) {
