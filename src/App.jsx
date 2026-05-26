@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
-const CLAUDE_API_KEY = "const CLAUDE_API_KEY = "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";";
+let CLAUDE_API_KEY = ""; // Se carga desde Apps Script al iniciar — no está en el código
 
 // ─── NUTRIENTES Y ALIMENTOS ──────────────────────────────────────────────────
 const NUTRIENT_MAP = {
@@ -201,6 +201,8 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem("vt_perfil_actual");
     if (saved) setPerfil(saved);
+    // Cargar API key desde Apps Script al iniciar
+    apiGet({ action: "getKey" }).then(r => { if (r.ok && r.k) CLAUDE_API_KEY = r.k; }).catch(()=>{});
   }, []);
 
   useEffect(() => {
