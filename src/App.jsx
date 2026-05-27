@@ -109,7 +109,42 @@ async function apiGet(params) {
   try { return JSON.parse(text); } catch(_) { return { ok:false, registros:[] }; }
 }
 
-async function analizarConClaude(base64, mediaType) {
+// ─── Analizar alimentos seleccionados manualmente (sin foto) ─────────────────
+async function analizarTexto(alimentos) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key": CLAUDE_API_KEY,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true",
+    },
+    body: JSON.stringify({
+      model:"claude-opus-4-5",
+      max_tokens:600,
+      messages:[{
+        role:"user",
+        content:`Eres un nutricionista experto. El usuario registró manualmente estos alimentos en su comida: ${alimentos.join(", ")}.
+
+Analiza su valor nutricional y responde SOLO con este JSON válido sin backticks ni texto extra:
+{
+  "recomendacion":"consejo nutricional específico y práctico en español, menciona qué le falta o qué tiene de bueno esta combinación, máximo 3 oraciones",
+  "semaforo":"verde|amarillo|rojo",
+  "calorias_aprox":"estimado de calorías",
+  "faltantes":["nutrientes o grupos alimenticios que hacen falta para completar la comida"]
+}
+verde=muy nutritiva y balanceada, amarillo=puede mejorar, rojo=poco nutritiva.`
+      }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message||JSON.stringify(data.error));
+  if (data.content?.[0]?.text) {
+    const clean = data.content[0].text.trim().replace(/```json|```/g,"").trim();
+    return JSON.parse(clean);
+  }
+  throw new Error("Sin respuesta");
+}
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
     headers:{
@@ -255,6 +290,7 @@ export default function App() {
   const [lastCats, setLastCats]       = useState(0);
   const [customFood, setCustomFood]   = useState(""); // campo texto libre
   const [customFoods, setCustomFoods] = useState([]); // alimentos libres agregados
+  const [analyzingText, setAnalyzingText] = useState(false); // análisis sin foto
   const fileRef = useRef();
 
   useEffect(() => {
@@ -551,6 +587,51 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Botón analizar selección manual */}
+          {(selected.length > 0 || customFoods.length > 0) && !photoResult && (
+            <button
+              onClick={async () => {
+                const todos = [...selected, ...customFoods];
+                if (todos.length === 0) return;
+                setAnalyzingText(true);
+                try {
+                  const result = await analizarTexto(todos);
+                  setPhotoResult({ ok:true, alimentos:[], ...result });
+                } catch(err) {
+                  setPhotoResult({ ok:false, recomendacion:`Error: ${err.message}`, semaforo:"rojo", alimentos:[] });
+                }
+                setAnalyzingText(false);
+              }}
+              disabled={analyzingText}
+              style={{width:"100%",marginTop:12,padding:"12px",borderRadius:12,border:`1.5px solid ${C.green}`,
+                background:`${C.green}15`,color:C.green,fontSize:14,fontWeight:600,cursor:"pointer"}}>
+              {analyzingText ? "🧠 Analizando tu selección..." : "🧠 Analizar nutrición de lo seleccionado"}
+            </button>
+          )}
+
+          {/* Resultado análisis de texto */}
+          {photoResult && !photoPreview && (
+            <div style={{marginTop:10,background:C.card2,borderRadius:12,padding:12,border:`1px solid ${photoResult.semaforo==="verde"?C.green:photoResult.semaforo==="rojo"?C.red:C.yellow}`}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:13,fontWeight:700}}>
+                  {photoResult.semaforo==="verde"?"🟢":photoResult.semaforo==="rojo"?"🔴":"🟡"} Análisis Nutricional
+                </div>
+                {photoResult.calorias_aprox&&<div style={{fontSize:11,color:C.accent,background:`${C.accent}22`,padding:"2px 8px",borderRadius:10}}>~{photoResult.calorias_aprox}</div>}
+              </div>
+              <div style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.5}}>{photoResult.recomendacion}</div>
+              {photoResult.faltantes?.length>0&&(
+                <div style={{marginTop:6}}>
+                  <div style={{fontSize:11,color:C.yellow,fontWeight:600,marginBottom:4}}>⚠️ Le falta a tu comida:</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                    {photoResult.faltantes.map((f,i)=>(
+                      <span key={i} style={{fontSize:11,background:`${C.yellow}22`,border:`1px solid ${C.yellow}44`,padding:"2px 8px",borderRadius:20,color:C.yellow}}>{f}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <button onClick={handleSave} disabled={saving} style={{width:"100%",marginTop:16,padding:"15px",borderRadius:14,border:"none",background:saving?C.border:`linear-gradient(135deg,${C.accent},${C.accent2})`,color:C.white,fontSize:16,fontWeight:700,cursor:saving?"not-allowed":"pointer"}}>
             {saving?"Guardando...":"💾 Guardar en mi pestaña"}
