@@ -348,11 +348,19 @@ export default function App() {
     let analisis = photoResult;
     if (!analisis && !photoPreview) {
       try {
-        setSavedMsg("🧠 Analizando nutrición...");
-        const todos = [...selected, ...customFoods];
-        const result = await analizarTexto(todos);
-        analisis = { ok:true, alimentos:[], ...result };
-        setPhotoResult(analisis);
+        // Esperar hasta 3s a que la key esté disponible
+        if (!CLAUDE_API_KEY) {
+          setSavedMsg("🔑 Cargando configuración...");
+          const r = await apiGet({ action:"getKey" });
+          if (r.ok && r.k) CLAUDE_API_KEY = r.k;
+        }
+        if (CLAUDE_API_KEY) {
+          setSavedMsg("🧠 Analizando nutrición...");
+          const todos = [...selected, ...customFoods];
+          const result = await analizarTexto(todos);
+          analisis = { ok:true, alimentos:[], ...result };
+          setPhotoResult(analisis);
+        }
       } catch(_) { analisis = null; }
     }
 
@@ -381,7 +389,10 @@ export default function App() {
         checkBadges({ streak:newStreak, water, lastScore:scores.total, lastCats:scores.cats }, updatedHistory);
 
         setSavedMsg(`✅ ¡Guardado! Score: ${scores.total}%`);
-        setSelected([]); setCustomFoods([]); setPhotoResult(null); setPhotoPreview(null);
+        // Limpiar después de 3 segundos para que el usuario vea el análisis
+        setTimeout(() => {
+          setSelected([]); setCustomFoods([]); setPhotoResult(null); setPhotoPreview(null);
+        }, 3000);
       } else {
         setSavedMsg("❌ Error al guardar. Intenta de nuevo.");
       }
