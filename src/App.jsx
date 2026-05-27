@@ -341,14 +341,18 @@ export default function App() {
 
   // ── Guardar ────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (selected.length===0 && customFoods.length===0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
+    // Auto-agregar texto pendiente en el campo si el usuario olvidó presionar +
+    const pendingFoods = customFood.trim() ? [...customFoods, customFood.trim()] : [...customFoods];
+    if (customFood.trim()) { setCustomFoods(pendingFoods); setCustomFood(""); }
+
+    const todosAlimentos = [...selected, ...pendingFoods];
+    if (todosAlimentos.length===0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
     setSaving(true);
 
     // Auto-analizar si no hay análisis previo y no hay foto
     let analisis = photoResult;
     if (!analisis && !photoPreview) {
       try {
-        // Esperar hasta 3s a que la key esté disponible
         if (!CLAUDE_API_KEY) {
           setSavedMsg("🔑 Cargando configuración...");
           const r = await apiGet({ action:"getKey" });
@@ -356,19 +360,23 @@ export default function App() {
         }
         if (CLAUDE_API_KEY) {
           setSavedMsg("🧠 Analizando nutrición...");
-          const todos = [...selected, ...customFoods];
-          const result = await analizarTexto(todos);
+          const result = await analizarTexto(todosAlimentos);
           analisis = { ok:true, alimentos:[], ...result };
           setPhotoResult(analisis);
+        } else {
+          setSavedMsg("⚠️ Sin conexión a IA, guardando sin análisis...");
         }
-      } catch(_) { analisis = null; }
+      } catch(err) {
+        setSavedMsg(`⚠️ Error IA: ${err.message}. Guardando igual...`);
+        analisis = null;
+      }
     }
 
     try {
       const res = await apiGet({
         action:"guardar", perfil, fecha:today,
         comida: encodeURIComponent(MEALS[meal].replace(/[^\w\s]/g,"").trim()),
-        alimentos: encodeURIComponent(JSON.stringify([...selected, ...customFoods])),
+        alimentos: encodeURIComponent(JSON.stringify(todosAlimentos)),
         score_total:scores.total, score_inmunidad:scores.immunity,
         score_energia:scores.energy, score_concentracion:scores.focus,
         score_vitalidad:scores.vitality, agua_vasos:water, racha_dias:streak,
@@ -383,22 +391,18 @@ export default function App() {
         localStorage.setItem(sk(perfil,"streak_date"), today);
         setLastScore(scores.total);
         setLastCats(scores.cats);
-
-        // Verificar insignias después de guardar
-        const updatedHistory = [...history, { comida: MEALS[meal], alimentos: selected }];
+        const updatedHistory = [...history, { comida: MEALS[meal], alimentos: todosAlimentos }];
         checkBadges({ streak:newStreak, water, lastScore:scores.total, lastCats:scores.cats }, updatedHistory);
-
         setSavedMsg(`✅ ¡Guardado! Score: ${scores.total}%`);
-        // Limpiar después de 3 segundos para que el usuario vea el análisis
         setTimeout(() => {
           setSelected([]); setCustomFoods([]); setPhotoResult(null); setPhotoPreview(null);
-        }, 3000);
+        }, 4000);
       } else {
         setSavedMsg("❌ Error al guardar. Intenta de nuevo.");
       }
     } catch(_) { setSavedMsg("❌ Sin conexión."); }
     setSaving(false);
-    setTimeout(()=>setSavedMsg(""),4000);
+    setTimeout(()=>setSavedMsg(""),5000);
   };
 
   const changeWater = delta => {
