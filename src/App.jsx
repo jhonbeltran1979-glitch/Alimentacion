@@ -588,18 +588,19 @@ export default function App() {
             )}
           </div>
 
-          {/* Botón analizar selección manual */}
-          {(selected.length > 0 || customFoods.length > 0) && !photoResult && (
+          {/* Botón analizar selección manual — aparece siempre que hay alimentos y no hay foto */}
+          {(selected.length > 0 || customFoods.length > 0) && !photoPreview && (
             <button
               onClick={async () => {
                 const todos = [...selected, ...customFoods];
                 if (todos.length === 0) return;
                 setAnalyzingText(true);
+                setPhotoResult(null);
                 try {
                   const result = await analizarTexto(todos);
                   setPhotoResult({ ok:true, alimentos:[], ...result });
                 } catch(err) {
-                  setPhotoResult({ ok:false, recomendacion:`Error: ${err.message}`, semaforo:"rojo", alimentos:[] });
+                  setPhotoResult({ ok:false, recomendacion:`Error: ${err.message}`, semaforo:"rojo", alimentos:[], faltantes:[] });
                 }
                 setAnalyzingText(false);
               }}
@@ -610,7 +611,7 @@ export default function App() {
             </button>
           )}
 
-          {/* Resultado análisis de texto */}
+          {/* Resultado análisis — texto sin foto */}
           {photoResult && !photoPreview && (
             <div style={{marginTop:10,background:C.card2,borderRadius:12,padding:12,border:`1px solid ${photoResult.semaforo==="verde"?C.green:photoResult.semaforo==="rojo"?C.red:C.yellow}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
