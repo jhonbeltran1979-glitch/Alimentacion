@@ -349,37 +349,33 @@ export default function App() {
 
   // ── Guardar ────────────────────────────────────────────────────
   const handleSave = async () => {
-    // Auto-agregar texto pendiente en el campo si el usuario olvidó presionar +
     const pendingFoods = customFood.trim() ? [...customFoods, customFood.trim()] : [...customFoods];
     if (customFood.trim()) { setCustomFoods(pendingFoods); setCustomFood(""); }
-
     const todosAlimentos = [...selected, ...pendingFoods];
     if (todosAlimentos.length===0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
-    setSaving(true);
 
-    // Auto-analizar si no hay análisis previo y no hay foto
+    setSaving(true);
+    setSavedMsg("💾 Guardando...");
+
+    // PASO 1: Analizar con IA si no hay análisis previo
     let analisis = photoResult;
     if (!analisis && !photoPreview) {
       try {
-        if (!CLAUDE_API_KEY) {
-          setSavedMsg("🔑 Cargando configuración...");
-          const r = await apiGet({ action:"getKey" });
-          if (r.ok && r.k) CLAUDE_API_KEY = r.k;
-        }
-        if (CLAUDE_API_KEY) {
+        const key = CLAUDE_API_KEY || localStorage.getItem("vt_api_key_cache") || "";
+        if (key) {
+          CLAUDE_API_KEY = key;
           setSavedMsg("🧠 Analizando nutrición...");
           const result = await analizarTexto(todosAlimentos);
           analisis = { ok:true, alimentos:[], ...result };
           setPhotoResult(analisis);
-        } else {
-          setSavedMsg("⚠️ Sin conexión a IA, guardando sin análisis...");
+          setSavedMsg("💾 Guardando...");
         }
       } catch(err) {
-        setSavedMsg(`⚠️ Error IA: ${err.message}. Guardando igual...`);
         analisis = null;
       }
     }
 
+    // PASO 2: Guardar en Sheets
     try {
       const res = await apiGet({
         action:"guardar", perfil, fecha:today,
@@ -404,13 +400,17 @@ export default function App() {
         setSavedMsg(`✅ ¡Guardado! Score: ${scores.total}%`);
         setTimeout(() => {
           setSelected([]); setCustomFoods([]); setPhotoResult(null); setPhotoPreview(null);
+          setSavedMsg("");
         }, 4000);
       } else {
         setSavedMsg("❌ Error al guardar. Intenta de nuevo.");
+        setTimeout(()=>setSavedMsg(""),3000);
       }
-    } catch(_) { setSavedMsg("❌ Sin conexión."); }
+    } catch(e) {
+      setSavedMsg(`❌ Error: ${e.message}`);
+      setTimeout(()=>setSavedMsg(""),3000);
+    }
     setSaving(false);
-    setTimeout(()=>setSavedMsg(""),5000);
   };
 
   const changeWater = delta => {
