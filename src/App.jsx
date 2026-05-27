@@ -341,8 +341,21 @@ export default function App() {
 
   // ── Guardar ────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (selected.length===0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
+    if (selected.length===0 && customFoods.length===0) { setSavedMsg("⚠️ Selecciona al menos un alimento"); setTimeout(()=>setSavedMsg(""),2500); return; }
     setSaving(true);
+
+    // Auto-analizar si no hay análisis previo y no hay foto
+    let analisis = photoResult;
+    if (!analisis && !photoPreview) {
+      try {
+        setSavedMsg("🧠 Analizando nutrición...");
+        const todos = [...selected, ...customFoods];
+        const result = await analizarTexto(todos);
+        analisis = { ok:true, alimentos:[], ...result };
+        setPhotoResult(analisis);
+      } catch(_) { analisis = null; }
+    }
+
     try {
       const res = await apiGet({
         action:"guardar", perfil, fecha:today,
@@ -351,7 +364,7 @@ export default function App() {
         score_total:scores.total, score_inmunidad:scores.immunity,
         score_energia:scores.energy, score_concentracion:scores.focus,
         score_vitalidad:scores.vitality, agua_vasos:water, racha_dias:streak,
-        notas: encodeURIComponent(photoResult?.recomendacion||"")
+        notas: encodeURIComponent(analisis?.recomendacion||"")
       });
       if (res.ok) {
         const lastDate = localStorage.getItem(sk(perfil,"streak_date"));
@@ -374,7 +387,7 @@ export default function App() {
       }
     } catch(_) { setSavedMsg("❌ Sin conexión."); }
     setSaving(false);
-    setTimeout(()=>setSavedMsg(""),3500);
+    setTimeout(()=>setSavedMsg(""),4000);
   };
 
   const changeWater = delta => {
