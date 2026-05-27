@@ -296,7 +296,15 @@ export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem("vt_perfil_actual");
     if (saved) setPerfil(saved);
-    apiGet({ action:"getKey" }).then(r => { if (r.ok && r.k) CLAUDE_API_KEY = r.k; }).catch(()=>{});
+    // Cargar key: primero del caché local, luego del servidor
+    const cached = localStorage.getItem("vt_api_key_cache");
+    if (cached) CLAUDE_API_KEY = cached;
+    apiGet({ action:"getKey" }).then(r => {
+      if (r.ok && r.k) {
+        CLAUDE_API_KEY = r.k;
+        localStorage.setItem("vt_api_key_cache", r.k); // guardar en caché
+      }
+    }).catch(()=>{});
   }, []);
 
   useEffect(() => {
