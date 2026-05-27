@@ -147,6 +147,9 @@ verde=muy nutritiva y balanceada, amarillo=puede mejorar, rojo=poco nutritiva.`
   }
   throw new Error("Sin respuesta");
 }
+
+// ─── Analizar foto con Claude Vision ─────────────────────────────────────────
+async function analizarConClaude(base64, mediaType) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
     headers:{
