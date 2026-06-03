@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-BA0M-LuHXPzBG1qDNPmv6ZbVM5nG744ZVsEDzN6ko_bsRZo6ewI1SIg/exec";
-const _k = ["sk-ant-api03-7i2NPrcTcVD3IKU8SQNmhf","VsoSQ1O0-ftZSVI3LfT_XZCxGkdRlw_0y29QO8LP","WCsuswtJwHxVoCJodbVaiSTw-PQ2ULwAA"];
-let CLAUDE_API_KEY = _k.join("");
+// ⚠️ NO pegues tu API key real en un repo público. La app la carga sola por getKey() del Apps Script.
+let CLAUDE_API_KEY = "PEGA_TU_API_KEY_AQUI_SOLO_PARA_PROBAR_LOCAL";
 
 const PILDORAS = [
   "La ahuyama es rica en betacaroteno, vitamina A y antioxidantes.",
@@ -93,7 +93,7 @@ async function analizarTexto(alimentos,hp){
   const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const res=await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-opus-4-5",max_tokens:600,messages:[{role:"user",content:`Nutricionista experto en gastronomía colombiana. ${ctx}\nAlimentos: ${alimentos.join(", ")}.\nJSON sin backticks:\n{"recomendacion":"consejo personalizado según perfil 2-3 oraciones concretas","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes faltantes según perfil"]}`}]})
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,messages:[{role:"user",content:`Nutricionista experto en gastronomía colombiana. ${ctx}\nAlimentos: ${alimentos.join(", ")}.\nJSON sin backticks:\n{"recomendacion":"consejo personalizado según perfil 2-3 oraciones concretas","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes faltantes según perfil"]}`}]})
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
@@ -104,24 +104,25 @@ async function analizarFoto(b64,type,hp){
   const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const res=await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-opus-4-5",max_tokens:800,messages:[{role:"user",content:[
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:900,messages:[{role:"user",content:[
       {type:"image",source:{type:"base64",media_type:type,data:b64}},
       {type:"text",text:`Eres nutricionista experto en gastronomía colombiana. ${ctx}
 
-IDENTIFICACIÓN PRECISA de alimentos colombianos:
-- AHUYAMA: calabaza naranja-amarilla cremosa, MUY común en Colombia, diferente a zanahoria
-- PLÁTANO MADURO: amarillo intenso blando (tajada/patacón), diferente a banano
-- ZANAHORIA: naranja brillante alargada y firme
-- PAPA: blanca/crema (papa común) o amarilla pequeña (papa criolla)
-- YUCA: blanca fibrosa
-- ARROZ: blanco granulado suelto
-- FRÍJOLES: rojos/negros/pintados en caldo o secos
-- AREPA: disco plano de maíz blanco/amarillo
+PASO 1 — Observa textura, brillo, forma y color de cada alimento antes de decidir.
+PASO 2 — Distingue explícitamente los pares que más se confunden:
+- PAPA CRIOLLA: amarilla pálida MATE, granulada, redonda/pequeña, interior harinoso seco. SIN brillo.
+- PLÁTANO MADURO COCIDO: amarillo-dorado intenso, superficie BRILLANTE/húmeda, alargado o en tajadas, bordes oscuros caramelizados, textura blanda lisa.
+  Regla: si brilla y es alargado/curvo → plátano maduro. Si es mate, redondo y granulado → papa criolla.
+- AHUYAMA: calabaza naranja-amarilla cremosa, diferente a zanahoria (naranja brillante, alargada, firme).
+- YUCA: blanca fibrosa. ARROZ: blanco granulado suelto. AREPA: disco plano de maíz.
+- FRÍJOLES: rojos/negros/pintados en caldo o secos.
+
+Para cada alimento da tu mejor identificación y, si tienes dudas, la segunda opción más probable en "alternativa".
 
 RECOMENDACIÓN: personalizada según perfil. Sedentario→porciones carbohidratos. Diabetes→índice glucémico. Hipertensión→sodio. Máximo 2 oraciones útiles.
 
-JSON sin backticks:
-{"alimentos":[{"nombre":"nombre exacto colombiano","porcion":"Xg","confianza":"alta|media|baja"}],"recomendacion":"consejo personalizado","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal"}`}
+Responde SOLO JSON sin backticks:
+{"alimentos":[{"nombre":"nombre exacto colombiano","porcion":"Xg","confianza":"alta|media|baja","alternativa":"segunda opción más probable o null"}],"recomendacion":"consejo personalizado","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal"}`}
     ]}]})
   });
   const d=await res.json();
@@ -378,12 +379,38 @@ export default function App(){
     setPhotoAI(true);setPhotoResult(null);setPhotoFoods(null);
     const url=URL.createObjectURL(file);setPhotoPreview(url);
     try{
-      const b64=await new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const MAX=512,r=Math.min(MAX/img.width,MAX/img.height,1),c=document.createElement("canvas");c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext("2d").drawImage(img,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.6).split(",")[1]);};img.onerror=rej;img.src=url;});
+      const b64=await new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const MAX=1280,r=Math.min(MAX/img.width,MAX/img.height,1),c=document.createElement("canvas");c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext("2d").drawImage(img,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.85).split(",")[1]);};img.onerror=rej;img.src=url;});
       const result=await analizarFoto(b64,"image/jpeg",hp);
       setPhotoResult({ok:true,...result});setPhotoFoods(result.alimentos||[]);
       (result.alimentos||[]).forEach(item=>{const al=typeof item==="object"?item.nombre:item;FOOD_CATEGORIES.forEach(cat=>{const m=cat.items.find(i=>i.toLowerCase().includes(al.toLowerCase())||al.toLowerCase().includes(i.toLowerCase()));if(m&&!selected.includes(m))setSelected(p=>[...p,m]);});});
     }catch(err){setPhotoResult({ok:false,recomendacion:`Error: ${err.message}`,semaforo:"rojo"});}
     setPhotoAI(false);e.target.value="";
+  };
+
+  // Empareja un nombre detectado por la IA con un alimento del catálogo de la app
+  const matchFood = (nombre) =>
+    FOOD_CATEGORIES.flatMap(c=>c.items)
+      .find(f => f.toLowerCase().includes((nombre||"").toLowerCase())
+              || (nombre||"").toLowerCase().includes(f.toLowerCase()));
+
+  // Corregir con UN toque: cambia el alimento por su alternativa y reajusta la selección
+  const swapToAlternative = (index) => {
+    const item = photoFoods[index];
+    const oldName = typeof item==="object" ? item.nombre : item;
+    const newName = typeof item==="object" ? item.alternativa : null;
+    if(!newName) return;
+    // 1) actualiza el chip (deja poder devolverlo con otro toque)
+    setPhotoFoods(prev => prev.map((it,i) =>
+      i===index ? { ...it, nombre:newName, alternativa:oldName, confianza:"alta" } : it
+    ));
+    // 2) saca el viejo de la selección, mete el nuevo
+    const oldMatch = matchFood(oldName);
+    const newMatch = matchFood(newName);
+    setSelected(sel => {
+      let s = oldMatch ? sel.filter(x => x!==oldMatch) : sel.slice();
+      if(newMatch && !s.includes(newMatch)) s = [...s, newMatch];
+      return s;
+    });
   };
 
   // Filtro de búsqueda
@@ -477,24 +504,32 @@ export default function App(){
             {/* Confirmación foto */}
             {photoFoods&&photoFoods.length>0&&(
               <div style={{marginTop:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"2px solid #E8F4EC"}}>
-                <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:10}}>✨ IA detectó — toca ✗ para corregir:</div>
+                <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:10}}>✨ IA detectó — confirma o corrige con un toque:</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {photoFoods.map((item,i)=>{
                     const nombre=typeof item==="object"?item.nombre:item;
                     const porcion=typeof item==="object"?item.porcion:"";
                     const confianza=typeof item==="object"?item.confianza:"alta";
-                    const matchApp=FOOD_CATEGORIES.flatMap(c=>c.items).find(f=>f.toLowerCase().includes(nombre.toLowerCase())||nombre.toLowerCase().includes(f.toLowerCase()));
+                    const alternativa=typeof item==="object"?item.alternativa:null;
+                    const matchApp=matchFood(nombre);
                     const isSel=matchApp&&selected.includes(matchApp);
                     return(
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:10,background:isSel?"#E8F4EC":"#F8FAF5",borderRadius:12,padding:"10px 12px",border:`1.5px solid ${confianza==="baja"?"#E9C46A33":isSel?"#2D6A4F33":"transparent"}`}}>
-                        <div style={{flex:1}}>
-                          <span style={{fontSize:13,fontWeight:700,color:"#1A1A1A"}}>{nombre}</span>
-                          {confianza==="baja"&&<span style={{marginLeft:6,fontSize:9,background:"#E9C46A22",color:"#856404",padding:"1px 5px",borderRadius:4,fontWeight:600}}>?dudoso</span>}
-                          {porcion&&<span style={{marginLeft:6,fontSize:10,color:"#888"}}>{porcion}</span>}
+                      <div key={i} style={{display:"flex",flexDirection:"column",gap:6,background:isSel?"#E8F4EC":"#F8FAF5",borderRadius:12,padding:"10px 12px",border:`1.5px solid ${confianza==="baja"?"#E9C46A55":isSel?"#2D6A4F33":"transparent"}`}}>
+                        <div style={{display:"flex",alignItems:"center",gap:10}}>
+                          <div style={{flex:1}}>
+                            <span style={{fontSize:13,fontWeight:700,color:"#1A1A1A"}}>{nombre}</span>
+                            {confianza==="baja"&&<span style={{marginLeft:6,fontSize:9,background:"#E9C46A22",color:"#856404",padding:"1px 5px",borderRadius:4,fontWeight:600}}>?dudoso</span>}
+                            {porcion&&<span style={{marginLeft:6,fontSize:10,color:"#888"}}>{porcion}</span>}
+                          </div>
+                          <button onClick={()=>{if(matchApp)toggle(matchApp);}} style={{padding:"5px 12px",borderRadius:10,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",background:isSel?"#2D6A4F":"#eee",color:isSel?"#fff":"#888",transition:"all .15s"}}>
+                            {isSel?"✓ Sí":"✗ No"}
+                          </button>
                         </div>
-                        <button onClick={()=>{if(matchApp)toggle(matchApp);}} style={{padding:"5px 12px",borderRadius:10,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",background:isSel?"#2D6A4F":"#eee",color:isSel?"#fff":"#888",transition:"all .15s"}}>
-                          {isSel?"✓ Sí":"✗ No"}
-                        </button>
+                        {confianza!=="alta"&&alternativa&&alternativa!=="null"&&(
+                          <button onClick={()=>swapToAlternative(i)} style={{alignSelf:"flex-start",fontSize:11,padding:"4px 10px",borderRadius:8,border:"1px solid #E9C46A",background:"#FFF8E1",color:"#856404",fontWeight:700,cursor:"pointer"}}>
+                            🔄 ¿Era {alternativa}? Cambiar
+                          </button>
+                        )}
                       </div>
                     );
                   })}
