@@ -60,7 +60,7 @@ const NUTRIENT_MAP = {
 };
 
 const FOOD_CATEGORIES = [
-  {key:"verduras",  label:"Verduras",     emoji:"🥦", bg:"#D8F3DC", color:"#2D6A4F", items:["Brócoli","Espinaca","Kale","Zanahoria","Tomate","Pimentón","Ajo","Champiñones","Aguacate","Repollo","Lechuga","Acelga","Cebolla","Remolacha","Ahuyama"], nutrients:["Vitamina C","Vitamina A","Fibra","Antioxidantes","Hierro"]},
+  {key:"verduras",  label:"Verduras",     emoji:"🥦", bg:"#D8F3DC", color:"#2D6A4F", items:["Brócoli","Espinaca","Kale","Zanahoria","Tomate","Pimentón","Ajo","Champiñones","Aguacate","Repollo","Lechuga","Acelga","Cebolla","Remolacha","Ahuyama","Calabacín","Zapallo","Habichuela","Pepino","Coliflor"], nutrients:["Vitamina C","Vitamina A","Fibra","Antioxidantes","Hierro"]},
   {key:"frutas",    label:"Frutas",       emoji:"🍎", bg:"#FFE8D6", color:"#C44B00", items:["Naranja","Mango","Papaya","Banano","Fresas","Arándanos","Guayaba","Maracuyá","Piña","Manzana","Uvas","Kiwi"], nutrients:["Vitamina C","Antioxidantes","Fibra","Potasio"]},
   {key:"proteinas", label:"Proteínas",    emoji:"🥩", bg:"#FFD7D7", color:"#9B2226", items:["Pollo","Res","Cerdo","Huevo","Atún","Sardinas","Salmón","Tofu","Lentejas","Fríjoles","Garbanzo"], nutrients:["Proteína","Hierro","Vitamina B12","Zinc","Omega-3"]},
   {key:"lacteos",   label:"Lácteos",      emoji:"🥛", bg:"#D4E8FF", color:"#1A6FA8", items:["Leche","Yogur","Queso","Kéfir","Kumis"], nutrients:["Calcio","Vitamina D","Probióticos","Proteína"]},
@@ -114,16 +114,89 @@ PASO 2 — Distingue explícitamente los pares que más se confunden:
 - PLÁTANO MADURO COCIDO: amarillo-dorado intenso, superficie BRILLANTE/húmeda, alargado o en tajadas, bordes oscuros caramelizados, textura blanda lisa.
   Regla: si brilla y es alargado/curvo → plátano maduro. Si es mate, redondo y granulado → papa criolla.
 - AHUYAMA: calabaza naranja-amarilla cremosa, diferente a zanahoria (naranja brillante, alargada, firme).
+- PAPA vs CALABACÍN: la PAPA es opaca, almidonada, color crema/café, firme. El CALABACÍN (zucchini) cocido o pelado es verde pálido o blanquecino, más acuoso y blando, suele venir en rodajas o trozos alargados y a veces conserva piel verde. Regla: si es alargado, acuoso o con piel verdosa → calabacín, NO papa.
 - YUCA: blanca fibrosa. ARROZ: blanco granulado suelto. AREPA: disco plano de maíz.
 - FRÍJOLES: rojos/negros/pintados en caldo o secos.
 
-Para cada alimento da tu mejor identificación y, si tienes dudas, la segunda opción más probable en "alternativa".
+Para CADA alimento da tu mejor identificación y SIEMPRE la segunda opción más probable en "alternativa" (nunca null), aunque estés seguro, para que el usuario pueda corregir si te equivocaste.
 
 RECOMENDACIÓN: personalizada según perfil. Sedentario→porciones carbohidratos. Diabetes→índice glucémico. Hipertensión→sodio. Máximo 2 oraciones útiles.
 
 Responde SOLO JSON sin backticks:
-{"alimentos":[{"nombre":"nombre exacto colombiano","porcion":"Xg","confianza":"alta|media|baja","alternativa":"segunda opción más probable o null"}],"recomendacion":"consejo personalizado","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal"}`}
+{"alimentos":[{"nombre":"nombre exacto colombiano","porcion":"Xg","confianza":"alta|media|baja","alternativa":"segunda opción más probable (siempre un alimento, nunca null)"}],"recomendacion":"consejo personalizado","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal"}`}
     ]}]})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
+async function analizarSueno(noches,hp){
+  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const resumen=noches.map(n=>`${n.date}: durmió ${n.hours}h (${n.bed}→${n.wake}), calidad ${n.quality}/5, ${n.awakenings} despertares${n.note?", nota: "+n.note:""}`).join("\n");
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,messages:[{role:"user",content:`Eres experto en higiene del sueño en Colombia. ${ctx}
+Últimas noches del usuario:
+${resumen}
+
+Analiza el patrón: duración promedio, calidad, consistencia de horarios (acostarse/levantarse a la misma hora) y despertares. Da consejos concretos y accionables adaptados a Colombia. NO diagnostiques enfermedades; si ves señales preocupantes (insomnio persistente, somnolencia diurna severa), sugiere consultar a un profesional de salud.
+
+Responde SOLO JSON sin backticks:
+{"resumen":"diagnóstico breve y empático del patrón en 2 oraciones","semaforo":"verde|amarillo|rojo","consejos":["consejo accionable 1","consejo accionable 2","consejo accionable 3"]}`}]})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
+async function resumenNoche(noche,contexto,hp,dieta){
+  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const det=noche.measured?`Medición por sensor del celular (movimiento + micrófono): ${noche.moves} movimientos en ${noche.mins} min. Fases estimadas → profundo:${noche.pctDeep}%, ligero:${noche.pctLight}%, despierto:${noche.pctAwake}%. Racha de sueño profundo más larga: ${noche.still} min. Ruidos/ronquidos detectados: ${noche.snores}.`:"Registro manual (sin sensor).";
+  const hist=contexto.length>1?`Contexto de noches recientes: ${contexto.map(n=>n.hours+"h cal"+n.quality).join(", ")}.`:"Es de sus primeras noches registradas.";
+  const die=dieta?`Comidas recientes del usuario (de la misma app): ${dieta}.`:"Sin datos de alimentación.";
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:700,messages:[{role:"user",content:`Eres un asistente cálido de bienestar del sueño. NO eres médico. ${ctxP}
+NOCHE A RESUMIR — ${noche.date}: durmió ${noche.hours}h (${noche.bed}→${noche.wake}), calidad autoevaluada ${noche.quality}/5, ${noche.awakenings} despertares.${noche.note?" Nota del usuario: "+noche.note:""}
+${det}
+${hist}
+${die}
+
+Tareas:
+1) Explica en lenguaje sencillo y empático cómo fue su noche.
+2) Da 1-2 recomendaciones concretas para hoy/esta noche.
+3) Si la alimentación reciente tiene relación plausible con el descanso (cena pesada o tardía, mucha azúcar, cafeína, alcohol, comer muy poco), menciónalo como HIPÓTESIS suave en "comida_sueno", sin afirmar causalidad. Si no hay relación clara o no hay datos, comida_sueno=null.
+4) Decide si conviene SUGERIR (no obligar) consultar a un profesional de salud. ver_medico=true SOLO si hay señales que ameriten revisión: dormir muy poco de forma repetida, despertares muy frecuentes sostenidos, o que la nota mencione síntomas como ronquidos fuertes con pausas o ahogos (posible apnea), insomnio persistente o somnolencia diurna marcada. Si es una noche normal o un mal día aislado, ver_medico=false y tranquiliza.
+
+REGLAS: NO diagnostiques enfermedades. No uses lenguaje alarmista. Si sugieres consultar, hazlo con calma y aclara que es solo una sugerencia, no un diagnóstico.
+
+Responde SOLO JSON sin backticks:
+{"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`}]})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
+async function planSemana(prefs,hp,contexto){
+  const ctxP=hp?`Perfil: ${hp.edad} años, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,messages:[{role:"user",content:`Eres un entrenador personal certificado y prudente. ${ctxP}
+Objetivo: ${prefs.goal}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
+${contexto||""}
+
+Diseña un plan SEMANAL (7 días, de lunes a domingo) realista y progresivo. Pon días de descanso o movilidad ligera en los días que no entrena (respetando los ${prefs.dias} días activos). Si el equipo es "Ninguno", usa peso corporal y elementos del hogar. Adapta a Colombia (caminar, escaleras, parque, ciclovía).
+
+SEGURIDAD (importante): respeta la condición de salud.
+- Hipertensión: evita esfuerzos máximos y aguantar la respiración (Valsalva); prioriza aeróbico moderado.
+- Diabetes: recomienda medir glucosa y tener un snack a mano.
+- Si la condición es seria, hay dolor o es principiante absoluto mayor: incluye en el consejo validar con el médico antes de empezar.
+No prometas resultados médicos ni de pérdida de peso garantizada.
+
+Responde SOLO JSON sin backticks:
+{"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","actividades":["actividad concreta 1","actividad concreta 2"],"duracion":"X min","intensidad":"baja|media|alta"}]}`}]})
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
@@ -293,6 +366,37 @@ export default function App(){
   const [idMsg,setIdMsg]=useState("");
   const [quickFoods,setQuickFoods]=useState([]);
   const [search,setSearch]=useState("");
+  const [sleepLog,setSleepLog]=useState([]);
+  const [bedtime,setBedtime]=useState("23:00");
+  const [waketime,setWaketime]=useState("06:30");
+  const [sleepQuality,setSleepQuality]=useState(3);
+  const [awakenings,setAwakenings]=useState(0);
+  const [sleepNote,setSleepNote]=useState("");
+  const [sleepAI,setSleepAI]=useState(null);
+  const [sleepAnalyzing,setSleepAnalyzing]=useState(false);
+  const [nightAI,setNightAI]=useState(null);
+  const [nightAnalyzing,setNightAnalyzing]=useState(false);
+  const [measuredData,setMeasuredData]=useState(null);
+  const [smartAlarm,setSmartAlarm]=useState(false);
+  const [alarmTime,setAlarmTime]=useState("06:30");
+  const [snoreCount,setSnoreCount]=useState(0);
+  const [exGoal,setExGoal]=useState("Bienestar general");
+  const [exEquip,setExEquip]=useState("Ninguno");
+  const [exDias,setExDias]=useState(4);
+  const [exMin,setExMin]=useState(30);
+  const [exPlan,setExPlan]=useState(null);
+  const [exDone,setExDone]=useState([]);
+  const [exLog,setExLog]=useState([]);
+  const [exType,setExType]=useState("Caminar");
+  const [exLogMin,setExLogMin]=useState(30);
+  const [exInt,setExInt]=useState("media");
+  const [exAnalyzing,setExAnalyzing]=useState(false);
+  const [exMsg,setExMsg]=useState("");
+  const [sleepMsg,setSleepMsg]=useState("");
+  const [measuring,setMeasuring]=useState(false);
+  const [moveCount,setMoveCount]=useState(0);
+  const measureRef=useRef({start:null,moves:0,lastMove:0,prevMag:null,handler:null,wake:null});
+  const smartAlarmRef=useRef({on:false,time:"06:30"});
   const fileRef=useRef();
 
   useEffect(()=>{
@@ -315,7 +419,14 @@ export default function App(){
     else{setWater(0);localStorage.setItem(k,"0");localStorage.setItem(d,today);}
     setStreak(parseInt(localStorage.getItem(sk(perfil,"streak"))||"0"));
     const b=localStorage.getItem(sk(perfil,"badges"));if(b)setBadges(JSON.parse(b));
+    const slp=localStorage.getItem(sk(perfil,"sleep"));if(slp)setSleepLog(JSON.parse(slp));
+    const fp=localStorage.getItem(sk(perfil,"fit_plan"));if(fp)setExPlan(JSON.parse(fp));
+    const fl=localStorage.getItem(sk(perfil,"fit_log"));if(fl)setExLog(JSON.parse(fl));
+    const fd=localStorage.getItem(sk(perfil,"fit_done"));if(fd)setExDone(JSON.parse(fd));
+    const fpr=localStorage.getItem(sk(perfil,"fit_prefs"));if(fpr){try{const p=JSON.parse(fpr);setExGoal(p.goal);setExEquip(p.equip);setExDias(p.dias);setExMin(p.min);}catch(_){}}
   },[perfil]);
+
+  useEffect(()=>{smartAlarmRef.current={on:smartAlarm,time:alarmTime};},[smartAlarm,alarmTime]);
 
   useEffect(()=>{
     if(!perfil||tab!==2)return;
@@ -374,6 +485,144 @@ export default function App(){
 
   const changeWater=d=>{const nw=Math.max(0,Math.min(12,water+d));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);if(nw>=8)checkBadges({streak,water:nw,lastScore,lastCats},history);};
 
+  // ── SUEÑO ──────────────────────────────────────────────
+  const calcHours=(bed,wake)=>{
+    if(!bed||!wake)return 0;
+    const [bh,bm]=bed.split(":").map(Number),[wh,wm]=wake.split(":").map(Number);
+    let mins=(wh*60+wm)-(bh*60+bm); if(mins<=0)mins+=1440;
+    return Math.round(mins/6)/10;
+  };
+  const sleepStats=()=>{
+    const last=sleepLog.slice(0,7);
+    if(!last.length)return null;
+    const avg=last.reduce((a,n)=>a+n.hours,0)/last.length;
+    const avgQ=last.reduce((a,n)=>a+(n.quality||3),0)/last.length;
+    const debt=last.reduce((a,n)=>a+Math.max(0,8-n.hours),0);
+    const beds=last.map(n=>{const[h,m]=n.bed.split(":").map(Number);let v=h*60+m;if(v<720)v+=1440;return v;});
+    const mB=beds.reduce((a,b)=>a+b,0)/beds.length;
+    const sd=Math.sqrt(beds.reduce((a,b)=>a+(b-mB)**2,0)/beds.length);
+    const consLabel=sd<30?"Excelente":sd<60?"Buena":sd<90?"Irregular":"Muy irregular";
+    const consScore=sd<30?30:sd<60?22:sd<90?12:5;
+    const durScore=Math.min(40,Math.round((avg/8)*40));
+    const qScore=Math.round((avgQ/5)*30);
+    const score=Math.max(0,Math.min(100,durScore+qScore+consScore));
+    return{avg:Math.round(avg*10)/10,avgQ:Math.round(avgQ*10)/10,debt:Math.round(debt*10)/10,sd:Math.round(sd),consLabel,score,n:last.length};
+  };
+  const saveSleep=()=>{
+    const hours=calcHours(bedtime,waketime);
+    if(!hours){setSleepMsg("Pon hora de dormir y de despertar");setTimeout(()=>setSleepMsg(""),2500);return;}
+    const rec={date:today,bed:bedtime,wake:waketime,hours,quality:sleepQuality,awakenings,note:sleepNote.trim()};
+    if(measuredData)Object.assign(rec,{measured:true},measuredData);
+    const next=[rec,...sleepLog.filter(n=>n.date!==today)].slice(0,60);
+    setSleepLog(next);localStorage.setItem(sk(perfil,"sleep"),JSON.stringify(next));
+    setSleepNote("");setSleepAI(null);setNightAI(null);setMeasuredData(null);setSleepMsg("✓ Noche guardada");setTimeout(()=>setSleepMsg(""),2500);
+  };
+  const analyzeSleep=async()=>{
+    if(sleepLog.length<2){setSleepMsg("Registra al menos 2 noches para analizar");setTimeout(()=>setSleepMsg(""),2500);return;}
+    setSleepAnalyzing(true);setSleepAI(null);
+    try{const r=await analizarSueno(sleepLog.slice(0,7),hp);setSleepAI(r);}
+    catch(e){setSleepMsg("Error: "+e.message);setTimeout(()=>setSleepMsg(""),3000);}
+    setSleepAnalyzing(false);
+  };
+  const analyzeNight=async()=>{
+    if(!sleepLog.length){setSleepMsg("Primero guarda la noche");setTimeout(()=>setSleepMsg(""),2500);return;}
+    setNightAnalyzing(true);setNightAI(null);
+    const dieta=[...history].slice(-4).map(r=>{let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}return `${r.comida||"Comida"}: ${(Array.isArray(f)?f:[]).join(", ")||"—"}`;}).join(" | ");
+    try{const r=await resumenNoche(sleepLog[0],sleepLog.slice(0,7),hp,dieta);setNightAI(r);}
+    catch(e){setSleepMsg("Error: "+e.message);setTimeout(()=>setSleepMsg(""),3000);}
+    setNightAnalyzing(false);
+  };
+
+  // ── EJERCICIO ──────────────────────────────────────────
+  const weekMinutes=()=>{const now=Date.now();return exLog.filter(w=>now-(w.ts||0)<7*864e5).reduce((a,w)=>a+(w.min||0),0);};
+  const weekDaysActive=()=>{const now=Date.now();const ds=new Set();exLog.forEach(w=>{if(now-(w.ts||0)<7*864e5)ds.add(w.date);});return ds.size;};
+  const genPlan=async()=>{
+    setExAnalyzing(true);
+    localStorage.setItem(sk(perfil,"fit_prefs"),JSON.stringify({goal:exGoal,equip:exEquip,dias:exDias,min:exMin}));
+    let contexto="";const ss=sleepStats();if(ss)contexto=`Contexto del usuario: duerme en promedio ${ss.avg}h con constancia ${ss.consLabel}. Ajusta la carga si duerme poco.`;
+    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin},hp,contexto);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
+    catch(e){setExMsg("Error: "+e.message);setTimeout(()=>setExMsg(""),3000);}
+    setExAnalyzing(false);
+  };
+  const toggleDone=(i)=>{const n=exDone.includes(i)?exDone.filter(x=>x!==i):[...exDone,i];setExDone(n);localStorage.setItem(sk(perfil,"fit_done"),JSON.stringify(n));};
+  const logWorkout=()=>{
+    if(!exLogMin){setExMsg("Pon los minutos");setTimeout(()=>setExMsg(""),2000);return;}
+    const rec={date:today,ts:Date.now(),tipo:exType,min:exLogMin,intensidad:exInt};
+    const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
+    setExMsg("✓ Entrenamiento registrado");setTimeout(()=>setExMsg(""),2500);
+  };
+  const fireAlarm=(ref)=>{
+    ref.alarmFired=true;
+    try{
+      const AC=window.AudioContext||window.webkitAudioContext;
+      const ctx=ref.audioCtx&&ref.audioCtx.state!=="closed"?ref.audioCtx:new AC();
+      let n=0;const beep=()=>{if(n++>12)return;const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=n%2?660:880;o.connect(g);g.connect(ctx.destination);g.gain.setValueAtTime(0.001,ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.35,ctx.currentTime+0.05);g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.5);o.start();o.stop(ctx.currentTime+0.55);setTimeout(beep,700);};
+      beep();
+    }catch(_){}
+    try{navigator.vibrate&&navigator.vibrate([500,300,500,300,800]);}catch(_){}
+    setSleepMsg("⏰ ¡Despertador inteligente! Te despertamos en una fase ligera.");
+  };
+  const startMeasure=async()=>{
+    try{
+      if(typeof DeviceMotionEvent!=="undefined"&&DeviceMotionEvent.requestPermission){
+        const p=await DeviceMotionEvent.requestPermission();
+        if(p!=="granted"){setSleepMsg("Permiso de movimiento denegado");setTimeout(()=>setSleepMsg(""),3000);return;}
+      }
+      const ref=measureRef.current;
+      ref.start=Date.now();ref.lastMove=0;ref.prevMag=null;ref.timeline=[];ref.sound=[];ref.snores=0;ref.lastSnore=0;ref.alarmFired=false;
+      ref.handler=(ev)=>{const a=ev.accelerationIncludingGravity;if(!a)return;const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);const now=Date.now();if(ref.prevMag!=null){const delta=Math.abs(mag-ref.prevMag);if(delta>3&&now-ref.lastMove>3000){ref.lastMove=now;ref.timeline.push((now-ref.start)/60000);setMoveCount(ref.timeline.length);}}ref.prevMag=mag;};
+      window.addEventListener("devicemotion",ref.handler);
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        ref.micStream=stream;const AC=window.AudioContext||window.webkitAudioContext;ref.audioCtx=new AC();
+        const src=ref.audioCtx.createMediaStreamSource(stream);ref.analyser=ref.audioCtx.createAnalyser();ref.analyser.fftSize=512;
+        src.connect(ref.analyser);ref.buf=new Uint8Array(ref.analyser.frequencyBinCount);
+      }catch(_){ref.analyser=null;}
+      try{ref.wake=await navigator.wakeLock.request("screen");}catch(_){}
+      ref.interval=setInterval(()=>{
+        const now=Date.now(),tmin=(now-ref.start)/60000;
+        if(ref.analyser){ref.analyser.getByteFrequencyData(ref.buf);let s=0;for(let i=0;i<ref.buf.length;i++)s+=ref.buf[i];const lvl=s/ref.buf.length;ref.sound.push({t:tmin,lvl});if(lvl>55&&now-ref.lastSnore>5000){ref.snores++;ref.lastSnore=now;setSnoreCount(ref.snores);}}
+        if(smartAlarmRef.current.on&&!ref.alarmFired){
+          const [ah,am]=smartAlarmRef.current.time.split(":").map(Number);
+          const target=new Date(ref.start);target.setHours(ah,am,0,0);if(target.getTime()<ref.start)target.setDate(target.getDate()+1);
+          const msTo=target.getTime()-now,recentMove=ref.timeline.length&&(tmin-ref.timeline[ref.timeline.length-1])<1.5;
+          if((msTo<=30*60000&&msTo>0&&recentMove)||msTo<=0)fireAlarm(ref);
+        }
+      },3000);
+      setMoveCount(0);setSnoreCount(0);setMeasuring(true);setBedtime(new Date().toTimeString().slice(0,5));
+    }catch(_){setSleepMsg("No se pudo iniciar la medición en este navegador");setTimeout(()=>setSleepMsg(""),3000);}
+  };
+  const stopMeasure=()=>{
+    const ref=measureRef.current;
+    if(ref.handler)window.removeEventListener("devicemotion",ref.handler);
+    if(ref.interval)clearInterval(ref.interval);
+    if(ref.micStream){try{ref.micStream.getTracks().forEach(t=>t.stop());}catch(_){}}
+    if(ref.audioCtx){try{ref.audioCtx.close();}catch(_){}}
+    if(ref.wake){try{ref.wake.release();}catch(_){}ref.wake=null;}
+    const mins=ref.start?Math.round((Date.now()-ref.start)/60000):0;
+    const tl=ref.timeline||[],sound=ref.sound||[],moves=tl.length;
+    const EP=5,nE=Math.max(1,Math.ceil(mins/EP)),stages=[];
+    for(let i=0;i<nE;i++){
+      const a=i*EP,b=(i+1)*EP;
+      const mv=tl.filter(t=>t>=a&&t<b).length;
+      const snd=sound.filter(s=>s.t>=a&&s.t<b);const avgL=snd.length?snd.reduce((x,s)=>x+s.lvl,0)/snd.length:0;
+      const act=mv*2+(avgL>45?2:avgL>30?1:0);
+      let st=act>=3?0:act>=1?1:2;
+      if((a<10||b>mins-5)&&mv>0)st=Math.min(st,1);
+      stages.push(st);
+    }
+    const cnt=[0,0,0];stages.forEach(s=>cnt[s]++);const tot=stages.length||1;
+    const pctAwake=Math.round(cnt[0]/tot*100),pctLight=Math.round(cnt[1]/tot*100),pctDeep=Math.round(cnt[2]/tot*100);
+    let deepRun=0,cur=0;stages.forEach(s=>{if(s===2){cur++;if(cur>deepRun)deepRun=cur;}else cur=0;});
+    const t=[0,0,0];tl.forEach(m=>{const f=mins>0?m/mins:0;t[f<0.34?0:f<0.67?1:2]++;});
+    setWaketime(new Date().toTimeString().slice(0,5));
+    setAwakenings(Math.min(9,cnt[0]));
+    setSleepQuality(pctDeep>=25?5:pctDeep>=15?4:pctDeep>=8?3:2);
+    setMeasuredData({mins,moves,t1:t[0],t2:t[1],t3:t[2],still:deepRun*EP,stages,pctAwake,pctLight,pctDeep,snores:ref.snores});
+    setMeasuring(false);
+    setSleepMsg(`Medido: ${(mins/60).toFixed(1)}h · ${pctDeep}% profundo · ${ref.snores} ruidos. Revisa y guarda.`);setTimeout(()=>setSleepMsg(""),7000);
+  };
+
   const handlePhoto=async(e)=>{
     const file=e.target.files?.[0];if(!file)return;
     setPhotoAI(true);setPhotoResult(null);setPhotoFoods(null);
@@ -416,7 +665,7 @@ export default function App(){
   // Filtro de búsqueda
   const filteredCats = search ? FOOD_CATEGORIES.map(c=>({...c,items:c.items.filter(i=>i.toLowerCase().includes(search.toLowerCase()))})).filter(c=>c.items.length>0) : FOOD_CATEGORIES;
 
-  const TABS=[{icon:"🏠",label:"Inicio"},{icon:"📊",label:"Score"},{icon:"📅",label:"Historial"},{icon:"🏅",label:"Logros"},{icon:"💧",label:"Agua"}];
+  const TABS=[{icon:"🏠",label:"Inicio"},{icon:"📊",label:"Score"},{icon:"📅",label:"Historial"},{icon:"🏅",label:"Logros"},{icon:"💧",label:"Agua"},{icon:"😴",label:"Sueño"},{icon:"💪",label:"Ejercicio"}];
 
   return(
     <div style={{minHeight:"100vh",background:"#F8FAF5",fontFamily:"'Segoe UI',system-ui,sans-serif",color:"#1A1A1A",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
@@ -525,9 +774,9 @@ export default function App(){
                             {isSel?"✓ Sí":"✗ No"}
                           </button>
                         </div>
-                        {confianza!=="alta"&&alternativa&&alternativa!=="null"&&(
+                        {alternativa&&alternativa!=="null"&&alternativa.toLowerCase()!==nombre.toLowerCase()&&(
                           <button onClick={()=>swapToAlternative(i)} style={{alignSelf:"flex-start",fontSize:11,padding:"4px 10px",borderRadius:8,border:"1px solid #E9C46A",background:"#FFF8E1",color:"#856404",fontWeight:700,cursor:"pointer"}}>
-                            🔄 ¿Era {alternativa}? Cambiar
+                            🔄 ¿No es {nombre}? Era {alternativa}
                           </button>
                         )}
                       </div>
@@ -839,6 +1088,262 @@ export default function App(){
           </div>
         </div>
       )}
+
+      {tab===5&&(()=>{
+        const ss=sleepStats();
+        const dur=calcHours(bedtime,waketime);
+        const chart=sleepLog.slice(0,7).slice().reverse();
+        const semColor=s=>s==="verde"?"#2D6A4F":s==="rojo"?"#C1121F":"#E9A23B";
+        return(
+        <div style={{padding:"16px 14px 90px"}}>
+          <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>😴 Sueño</div>
+          <div style={{fontSize:13,color:"#888",marginBottom:16}}>Registra tu noche y mira tus patrones. Meta: 7–9 h.</div>
+
+          {ss&&(
+            <div style={{background:"linear-gradient(135deg,#2D3561,#4A5899)",borderRadius:20,padding:20,marginBottom:14,color:"#fff",boxShadow:"0 4px 20px rgba(45,53,97,.3)"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:11,opacity:.8,fontWeight:700,letterSpacing:.5}}>SCORE DE SUEÑO ({ss.n} noches)</div>
+                  <div style={{fontSize:44,fontWeight:900,lineHeight:1.1}}>{ss.score}<span style={{fontSize:18,opacity:.7}}>/100</span></div>
+                </div>
+                <div style={{fontSize:46}}>{ss.score>=80?"🌙":ss.score>=60?"😌":"😪"}</div>
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:14}}>
+                <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"8px 10px"}}><div style={{fontSize:18,fontWeight:900}}>{ss.avg}h</div><div style={{fontSize:10,opacity:.8}}>Promedio</div></div>
+                <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"8px 10px"}}><div style={{fontSize:18,fontWeight:900}}>{ss.debt}h</div><div style={{fontSize:10,opacity:.8}}>Deuda</div></div>
+                <div style={{flex:1,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"8px 10px"}}><div style={{fontSize:14,fontWeight:900}}>{ss.consLabel}</div><div style={{fontSize:10,opacity:.8}}>Constancia</div></div>
+              </div>
+            </div>
+          )}
+
+          {chart.length>0&&(
+            <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#2D3561",marginBottom:12}}>Últimas noches</div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:6,height:96}}>
+                {chart.map((n,i)=>(
+                  <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                    <div style={{fontSize:9,fontWeight:800,color:"#4A5899"}}>{n.hours}</div>
+                    <div style={{width:"70%",height:`${Math.min(100,(n.hours/10)*100)}%`,minHeight:4,borderRadius:6,background:n.hours>=7?"linear-gradient(180deg,#4A5899,#2D3561)":"linear-gradient(180deg,#E9A23B,#C97B1E)"}}/>
+                    <div style={{fontSize:8,color:"#aaa"}}>{n.date.split("/").slice(0,2).join("/")}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:14,fontWeight:900,marginBottom:14,color:"#2D3561"}}>📝 Registrar la noche de hoy</div>
+            <div style={{display:"flex",gap:10,marginBottom:14}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:5}}>🛏️ Me dormí</div>
+                <input type="time" value={bedtime} onChange={e=>setBedtime(e.target.value)} style={{width:"100%",padding:"10px",borderRadius:12,border:"2px solid #E8E8E8",fontSize:16,fontWeight:700,color:"#2D3561",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:5}}>☀️ Desperté</div>
+                <input type="time" value={waketime} onChange={e=>setWaketime(e.target.value)} style={{width:"100%",padding:"10px",borderRadius:12,border:"2px solid #E8E8E8",fontSize:16,fontWeight:700,color:"#2D3561",boxSizing:"border-box"}}/>
+              </div>
+            </div>
+            <div style={{textAlign:"center",fontSize:13,color:"#4A5899",fontWeight:800,marginBottom:14}}>⏱️ {dur} horas de sueño</div>
+
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>⭐ ¿Cómo descansaste?</div>
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              {[1,2,3,4,5].map(q=>(
+                <button key={q} onClick={()=>setSleepQuality(q)} style={{flex:1,padding:"10px 0",borderRadius:12,border:"none",cursor:"pointer",fontSize:20,background:q<=sleepQuality?"#4A5899":"#F0F0F0",transition:"all .15s"}}>{q<=sleepQuality?"⭐":"☆"}</button>
+              ))}
+            </div>
+
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+              <div style={{fontSize:11,color:"#888",fontWeight:700}}>😣 Veces que desperté</div>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <button onClick={()=>setAwakenings(Math.max(0,awakenings-1))} style={{width:36,height:36,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8FAF5",fontSize:18,cursor:"pointer",fontWeight:700}}>−</button>
+                <span style={{fontSize:18,fontWeight:900,minWidth:20,textAlign:"center"}}>{awakenings}</span>
+                <button onClick={()=>setAwakenings(Math.min(9,awakenings+1))} style={{width:36,height:36,borderRadius:"50%",border:"none",background:"#4A5899",color:"#fff",fontSize:18,cursor:"pointer",fontWeight:700}}>+</button>
+              </div>
+            </div>
+
+            <input value={sleepNote} onChange={e=>setSleepNote(e.target.value)} placeholder="Nota (café tarde, estrés, pantalla…)" style={{width:"100%",padding:"10px 12px",borderRadius:12,border:"2px solid #E8E8E8",fontSize:13,marginBottom:14,boxSizing:"border-box"}}/>
+
+            <button onClick={saveSleep} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#2D3561,#4A5899)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #2D356144"}}>Guardar noche</button>
+            {sleepMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:12,fontWeight:700,color:"#2D3561"}}>{sleepMsg}</div>}
+          </div>
+
+          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px dashed #C9CEE8"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#2D3561",marginBottom:4}}>🌙 Medir la noche (movimiento + micrófono)</div>
+            <div style={{fontSize:11,color:"#999",lineHeight:1.5,marginBottom:12}}>Deja el celular en el colchón, enchufado y con la app abierta. Usa movimiento y sonido para estimar tus fases (profundo/ligero/despierto) y ronquidos. Es una estimación, no grado clínico; REM real, oxígeno y pulso necesitan un wearable.</div>
+            {!measuring&&(
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"#F4F4FB",borderRadius:12,padding:"10px 12px",marginBottom:10}}>
+                <div onClick={()=>setSmartAlarm(!smartAlarm)} style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}}>
+                  <div style={{width:38,height:22,borderRadius:11,background:smartAlarm?"#4A5899":"#ccc",position:"relative",transition:"all .2s"}}><div style={{width:18,height:18,borderRadius:"50%",background:"#fff",position:"absolute",top:2,left:smartAlarm?18:2,transition:"all .2s"}}/></div>
+                  <span style={{fontSize:13,fontWeight:700,color:"#2D3561"}}>⏰ Despertador inteligente</span>
+                </div>
+                {smartAlarm&&<input type="time" value={alarmTime} onChange={e=>setAlarmTime(e.target.value)} style={{padding:"4px 8px",borderRadius:8,border:"1.5px solid #C9CEE8",fontSize:14,fontWeight:700,color:"#2D3561"}}/>}
+              </div>
+            )}
+            {smartAlarm&&!measuring&&<div style={{fontSize:10,color:"#999",marginBottom:10,lineHeight:1.4}}>Te despertará en una fase ligera hasta 30 min antes de las {alarmTime} (o exacto a esa hora). Sube el volumen del celular.</div>}
+            {!measuring
+              ? <button onClick={startMeasure} style={{width:"100%",padding:"12px",borderRadius:12,border:"2px solid #4A5899",background:"#fff",color:"#2D3561",fontSize:14,fontWeight:800,cursor:"pointer"}}>▶️ Empezar a medir</button>
+              : <div style={{textAlign:"center"}}>
+                  <div style={{fontSize:13,color:"#4A5899",fontWeight:800,marginBottom:4}}>🟢 Midiendo… {moveCount} movimientos</div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:10}}>🔊 {snoreCount} ruidos detectados{smartAlarm?` · ⏰ ${alarmTime}`:""}</div>
+                  <button onClick={stopMeasure} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"#C1121F",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>⏹️ Desperté / Detener</button>
+                </div>}
+          </div>
+
+          {(()=>{
+            const sd=measuredData&&measuredData.stages?measuredData:(sleepLog[0]&&sleepLog[0].stages?sleepLog[0]:null);
+            if(!sd)return null;
+            const st=sd.stages,W=300,H=70,step=st.length>1?W/(st.length-1):W,yOf=s=>s===0?10:s===1?32:54;
+            const pts=st.map((s,i)=>`${(i*step).toFixed(1)},${yOf(s)}`).join(" ");
+            return(
+              <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#2D3561",marginBottom:10}}>🌙 Fases estimadas de la noche</div>
+                <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:80}} preserveAspectRatio="none">
+                  {[10,32,54].map((y,i)=><line key={i} x1="0" y1={y} x2={W} y2={y} stroke="#F0F0F5" strokeWidth="1"/>)}
+                  <polyline points={pts} fill="none" stroke="#4A5899" strokeWidth="2.5" strokeLinejoin="round"/>
+                </svg>
+                <div style={{display:"flex",justifyContent:"space-between",fontSize:9,color:"#aaa",marginBottom:12}}><span>Despierto</span><span>Ligero</span><span>Profundo</span></div>
+                <div style={{display:"flex",gap:8}}>
+                  <div style={{flex:1,textAlign:"center",background:"#FBF3E6",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#E9A23B"}}>{sd.pctAwake}%</div><div style={{fontSize:9,color:"#999"}}>Despierto</div></div>
+                  <div style={{flex:1,textAlign:"center",background:"#EEEDFB",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#6C63FF"}}>{sd.pctLight}%</div><div style={{fontSize:9,color:"#999"}}>Ligero</div></div>
+                  <div style={{flex:1,textAlign:"center",background:"#E6E8F2",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D3561"}}>{sd.pctDeep}%</div><div style={{fontSize:9,color:"#999"}}>Profundo</div></div>
+                  <div style={{flex:1,textAlign:"center",background:"#F0F4F1",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D6A4F"}}>{sd.snores}</div><div style={{fontSize:9,color:"#999"}}>Ruidos</div></div>
+                </div>
+                <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center",lineHeight:1.4}}>Estimación por movimiento y sonido, no es un estudio de sueño clínico.</div>
+              </div>
+            );
+          })()}
+
+          <button onClick={analyzeNight} disabled={nightAnalyzing} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:nightAnalyzing?"#ccc":"linear-gradient(135deg,#2D3561,#6C63FF)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",marginBottom:12,boxShadow:"0 4px 16px #2D356133"}}>{nightAnalyzing?"🔍 Analizando tu noche…":"📋 Resumen de anoche con IA"}</button>
+
+          {nightAI&&(
+            <div style={{background:"#fff",borderRadius:16,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`5px solid ${semColor(nightAI.semaforo)}`}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <span style={{fontSize:20}}>{nightAI.semaforo==="verde"?"😴":nightAI.semaforo==="rojo"?"😪":"😌"}</span>
+                <span style={{fontSize:16,fontWeight:900,color:semColor(nightAI.semaforo)}}>{nightAI.titulo}</span>
+              </div>
+              <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{nightAI.resumen}</div>
+              <div style={{background:"#F4F4FB",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#3A3A5C",lineHeight:1.5}}>💡 {nightAI.recomendacion}</div>
+              {nightAI.comida_sueno&&nightAI.comida_sueno!=="null"&&(
+                <div style={{marginTop:10,background:"#E8F4EC",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#1B5E3A",lineHeight:1.5}}>🍽️↔😴 {nightAI.comida_sueno}</div>
+              )}
+              {nightAI.ver_medico&&(
+                <div style={{marginTop:12,background:"#FFF4E5",border:"1.5px solid #E9A23B",borderRadius:12,padding:"12px 14px"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#B26A00",marginBottom:4}}>🩺 Quizás valga la pena consultar a un profesional</div>
+                  <div style={{fontSize:12,color:"#7A5200",lineHeight:1.5}}>{nightAI.motivo_medico}</div>
+                </div>
+              )}
+              <div style={{marginTop:12,fontSize:10,color:"#aaa",lineHeight:1.4,textAlign:"center"}}>Esto es una estimación de bienestar, no un diagnóstico médico.</div>
+            </div>
+          )}
+
+          <button onClick={analyzeSleep} disabled={sleepAnalyzing} style={{width:"100%",padding:"13px",borderRadius:14,border:"2px solid #C9CEE8",background:"#fff",color:sleepAnalyzing?"#aaa":"#4A5899",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:14}}>{sleepAnalyzing?"🔍 Analizando…":"📈 Ver tendencia de 7 noches"}</button>
+
+          {sleepAI&&(
+            <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`5px solid ${semColor(sleepAI.semaforo)}`}}>
+              <div style={{fontSize:13,fontWeight:800,color:semColor(sleepAI.semaforo),marginBottom:8}}>{sleepAI.semaforo==="verde"?"🟢":sleepAI.semaforo==="rojo"?"🔴":"🟡"} Análisis de tu sueño</div>
+              <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{sleepAI.resumen}</div>
+              {(sleepAI.consejos||[]).map((c,i)=>(
+                <div key={i} style={{display:"flex",gap:8,marginBottom:6,fontSize:13,color:"#555",lineHeight:1.5}}><span>💡</span><span>{c}</span></div>
+              ))}
+            </div>
+          )}
+
+          {sleepLog.length>0&&(
+            <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#2D3561",marginBottom:10}}>Historial</div>
+              {sleepLog.slice(0,10).map((n,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:i<Math.min(9,sleepLog.length-1)?"1px solid #F2F2F2":"none"}}>
+                  <div><div style={{fontSize:13,fontWeight:700}}>{n.date}</div><div style={{fontSize:10,color:"#aaa"}}>{n.bed} → {n.wake}{n.awakenings?` · ${n.awakenings} despertares`:""}</div></div>
+                  <div style={{textAlign:"right"}}><span style={{fontSize:15,fontWeight:900,color:n.hours>=7?"#2D6A4F":"#E9A23B"}}>{n.hours}h</span><div style={{fontSize:11}}>{"⭐".repeat(n.quality||0)}</div></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        );
+      })()}
+
+      {tab===6&&(()=>{
+        const WHO=150,wm=weekMinutes(),wpct=Math.min(100,Math.round(wm/WHO*100)),wd=weekDaysActive();
+        const intColor=v=>v==="alta"?"#C1121F":v==="baja"?"#2D6A4F":"#E76F51";
+        const chip=(val,cur,set)=>({padding:"7px 12px",borderRadius:10,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:val===cur?"#E76F51":"#F0F0F0",color:val===cur?"#fff":"#666"});
+        return(
+        <div style={{padding:"16px 14px 90px"}}>
+          <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>💪 Ejercicio</div>
+          <div style={{fontSize:13,color:"#888",marginBottom:16}}>Meta OMS: 150 min de actividad moderada por semana.</div>
+
+          <div style={{background:"linear-gradient(135deg,#E76F51,#F4A261)",borderRadius:20,padding:20,marginBottom:14,color:"#fff",boxShadow:"0 4px 20px rgba(231,111,81,.3)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
+              <span style={{fontSize:12,fontWeight:700,opacity:.9}}>ESTA SEMANA</span>
+              <span style={{fontSize:13,fontWeight:800}}>{wm}/{WHO} min</span>
+            </div>
+            <div style={{background:"rgba(255,255,255,.25)",borderRadius:10,height:14,margin:"10px 0",overflow:"hidden"}}>
+              <div style={{width:`${wpct}%`,height:14,borderRadius:10,background:"#fff",transition:"width .5s"}}/>
+            </div>
+            <div style={{fontSize:12,opacity:.9}}>{wd} día{wd!==1?"s":""} activo{wd!==1?"s":""} · {wpct>=100?"¡Meta cumplida! 🎉":`Te faltan ${Math.max(0,WHO-wm)} min`}</div>
+          </div>
+
+          <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>🎯 Tu plan a la medida</div>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Objetivo</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Bajar peso","Fuerza","Resistencia","Bienestar general"].map(g=><button key={g} onClick={()=>setExGoal(g)} style={chip(g,exGoal)}>{g}</button>)}</div>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Equipo</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Ninguno","Casa","Gimnasio"].map(g=><button key={g} onClick={()=>setExEquip(g)} style={chip(g,exEquip)}>{g}</button>)}</div>
+            <div style={{display:"flex",gap:14,marginBottom:14}}>
+              <div style={{flex:1}}><div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Días/semana</div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setExDias(Math.max(2,exDias-1))} style={{width:32,height:32,borderRadius:"50%",border:"2px solid #eee",background:"#F8F8F8",fontSize:16,cursor:"pointer"}}>−</button><span style={{fontSize:16,fontWeight:900,minWidth:16,textAlign:"center"}}>{exDias}</span><button onClick={()=>setExDias(Math.min(7,exDias+1))} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#E76F51",color:"#fff",fontSize:16,cursor:"pointer"}}>+</button></div></div>
+              <div style={{flex:1}}><div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Min/sesión</div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setExMin(Math.max(15,exMin-5))} style={{width:32,height:32,borderRadius:"50%",border:"2px solid #eee",background:"#F8F8F8",fontSize:16,cursor:"pointer"}}>−</button><span style={{fontSize:16,fontWeight:900,minWidth:24,textAlign:"center"}}>{exMin}</span><button onClick={()=>setExMin(Math.min(90,exMin+5))} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#E76F51",color:"#fff",fontSize:16,cursor:"pointer"}}>+</button></div></div>
+            </div>
+            <button onClick={genPlan} disabled={exAnalyzing} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:exAnalyzing?"#ccc":"linear-gradient(135deg,#E76F51,#C1492B)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #E76F5144"}}>{exAnalyzing?"🔍 Creando tu plan…":exPlan?"🔄 Regenerar plan de la semana":"✨ Generar plan de la semana con IA"}</button>
+            {exMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:12,fontWeight:700,color:"#C1492B"}}>{exMsg}</div>}
+          </div>
+
+          {exPlan&&(
+            <div style={{marginBottom:14}}>
+              <div style={{background:"#FFF4EF",borderRadius:14,padding:"12px 14px",marginBottom:10,borderLeft:"4px solid #E76F51"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#C1492B",marginBottom:4}}>🎯 {exPlan.meta_semanal}</div>
+                <div style={{fontSize:12,color:"#7A4A3A",lineHeight:1.5}}>💡 {exPlan.consejo}</div>
+              </div>
+              {(exPlan.dias||[]).map((d,i)=>{
+                const done=exDone.includes(i),rest=/descanso/i.test(d.foco||"");
+                return(
+                  <div key={i} style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:8,boxShadow:"0 2px 10px rgba(0,0,0,0.05)",opacity:done?.6:1,borderLeft:`4px solid ${rest?"#bbb":intColor(d.intensidad)}`}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <div style={{fontSize:14,fontWeight:900,color:"#333"}}>{d.dia} · <span style={{color:"#E76F51"}}>{d.foco}</span></div>
+                      {!rest&&<button onClick={()=>toggleDone(i)} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#2D6A4F":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
+                    </div>
+                    {(d.actividades||[]).map((a,j)=><div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>)}
+                    {!rest&&<div style={{fontSize:11,color:"#999",marginTop:6}}>⏱️ {d.duracion} · intensidad {d.intensidad}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>📝 Registrar entrenamiento</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Caminar","Correr","Fuerza","Cardio","Yoga","Ciclismo","Deporte"].map(t=><button key={t} onClick={()=>setExType(t)} style={chip(t,exType)}>{t}</button>)}</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <div style={{fontSize:12,color:"#888",fontWeight:700}}>Minutos</div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setExLogMin(Math.max(5,exLogMin-5))} style={{width:34,height:34,borderRadius:"50%",border:"2px solid #eee",background:"#F8F8F8",fontSize:16,cursor:"pointer"}}>−</button><span style={{fontSize:17,fontWeight:900,minWidth:30,textAlign:"center"}}>{exLogMin}</span><button onClick={()=>setExLogMin(Math.min(180,exLogMin+5))} style={{width:34,height:34,borderRadius:"50%",border:"none",background:"#E76F51",color:"#fff",fontSize:16,cursor:"pointer"}}>+</button></div>
+            </div>
+            <div style={{display:"flex",gap:6,marginBottom:14}}>{["baja","media","alta"].map(v=><button key={v} onClick={()=>setExInt(v)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:v===exInt?intColor(v):"#F0F0F0",color:v===exInt?"#fff":"#666"}}>{v}</button>)}</div>
+            <button onClick={logWorkout} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#E76F51,#F4A261)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>Registrar {exLogMin} min de {exType}</button>
+          </div>
+
+          {exLog.length>0&&(
+            <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:12,fontWeight:800,color:"#C1492B",marginBottom:10}}>Entrenamientos recientes</div>
+              {exLog.slice(0,10).map((w,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:i<Math.min(9,exLog.length-1)?"1px solid #F2F2F2":"none"}}>
+                  <div><span style={{fontSize:13,fontWeight:700}}>{w.tipo}</span><span style={{fontSize:10,color:"#aaa",marginLeft:8}}>{w.date}</span></div>
+                  <div style={{fontSize:13,fontWeight:900,color:intColor(w.intensidad)}}>{w.min} min</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        );
+      })()}
 
       {/* ══ NAV INFERIOR ══════════════════════════════════════════ */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #F0F0F0",display:"flex",zIndex:20,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
