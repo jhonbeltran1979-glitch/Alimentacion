@@ -203,6 +203,38 @@ Responde SOLO JSON sin backticks:
   return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
 }
 
+async function interpretarVoz(texto){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,messages:[{role:"user",content:`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".
+Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimentos), ejercicio (tipo, minutos, intensidad) y vasos de agua. Alimentos en español colombiano. Si algo no se menciona: comidas=[], ejercicio=null, agua_vasos=null.
+Responde SOLO JSON sin backticks:
+{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida de lo que entendiste"}`}]})
+  });
+  const d=await res.json();if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
+async function analisisSemanal(datos,hp){
+  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:800,messages:[{role:"user",content:`Eres un coach de salud integral, cálido y realista. ${ctxP}
+Datos de la última semana del usuario (todo lo que registró):
+- Alimentación: ${datos.comida}
+- Sueño: ${datos.sueno}
+- Ejercicio: ${datos.ejercicio}
+- Hidratación: ${datos.agua}
+
+Analiza de forma integral su energía y vitalidad. Da sugerencias CONCRETAS de cambio de hábitos y CONECTA las áreas entre sí (ej: dormir mejor mejora el rendimiento en el ejercicio; hidratarse y comer mejor sube la energía). Motivador, sin alarmismo ni diagnósticos médicos.
+
+Responde SOLO JSON sin backticks:
+{"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`}]})
+  });
+  const d=await res.json();if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
 const sk=(p,k)=>`vt_${p}_${k}`;
 
 // ══ CONFETI ══════════════════════════════════════════════════════
@@ -392,6 +424,13 @@ export default function App(){
   const [exInt,setExInt]=useState("media");
   const [exAnalyzing,setExAnalyzing]=useState(false);
   const [exMsg,setExMsg]=useState("");
+  const [listening,setListening]=useState(false);
+  const [voiceText,setVoiceText]=useState("");
+  const [voiceBusy,setVoiceBusy]=useState(false);
+  const [voiceResult,setVoiceResult]=useState(null);
+  const [weeklyAI,setWeeklyAI]=useState(null);
+  const [weeklyBusy,setWeeklyBusy]=useState(false);
+  const recRef=useRef(null);
   const [sleepMsg,setSleepMsg]=useState("");
   const [measuring,setMeasuring]=useState(false);
   const [moveCount,setMoveCount]=useState(0);
@@ -550,6 +589,56 @@ export default function App(){
     const rec={date:today,ts:Date.now(),tipo:exType,min:exLogMin,intensidad:exInt};
     const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
     setExMsg("✓ Entrenamiento registrado");setTimeout(()=>setExMsg(""),2500);
+  };
+
+  // ── VOZ ────────────────────────────────────────────────
+  const applyVoz=(p)=>{
+    if(p.ejercicio&&p.ejercicio.minutos){
+      const rec={date:today,ts:Date.now(),tipo:p.ejercicio.tipo||"Ejercicio",min:Number(p.ejercicio.minutos)||0,intensidad:p.ejercicio.intensidad||"media"};
+      setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});
+    }
+    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);}
+    if(Array.isArray(p.comidas)&&p.comidas.length){
+      const nuevos=[];
+      p.comidas.forEach(c=>{
+        const all=Array.isArray(c.alimentos)?c.alimentos:[];
+        const matched=FOOD_CATEGORIES.flatMap(cat=>cat.items).filter(f=>all.some(a=>f.toLowerCase().includes(String(a).toLowerCase())||String(a).toLowerCase().includes(f.toLowerCase())));
+        const sc=calcScores(matched);
+        nuevos.push({fecha:today,comida:c.momento||"Comida",alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true});
+        apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(c.momento||"Comida"),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,agua_vasos:water,racha_dias:streak,notas:""}).catch(()=>{});
+      });
+      setHistory(prev=>[...nuevos,...prev]);
+    }
+  };
+  const processVoice=async(texto)=>{
+    setVoiceBusy(true);
+    try{const p=await interpretarVoz(texto);applyVoz(p);setVoiceResult(p);}
+    catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});}
+    setVoiceBusy(false);
+  };
+  const startVoice=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
+    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=false;
+    let finalText="";
+    setVoiceText("");setVoiceResult(null);setListening(true);
+    r.onresult=(e)=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;finalText=t;setVoiceText(t);};
+    r.onerror=()=>{setListening(false);setVoiceResult({respuesta:"No te escuché bien, intenta de nuevo."});};
+    r.onend=()=>{setListening(false);if(finalText.trim())processVoice(finalText.trim());};
+    recRef.current=r;try{r.start();}catch(_){}
+  };
+  const stopVoice=()=>{if(recRef.current){try{recRef.current.stop();}catch(_){}}};
+
+  // ── ANÁLISIS SEMANAL INTEGRAL ──────────────────────────
+  const analizarSemana=async()=>{
+    setWeeklyBusy(true);setWeeklyAI(null);
+    const comida=history.slice(0,10).map(r=>{let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}return `${r.comida}: ${(Array.isArray(f)?f:[]).join(", ")}`;}).join(" | ")||"sin registros de comida";
+    const ss=sleepStats();const sueno=ss?`promedio ${ss.avg}h, calidad ${ss.avgQ}/5, constancia ${ss.consLabel}, deuda ${ss.debt}h`:"sin registros de sueño";
+    const ejercicio=`${weekMinutes()} min en ${weekDaysActive()} días esta semana; recientes: ${exLog.slice(0,5).map(w=>w.tipo+" "+w.min+"min").join(", ")||"ninguno"}`;
+    const agua=`${water} de ${WATER_GOAL} vasos hoy`;
+    try{const r=await analisisSemanal({comida,sueno,ejercicio,agua},hp);setWeeklyAI(r);}
+    catch(e){setWeeklyAI({resumen:"No se pudo analizar: "+e.message,habitos:[]});}
+    setWeeklyBusy(false);
   };
   const fireAlarm=(ref)=>{
     ref.alarmFired=true;
@@ -717,6 +806,7 @@ export default function App(){
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="¿Qué comiste hoy?"
             style={{flex:1,border:"none",background:"transparent",color:"#333",fontSize:14,outline:"none",fontWeight:500}}/>
           {search&&<button onClick={()=>setSearch("")} style={{background:"#f0f0f0",border:"none",borderRadius:8,width:22,height:22,cursor:"pointer",color:"#999",fontSize:11}}>✕</button>}
+          <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{background:listening?"#C1121F":"#2D6A4F",border:"none",borderRadius:10,width:36,height:36,minWidth:36,cursor:"pointer",color:"#fff",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"}}>{listening?"⏹️":"🎤"}</button>
         </div>
       </div>
 
@@ -914,6 +1004,28 @@ export default function App(){
       {/* ══ TAB 1: SCORE ══════════════════════════════════════════ */}
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
+          <div style={{marginBottom:18}}>
+            <button onClick={analizarSemana} disabled={weeklyBusy} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:weeklyBusy?"#ccc":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #2D6A4F33"}}>{weeklyBusy?"🔍 Analizando tu semana…":"✨ Mi semana: energía y vitalidad"}</button>
+            {weeklyAI&&(
+              <div style={{background:"#fff",borderRadius:16,padding:18,marginTop:12,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+                {typeof weeklyAI.energia==="number"&&(
+                  <div style={{textAlign:"center",marginBottom:12}}>
+                    <span style={{fontSize:36,fontWeight:900,color:"#2D6A4F"}}>{weeklyAI.energia}</span>
+                    <span style={{fontSize:14,color:"#aaa"}}>/100 energía</span>
+                  </div>
+                )}
+                <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{weeklyAI.resumen}</div>
+                {(weeklyAI.habitos||[]).map((h,i)=>(
+                  <div key={i} style={{background:"#F8FAF5",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#2D6A4F",marginBottom:3}}>{h.area}</div>
+                    <div style={{fontSize:13,color:"#555",lineHeight:1.5}}>{h.cambio}</div>
+                  </div>
+                ))}
+                {weeklyAI.mensaje&&<div style={{marginTop:8,textAlign:"center",fontSize:13,fontWeight:800,color:"#2D6A4F"}}>💚 {weeklyAI.mensaje}</div>}
+                <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center"}}>Sugerencias de bienestar, no consejo médico.</div>
+              </div>
+            )}
+          </div>
           <div style={{textAlign:"center",marginBottom:20}}>
             <div style={{position:"relative",width:150,height:150,margin:"0 auto 14px"}}>
               <svg width="150" height="150" style={{transform:"rotate(-90deg)"}}>
@@ -1344,6 +1456,20 @@ export default function App(){
         </div>
         );
       })()}
+
+      {/* ══ MICRÓFONO FLOTANTE GLOBAL ═════════════════════════════ */}
+      <div style={{position:"fixed",left:14,right:14,bottom:80,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
+        {(listening||voiceBusy||voiceResult)&&(
+          <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:12,boxShadow:"0 6px 24px rgba(0,0,0,0.18)",border:"2px solid #E8F4EC",pointerEvents:"auto"}}>
+            {listening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:800}}>🎤 Escuchando… di lo que hiciste hoy</div>}
+            {voiceText&&<div style={{fontSize:12,color:"#444",marginTop:4,fontStyle:"italic"}}>"{voiceText}"</div>}
+            {voiceBusy&&<div style={{fontSize:11,color:"#888",marginTop:6}}>🤔 Interpretando y guardando…</div>}
+            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:12,color:"#2D6A4F",fontWeight:700,marginTop:6,background:"#E8F4EC",padding:"8px 10px",borderRadius:8}}>✓ {voiceResult.respuesta}</div>}
+            {voiceResult&&<div style={{textAlign:"right",marginTop:6}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
+          </div>
+        )}
+        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:56,height:56,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:24,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0}}>{listening?"⏹️":"🎤"}</button>
+      </div>
 
       {/* ══ NAV INFERIOR ══════════════════════════════════════════ */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #F0F0F0",display:"flex",zIndex:20,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
