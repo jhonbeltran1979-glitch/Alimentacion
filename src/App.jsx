@@ -4,6 +4,14 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-B
 // ⚠️ NO pegues tu API key real en un repo público. La app la carga sola por getKey() del Apps Script.
 let CLAUDE_API_KEY = "PEGA_TU_API_KEY_AQUI_SOLO_PARA_PROBAR_LOCAL";
 
+function jparse(text){
+  let t=(text||"").trim().replace(/```json|```/g,"").trim();
+  try{return JSON.parse(t);}catch(_){}
+  const m=t.match(/\{[\s\S]*\}/);
+  if(m){try{return JSON.parse(m[0]);}catch(_){}}
+  throw new Error("Respuesta no válida de la IA");
+}
+
 const PILDORAS = [
   "La ahuyama es rica en betacaroteno, vitamina A y antioxidantes.",
   "El plátano maduro aporta potasio y es fuente de energía rápida.",
@@ -97,7 +105,7 @@ async function analizarTexto(alimentos,hp){
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function analizarFoto(b64,type,hp){
@@ -136,7 +144,7 @@ Responde SOLO JSON sin backticks:
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function analizarSueno(noches,hp){
@@ -155,7 +163,7 @@ Responde SOLO JSON sin backticks:
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function resumenNoche(noche,contexto,hp,dieta){
@@ -184,7 +192,7 @@ Responde SOLO JSON sin backticks:
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function planSemana(prefs,hp,contexto){
@@ -208,7 +216,7 @@ Responde SOLO JSON sin backticks:
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function interpretarVoz(texto){
@@ -220,7 +228,7 @@ Responde SOLO JSON sin backticks:
 {"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida de lo que entendiste"}`}]})
   });
   const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function analisisSemanal(datos,hp){
@@ -240,7 +248,7 @@ Responde SOLO JSON sin backticks:
 {"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`}]})
   });
   const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 async function corregirFoto(detectados,correccion){
@@ -253,7 +261,7 @@ Responde SOLO JSON sin backticks:
 {"alimentos":[{"nombre":"...","porcion":"Xg","confianza":"alta","alternativa":"segunda opción o null"}],"respuesta":"confirmación corta y cálida de lo que corregiste"}`}]})
   });
   const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+  return jparse(d.content[0].text);
 }
 
 const sk=(p,k)=>`vt_${p}_${k}`;
@@ -437,6 +445,8 @@ export default function App(){
   const [smartAlarm,setSmartAlarm]=useState(false);
   const [alarmTime,setAlarmTime]=useState("06:30");
   const [snoreCount,setSnoreCount]=useState(0);
+  const [soundLevel,setSoundLevel]=useState(0);
+  const [micActive,setMicActive]=useState(false);
   const [exGoal,setExGoal]=useState("Bienestar general");
   const [exEquip,setExEquip]=useState("Ninguno");
   const [exDias,setExDias]=useState(4);
@@ -583,7 +593,8 @@ export default function App(){
     if(measuredData)Object.assign(rec,{measured:true},measuredData);
     const next=[rec,...sleepLog.filter(n=>n.date!==today)].slice(0,60);
     setSleepLog(next);localStorage.setItem(sk(perfil,"sleep"),JSON.stringify(next));
-    setSleepNote("");setSleepAI(null);setNightAI(null);setMeasuredData(null);setSleepMsg("✓ Noche guardada");setTimeout(()=>setSleepMsg(""),2500);
+    setSleepNote("");setSleepAI(null);setNightAI(null);setMeasuredData(null);setSleepMsg("✓ Noche guardada — generando resumen…");setTimeout(()=>setSleepMsg(""),2500);
+    analyzeNight(next);
   };
   const analyzeSleep=async()=>{
     if(sleepLog.length<2){setSleepMsg("Registra al menos 2 noches para analizar");setTimeout(()=>setSleepMsg(""),2500);return;}
@@ -592,12 +603,13 @@ export default function App(){
     catch(e){setSleepMsg("Error: "+e.message);setTimeout(()=>setSleepMsg(""),3000);}
     setSleepAnalyzing(false);
   };
-  const analyzeNight=async()=>{
-    if(!sleepLog.length){setSleepMsg("Primero guarda la noche");setTimeout(()=>setSleepMsg(""),2500);return;}
+  const analyzeNight=async(nightsArg)=>{
+    const nights=Array.isArray(nightsArg)?nightsArg:sleepLog;
+    if(!nights.length){setSleepMsg("Primero guarda la noche");setTimeout(()=>setSleepMsg(""),2500);return;}
     setNightAnalyzing(true);setNightAI(null);
     const dieta=[...history].slice(-4).map(r=>{let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}return `${r.comida||"Comida"}: ${(Array.isArray(f)?f:[]).join(", ")||"—"}`;}).join(" | ");
-    try{const r=await resumenNoche(sleepLog[0],sleepLog.slice(0,7),hp,dieta);setNightAI(r);}
-    catch(e){setSleepMsg("Error: "+e.message);setTimeout(()=>setSleepMsg(""),3000);}
+    try{const r=await resumenNoche(nights[0],nights.slice(0,7),hp,dieta);setNightAI(r);}
+    catch(e){setNightAI({titulo:"No se pudo generar el resumen",resumen:"Hubo un problema al analizar tu noche ("+e.message+"). Revisa tu conexión y vuelve a intentarlo.",semaforo:"amarillo",recomendacion:"Toca de nuevo \"Resumen de anoche con IA\" para reintentar.",ver_medico:false});}
     setNightAnalyzing(false);
   };
 
@@ -697,19 +709,33 @@ export default function App(){
         if(p!=="granted"){setSleepMsg("Permiso de movimiento denegado");setTimeout(()=>setSleepMsg(""),3000);return;}
       }
       const ref=measureRef.current;
-      ref.start=Date.now();ref.lastMove=0;ref.prevMag=null;ref.timeline=[];ref.sound=[];ref.snores=0;ref.lastSnore=0;ref.alarmFired=false;
+      ref.start=Date.now();ref.lastMove=0;ref.prevMag=null;ref.timeline=[];ref.sound=[];ref.snores=0;ref.lastSnore=0;ref.alarmFired=false;ref.curLevel=0;ref.ambient=null;
       ref.handler=(ev)=>{const a=ev.accelerationIncludingGravity;if(!a)return;const mag=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);const now=Date.now();if(ref.prevMag!=null){const delta=Math.abs(mag-ref.prevMag);if(delta>3&&now-ref.lastMove>3000){ref.lastMove=now;ref.timeline.push((now-ref.start)/60000);setMoveCount(ref.timeline.length);}}ref.prevMag=mag;};
       window.addEventListener("devicemotion",ref.handler);
       try{
         const stream=await navigator.mediaDevices.getUserMedia({audio:true});
         ref.micStream=stream;const AC=window.AudioContext||window.webkitAudioContext;ref.audioCtx=new AC();
-        const src=ref.audioCtx.createMediaStreamSource(stream);ref.analyser=ref.audioCtx.createAnalyser();ref.analyser.fftSize=512;
-        src.connect(ref.analyser);ref.buf=new Uint8Array(ref.analyser.frequencyBinCount);
-      }catch(_){ref.analyser=null;}
+        if(ref.audioCtx.state==="suspended"){try{await ref.audioCtx.resume();}catch(_){}}
+        const srcN=ref.audioCtx.createMediaStreamSource(stream);ref.analyser=ref.audioCtx.createAnalyser();ref.analyser.fftSize=1024;
+        srcN.connect(ref.analyser);ref.buf=new Uint8Array(ref.analyser.fftSize);
+        setMicActive(true);
+      }catch(_){ref.analyser=null;setMicActive(false);}
       try{ref.wake=await navigator.wakeLock.request("screen");}catch(_){}
+      // Loop rápido de audio: nivel real (RMS) + detección de ronquidos + medidor en vivo
+      ref.audioInt=setInterval(()=>{
+        if(!ref.analyser)return;
+        ref.analyser.getByteTimeDomainData(ref.buf);
+        let sum=0;for(let i=0;i<ref.buf.length;i++){const v=(ref.buf[i]-128)/128;sum+=v*v;}
+        const level=Math.round(Math.sqrt(sum/ref.buf.length)*200);
+        ref.curLevel=level;setSoundLevel(level);
+        ref.ambient=ref.ambient==null?level:ref.ambient*0.96+level*0.04;
+        const now=Date.now();
+        if(level>Math.max(12,(ref.ambient||0)*2.5)&&now-ref.lastSnore>2000){ref.snores++;ref.lastSnore=now;setSnoreCount(ref.snores);}
+      },300);
+      // Loop lento: guarda muestra para fases + revisa despertador inteligente
       ref.interval=setInterval(()=>{
         const now=Date.now(),tmin=(now-ref.start)/60000;
-        if(ref.analyser){ref.analyser.getByteFrequencyData(ref.buf);let s=0;for(let i=0;i<ref.buf.length;i++)s+=ref.buf[i];const lvl=s/ref.buf.length;ref.sound.push({t:tmin,lvl});if(lvl>55&&now-ref.lastSnore>5000){ref.snores++;ref.lastSnore=now;setSnoreCount(ref.snores);}}
+        ref.sound.push({t:tmin,lvl:ref.curLevel||0});
         if(smartAlarmRef.current.on&&!ref.alarmFired){
           const [ah,am]=smartAlarmRef.current.time.split(":").map(Number);
           const target=new Date(ref.start);target.setHours(ah,am,0,0);if(target.getTime()<ref.start)target.setDate(target.getDate()+1);
@@ -724,9 +750,11 @@ export default function App(){
     const ref=measureRef.current;
     if(ref.handler)window.removeEventListener("devicemotion",ref.handler);
     if(ref.interval)clearInterval(ref.interval);
+    if(ref.audioInt)clearInterval(ref.audioInt);
     if(ref.micStream){try{ref.micStream.getTracks().forEach(t=>t.stop());}catch(_){}}
     if(ref.audioCtx){try{ref.audioCtx.close();}catch(_){}}
     if(ref.wake){try{ref.wake.release();}catch(_){}ref.wake=null;}
+    setSoundLevel(0);setMicActive(false);
     const mins=ref.start?Math.round((Date.now()-ref.start)/60000):0;
     const tl=ref.timeline||[],sound=ref.sound||[],moves=tl.length;
     const EP=5,nE=Math.max(1,Math.ceil(mins/EP)),stages=[];
@@ -734,7 +762,7 @@ export default function App(){
       const a=i*EP,b=(i+1)*EP;
       const mv=tl.filter(t=>t>=a&&t<b).length;
       const snd=sound.filter(s=>s.t>=a&&s.t<b);const avgL=snd.length?snd.reduce((x,s)=>x+s.lvl,0)/snd.length:0;
-      const act=mv*2+(avgL>45?2:avgL>30?1:0);
+      const act=mv*2+(avgL>30?2:avgL>15?1:0);
       let st=act>=3?0:act>=1?1:2;
       if((a<10||b>mins-5)&&mv>0)st=Math.min(st,1);
       stages.push(st);
@@ -1371,7 +1399,15 @@ export default function App(){
               ? <button onClick={startMeasure} style={{width:"100%",padding:"12px",borderRadius:12,border:"2px solid #4A5899",background:"#fff",color:"#2D3561",fontSize:14,fontWeight:800,cursor:"pointer"}}>▶️ Empezar a medir</button>
               : <div style={{textAlign:"center"}}>
                   <div style={{fontSize:13,color:"#4A5899",fontWeight:800,marginBottom:4}}>🟢 Midiendo… {moveCount} movimientos</div>
-                  <div style={{fontSize:11,color:"#888",marginBottom:10}}>🔊 {snoreCount} ruidos detectados{smartAlarm?` · ⏰ ${alarmTime}`:""}</div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:8}}>🔊 {snoreCount} ruidos detectados{smartAlarm?` · ⏰ ${alarmTime}`:""}</div>
+                  {micActive
+                    ?<div style={{marginBottom:10}}>
+                       <div style={{fontSize:10,color:"#999",marginBottom:4}}>Nivel de sonido (habla o ronca para probarlo)</div>
+                       <div style={{background:"#EEE",borderRadius:8,height:14,overflow:"hidden"}}>
+                         <div style={{width:`${Math.min(100,soundLevel*1.6)}%`,height:14,borderRadius:8,background:soundLevel>30?"#C1121F":soundLevel>15?"#E9A23B":"#52B788",transition:"width .12s"}}/>
+                       </div>
+                     </div>
+                    :<div style={{fontSize:11,color:"#C1121F",fontWeight:700,marginBottom:10}}>🔇 Micrófono no activo — acepta el permiso para detectar ronquidos</div>}
                   <button onClick={stopMeasure} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"#C1121F",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>⏹️ Desperté / Detener</button>
                 </div>}
           </div>
