@@ -641,22 +641,32 @@ export default function App(){
   };
   const processVoice=async(texto)=>{
     setVoiceBusy(true);
-    try{const p=await interpretarVoz(texto);applyVoz(p);setVoiceResult(p);}
+    try{
+      const p=await interpretarVoz(texto);
+      applyVoz(p);
+      let analisis=null;
+      const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
+      if(foods.length){try{analisis=await analizarTexto(foods,hp);}catch(_){}}
+      setVoiceResult({...p,analisis});
+    }
     catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});}
     setVoiceBusy(false);
   };
   const startVoice=()=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
-    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=false;
-    let finalText="";
+    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
+    let acc="";r._userStop=false;
     setVoiceText("");setVoiceResult(null);setListening(true);
-    r.onresult=(e)=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;finalText=t;setVoiceText(t);};
-    r.onerror=()=>{setListening(false);setVoiceResult({respuesta:"No te escuché bien, intenta de nuevo."});};
-    r.onend=()=>{setListening(false);if(finalText.trim())processVoice(finalText.trim());};
+    r.onresult=(e)=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)acc+=t+" ";else interim+=t;}setVoiceText((acc+interim).trim());};
+    r.onerror=(ev)=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});}};
+    r.onend=()=>{
+      if(r._userStop){setListening(false);const t=acc.trim();if(t)processVoice(t);else setVoiceResult(null);}
+      else{try{r.start();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}
+    };
     recRef.current=r;try{r.start();}catch(_){}
   };
-  const stopVoice=()=>{if(recRef.current){try{recRef.current.stop();}catch(_){}}};
+  const stopVoice=()=>{const r=recRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
 
   // ── ANÁLISIS SEMANAL INTEGRAL ──────────────────────────
   const analizarSemana=async()=>{
@@ -796,13 +806,14 @@ export default function App(){
   const startPhotoVoiceCorrection=()=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setSavedMsg("Tu navegador no soporta voz. Usa Chrome.");setTimeout(()=>setSavedMsg(""),3000);return;}
-    const r=new SR();r.lang="es-CO";r.interimResults=false;r.continuous=false;
-    let finalText="";setPhotoVoiceListening(true);
-    r.onresult=(e)=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;finalText=t;};
-    r.onerror=()=>{setPhotoVoiceListening(false);};
-    r.onend=()=>{setPhotoVoiceListening(false);if(finalText.trim())applyPhotoCorrection(finalText.trim());};
+    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
+    let acc="";r._userStop=false;setPhotoVoiceListening(true);
+    r.onresult=(e)=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)acc+=e.results[i][0].transcript+" ";}};
+    r.onerror=(ev)=>{if(ev.error==="not-allowed"){setPhotoVoiceListening(false);}};
+    r.onend=()=>{if(r._userStop){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}else{try{r.start();}catch(_){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}}};
     photoRecRef.current=r;try{r.start();}catch(_){}
   };
+  const stopPhotoVoice=()=>{const r=photoRecRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
   // Confirmar la foto → guardar y luego analizar
   const confirmPhotoAndSave=()=>{
     setPhotoConfirmed(true);
@@ -858,14 +869,6 @@ export default function App(){
               <div style={{color:"rgba(255,255,255,.65)",fontSize:9,marginTop:3}}>{l}</div>
             </div>
           ))}
-        </div>
-        {/* Barra búsqueda */}
-        <div style={{background:"rgba(255,255,255,0.95)",borderRadius:14,display:"flex",alignItems:"center",padding:"12px 16px",gap:10,boxShadow:"0 4px 20px rgba(0,0,0,0.15)"}}>
-          <span style={{fontSize:18,opacity:.5}}>🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="¿Qué comiste hoy?"
-            style={{flex:1,border:"none",background:"transparent",color:"#333",fontSize:14,outline:"none",fontWeight:500}}/>
-          {search&&<button onClick={()=>setSearch("")} style={{background:"#f0f0f0",border:"none",borderRadius:8,width:22,height:22,cursor:"pointer",color:"#999",fontSize:11}}>✕</button>}
-          <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{background:listening?"#C1121F":"#2D6A4F",border:"none",borderRadius:10,width:36,height:36,minWidth:36,cursor:"pointer",color:"#fff",fontSize:17,display:"flex",alignItems:"center",justifyContent:"center"}}>{listening?"⏹️":"🎤"}</button>
         </div>
       </div>
 
@@ -936,10 +939,12 @@ export default function App(){
                 {!photoConfirmed&&(
                   <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #F0F0F0"}}>
                     <div style={{fontSize:13,fontWeight:800,color:"#2D6A4F",marginBottom:8,textAlign:"center"}}>¿Es correcta esta información?</div>
-                    {photoVoiceListening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:700,textAlign:"center",marginBottom:8}}>🎤 Escuchando… di qué corregir (ej: "no es mango, es plátano maduro")</div>}
+                    {photoVoiceListening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:700,textAlign:"center",marginBottom:8}}>🎤 Escuchando… di qué corregir y toca Detener</div>}
                     {photoVoiceBusy&&<div style={{fontSize:12,color:"#888",textAlign:"center",marginBottom:8}}>🤔 Aplicando tu corrección…</div>}
                     <div style={{display:"flex",gap:8}}>
-                      <button onClick={startPhotoVoiceCorrection} disabled={photoVoiceListening||photoVoiceBusy} style={{flex:1,padding:"12px",borderRadius:12,border:"2px solid #2D6A4F",background:"#fff",color:"#2D6A4F",fontSize:13,fontWeight:800,cursor:"pointer"}}>🎤 Corregir por voz</button>
+                      {photoVoiceListening
+                        ?<button onClick={stopPhotoVoice} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"#C1121F",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>⏹️ Detener</button>
+                        :<button onClick={startPhotoVoiceCorrection} disabled={photoVoiceBusy} style={{flex:1,padding:"12px",borderRadius:12,border:"2px solid #2D6A4F",background:"#fff",color:"#2D6A4F",fontSize:13,fontWeight:800,cursor:"pointer"}}>🎤 Corregir por voz</button>}
                       <button onClick={confirmPhotoAndSave} disabled={photoVoiceListening||photoVoiceBusy||saving} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>✓ Sí, guardar</button>
                     </div>
                   </div>
@@ -1125,6 +1130,24 @@ export default function App(){
               </div>
             </div>
           ))}
+
+          {eatScore&&(()=>{
+            const dims=[["immunity","🛡️ Inmunidad"],["energy","⚡ Energía"],["focus","🧠 Concentración"],["vitality","✨ Vitalidad"]];
+            const TIPS={immunity:"Suma frutas y verduras de colores (cítricos, brócoli, zanahoria, espinaca).",energy:"Prefiere granos integrales y baja el azúcar y los fritos para energía estable.",focus:"Incluye proteína, pescado o frutos secos y mantente hidratado.",vitality:"Varía más el plato con verduras de hoja y menos ultraprocesados."};
+            const weak=dims.slice().sort((a,b)=>eatScore[a[0]]-eatScore[b[0]]).slice(0,2);
+            return(
+              <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",borderLeft:"5px solid #E9A23B"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#B26A00",marginBottom:10}}>📈 Para mejorar tu alimentación</div>
+                {weak.map(([k,label])=>(
+                  <div key={k} style={{background:"#FFF8EC",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                    <div style={{fontSize:12,fontWeight:800,color:"#856404",marginBottom:3}}>{label} · {eatScore[k]}%</div>
+                    <div style={{fontSize:13,color:"#6b5a2e",lineHeight:1.5}}>{TIPS[k]}</div>
+                  </div>
+                ))}
+                <div style={{fontSize:11,color:"#aaa",marginTop:2}}>Para un plan completo, usa "✨ Mi semana" arriba.</div>
+              </div>
+            );
+          })()}
 
           {hp&&(
             <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #E8F4EC"}}>
@@ -1510,17 +1533,25 @@ export default function App(){
       })()}
 
       {/* ══ MICRÓFONO FLOTANTE GLOBAL ═════════════════════════════ */}
-      <div style={{position:"fixed",left:14,right:14,bottom:80,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
+      <style>{`@keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(193,18,31,.55)}70%{box-shadow:0 0 0 22px rgba(193,18,31,0)}100%{box-shadow:0 0 0 0 rgba(193,18,31,0)}}`}</style>
+      <div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult)&&(
-          <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:12,boxShadow:"0 6px 24px rgba(0,0,0,0.18)",border:"2px solid #E8F4EC",pointerEvents:"auto"}}>
-            {listening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:800}}>🎤 Escuchando… di lo que hiciste hoy</div>}
-            {voiceText&&<div style={{fontSize:12,color:"#444",marginTop:4,fontStyle:"italic"}}>"{voiceText}"</div>}
-            {voiceBusy&&<div style={{fontSize:11,color:"#888",marginTop:6}}>🤔 Interpretando y guardando…</div>}
-            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:12,color:"#2D6A4F",fontWeight:700,marginTop:6,background:"#E8F4EC",padding:"8px 10px",borderRadius:8}}>✓ {voiceResult.respuesta}</div>}
-            {voiceResult&&<div style={{textAlign:"right",marginTop:6}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
+          <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#E8F4EC"}`,pointerEvents:"auto"}}>
+            {listening&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#C1121F",fontWeight:800}}><span style={{width:10,height:10,borderRadius:"50%",background:"#C1121F",animation:"vtpulse 1.3s infinite"}}/>Escuchando… habla tranquilo</div>}
+            {listening&&<div style={{fontSize:11,color:"#888",marginTop:4}}>Cuando termines, toca ⏹️ para guardar y analizar.</div>}
+            {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:8,fontStyle:"italic",lineHeight:1.4}}>"{voiceText}"</div>}
+            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:8}}>🤔 Guardando y analizando…</div>}
+            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#2D6A4F",fontWeight:700,marginTop:8,background:"#E8F4EC",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
+            {voiceResult&&voiceResult.analisis&&(
+              <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8FAF5",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2D6A4F":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#2D6A4F",marginBottom:3}}>{voiceResult.analisis.semaforo==="verde"?"🟢":voiceResult.analisis.semaforo==="rojo"?"🔴":"🟡"} Análisis de lo que comiste</div>
+                <div style={{fontSize:12,color:"#555",lineHeight:1.5}}>{voiceResult.analisis.recomendacion}</div>
+              </div>
+            )}
+            {voiceResult&&<div style={{textAlign:"right",marginTop:8}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
           </div>
         )}
-        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:56,height:56,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:24,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0}}>{listening?"⏹️":"🎤"}</button>
+        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
       </div>
 
       {/* ══ NAV INFERIOR ══════════════════════════════════════════ */}
