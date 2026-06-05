@@ -757,15 +757,28 @@ export default function App(){
     setSoundLevel(0);setMicActive(false);
     const mins=ref.start?Math.round((Date.now()-ref.start)/60000):0;
     const tl=ref.timeline||[],sound=ref.sound||[],moves=tl.length;
-    const EP=5,nE=Math.max(1,Math.ceil(mins/EP)),stages=[];
+    const tooShort=mins<25;
+    const EP=5,nE=Math.max(1,Math.ceil(mins/EP));
+    // 1) actividad por bloque de 5 min
+    const epAct=[];
     for(let i=0;i<nE;i++){
       const a=i*EP,b=(i+1)*EP;
       const mv=tl.filter(t=>t>=a&&t<b).length;
-      const snd=sound.filter(s=>s.t>=a&&s.t<b);const avgL=snd.length?snd.reduce((x,s)=>x+s.lvl,0)/snd.length:0;
-      const act=mv*2+(avgL>30?2:avgL>15?1:0);
-      let st=act>=3?0:act>=1?1:2;
-      if((a<10||b>mins-5)&&mv>0)st=Math.min(st,1);
-      stages.push(st);
+      const snd=sound.filter(s=>s.t>=a&&s.t<b);const maxL=snd.length?Math.max(...snd.map(s=>s.lvl)):0;
+      epAct.push({mv,maxL});
+    }
+    // 2) clasificación inicial: 0 despierto, 1 ligero, 2 quieto(candidato a profundo)
+    const stages=epAct.map((e,i)=>{
+      if(e.mv>=2||(i<2&&e.mv>=1))return 0;
+      if(e.mv>=1||e.maxL>35)return 1;
+      return 2;
+    });
+    // 3) refinar: el sueño profundo de verdad ocurre en RACHAS largas de quietud y sobre todo
+    //    en la primera mitad de la noche. Lo demás (quietud aislada o 2a mitad) es sueño ligero.
+    let run=0;
+    for(let i=0;i<stages.length;i++){
+      run=stages[i]===2?run+1:0;
+      if(stages[i]===2 && !(run>=3 && i<nE/2)) stages[i]=1;
     }
     const cnt=[0,0,0];stages.forEach(s=>cnt[s]++);const tot=stages.length||1;
     const pctAwake=Math.round(cnt[0]/tot*100),pctLight=Math.round(cnt[1]/tot*100),pctDeep=Math.round(cnt[2]/tot*100);
@@ -773,10 +786,10 @@ export default function App(){
     const t=[0,0,0];tl.forEach(m=>{const f=mins>0?m/mins:0;t[f<0.34?0:f<0.67?1:2]++;});
     setWaketime(new Date().toTimeString().slice(0,5));
     setAwakenings(Math.min(9,cnt[0]));
-    setSleepQuality(pctDeep>=25?5:pctDeep>=15?4:pctDeep>=8?3:2);
-    setMeasuredData({mins,moves,t1:t[0],t2:t[1],t3:t[2],still:deepRun*EP,stages,pctAwake,pctLight,pctDeep,snores:ref.snores});
+    setSleepQuality(tooShort?3:(pctDeep>=20?5:pctDeep>=12?4:pctDeep>=6?3:2));
+    setMeasuredData({mins,moves,t1:t[0],t2:t[1],t3:t[2],still:deepRun*EP,stages,pctAwake,pctLight,pctDeep,snores:ref.snores,tooShort});
     setMeasuring(false);
-    setSleepMsg(`Medido: ${(mins/60).toFixed(1)}h · ${pctDeep}% profundo · ${ref.snores} ruidos. Revisa y guarda.`);setTimeout(()=>setSleepMsg(""),7000);
+    setSleepMsg(tooShort?`Medido: ${(mins/60).toFixed(1)}h y ${ref.snores} ruidos. Muy corto para estimar fases — revisa y guarda.`:`Medido: ${(mins/60).toFixed(1)}h · ${pctDeep}% profundo · ${ref.snores} ruidos. Revisa y guarda.`);setTimeout(()=>setSleepMsg(""),7000);
   };
 
   const handlePhoto=async(e)=>{
@@ -1415,6 +1428,12 @@ export default function App(){
           {(()=>{
             const sd=measuredData&&measuredData.stages?measuredData:(sleepLog[0]&&sleepLog[0].stages?sleepLog[0]:null);
             if(!sd)return null;
+            if(sd.tooShort)return(
+              <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#2D3561",marginBottom:8}}>🌙 Fases estimadas</div>
+                <div style={{background:"#FFF8EC",border:"1.5px solid #E9A23B",borderRadius:12,padding:"12px 14px",fontSize:13,color:"#7A5200",lineHeight:1.5}}>⏱️ La medición fue muy corta ({(sd.mins/60).toFixed(1)} h) para estimar fases de sueño con sentido. Mide al menos ~30 min (idealmente toda la noche). Eso sí, ya detecté <b>{sd.snores} ruidos/ronquidos</b>.</div>
+              </div>
+            );
             const st=sd.stages,W=300,H=70,step=st.length>1?W/(st.length-1):W,yOf=s=>s===0?10:s===1?32:54;
             const pts=st.map((s,i)=>`${(i*step).toFixed(1)},${yOf(s)}`).join(" ");
             return(
@@ -1431,7 +1450,7 @@ export default function App(){
                   <div style={{flex:1,textAlign:"center",background:"#E6E8F2",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D3561"}}>{sd.pctDeep}%</div><div style={{fontSize:9,color:"#999"}}>Profundo</div></div>
                   <div style={{flex:1,textAlign:"center",background:"#F0F4F1",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D6A4F"}}>{sd.snores}</div><div style={{fontSize:9,color:"#999"}}>Ruidos</div></div>
                 </div>
-                <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center",lineHeight:1.4}}>Estimación por movimiento y sonido, no es un estudio de sueño clínico.</div>
+                <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center",lineHeight:1.4}}>Estimación por movimiento y sonido (el profundo se infiere de las rachas largas sin moverte). No es un estudio de sueño clínico.</div>
               </div>
             );
           })()}
