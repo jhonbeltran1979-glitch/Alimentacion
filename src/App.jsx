@@ -64,7 +64,7 @@ const FOOD_CATEGORIES = [
   {key:"frutas",    label:"Frutas",       emoji:"🍎", bg:"#FFE8D6", color:"#C44B00", items:["Naranja","Mango","Papaya","Banano","Fresas","Arándanos","Guayaba","Maracuyá","Piña","Manzana","Uvas","Kiwi"], nutrients:["Vitamina C","Antioxidantes","Fibra","Potasio"]},
   {key:"proteinas", label:"Proteínas",    emoji:"🥩", bg:"#FFD7D7", color:"#9B2226", items:["Pollo","Res","Cerdo","Huevo","Atún","Sardinas","Salmón","Tofu","Lentejas","Fríjoles","Garbanzo"], nutrients:["Proteína","Hierro","Vitamina B12","Zinc","Omega-3"]},
   {key:"lacteos",   label:"Lácteos",      emoji:"🥛", bg:"#D4E8FF", color:"#1A6FA8", items:["Leche","Yogur","Queso","Kéfir","Kumis"], nutrients:["Calcio","Vitamina D","Probióticos","Proteína"]},
-  {key:"granos",    label:"Granos",       emoji:"🌾", bg:"#FFF3CD", color:"#856404", items:["Arroz","Avena","Quinoa","Pasta","Pan integral","Maíz","Cebada","Plátano maduro","Yuca","Papa","Arepa"], nutrients:["Fibra","Magnesio","Vitamina B12","Proteína"]},
+  {key:"granos",    label:"Granos",       emoji:"🌾", bg:"#FFF3CD", color:"#856404", items:["Arroz","Avena","Quinoa","Pasta","Pan integral","Maíz","Cebada","Plátano maduro","Yuca","Papa","Arepa","Peto","Mazamorra","Changua"], nutrients:["Fibra","Magnesio","Vitamina B12","Proteína"]},
   {key:"frutos",    label:"Frutos secos", emoji:"🥜", bg:"#E8DCC8", color:"#6D4C41", items:["Almendras","Nueces","Maní","Marañón","Chía","Linaza","Ajonjolí"], nutrients:["Omega-3","Magnesio","Proteína","Calcio"]},
   {key:"bebidas",   label:"Bebidas",      emoji:"💧", bg:"#D4F1F9", color:"#0077B6", items:["Agua","Jugo natural","Té verde","Café","Leche vegetal"], nutrients:["Antioxidantes"]},
 ];
@@ -117,6 +117,14 @@ PASO 2 — Distingue explícitamente los pares que más se confunden:
 - PAPA vs CALABACÍN: la PAPA es opaca, almidonada, color crema/café, firme. El CALABACÍN (zucchini) cocido o pelado es verde pálido o blanquecino, más acuoso y blando, suele venir en rodajas o trozos alargados y a veces conserva piel verde. Regla: si es alargado, acuoso o con piel verdosa → calabacín, NO papa.
 - YUCA: blanca fibrosa. ARROZ: blanco granulado suelto. AREPA: disco plano de maíz.
 - FRÍJOLES: rojos/negros/pintados en caldo o secos.
+- PLATOS PREPARADOS COLOMBIANOS: reconócelos por su nombre, no solo por ingredientes sueltos.
+  • PETO / MAZAMORRA: sopa o colada CREMOSA y espesa de maíz blanco con leche, servida en pocillo o taza. Si ves una sopa blanca lechosa con granos de maíz → es "Peto", NO "sopa láctea" ni leche+maíz por separado.
+  • Otros: Ajiaco, Sancocho, Changua, Avena, Arroz con leche.
+- AMARILLOS QUE SE CONFUNDEN (plátano maduro cocido vs mango vs papa):
+  • PLÁTANO MADURO COCIDO: trozo o tajada ALARGADA u ovalada, amarillo-dorado, textura firme y densa (almidón), NO jugoso ni fibroso. Es el acompañamiento típico de un almuerzo colombiano (junto a carne, papa, arroz).
+  • MANGO: FRUTA jugosa y fibrosa, tajada irregular, color más intenso y húmedo/brillante; suele ir aparte como fruta o postre.
+  • PAPA: opaca, pálida crema, almidonada, sin brillo.
+  Pista de contexto: en un plato principal con carne y papa, una pieza amarilla casi siempre es PLÁTANO MADURO COCIDO, no mango. Ante la duda entre plátano y mango, pon el otro en "alternativa".
 
 Para CADA alimento da tu mejor identificación y SIEMPRE la segunda opción más probable en "alternativa" (nunca null), aunque estés seguro, para que el usuario pueda corregir si te equivocaste.
 
@@ -230,6 +238,19 @@ Analiza de forma integral su energía y vitalidad. Da sugerencias CONCRETAS de c
 
 Responde SOLO JSON sin backticks:
 {"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`}]})
+  });
+  const d=await res.json();if(d.error)throw new Error(d.error.message);
+  return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
+}
+
+async function corregirFoto(detectados,correccion){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,messages:[{role:"user",content:`Detecté estos alimentos en una foto: ${detectados.join(", ")||"ninguno"}.
+El usuario corrige por voz: "${correccion}".
+Aplica su corrección: cambia, agrega o quita alimentos según lo que dijo, y mantén los que no menciona. Nombres en español colombiano.
+Responde SOLO JSON sin backticks:
+{"alimentos":[{"nombre":"...","porcion":"Xg","confianza":"alta","alternativa":"segunda opción o null"}],"respuesta":"confirmación corta y cálida de lo que corregiste"}`}]})
   });
   const d=await res.json();if(d.error)throw new Error(d.error.message);
   return JSON.parse(d.content[0].text.trim().replace(/```json|```/g,"").trim());
@@ -386,6 +407,10 @@ export default function App(){
   const [photoResult,setPhotoResult]=useState(null);
   const [photoPreview,setPhotoPreview]=useState(null);
   const [photoFoods,setPhotoFoods]=useState(null);
+  const [photoConfirmed,setPhotoConfirmed]=useState(false);
+  const [photoVoiceBusy,setPhotoVoiceBusy]=useState(false);
+  const [photoVoiceListening,setPhotoVoiceListening]=useState(false);
+  const photoRecRef=useRef(null);
   const [badges,setBadges]=useState([]);
   const [newBadge,setNewBadge]=useState(null);
   const [lastScore,setLastScore]=useState(0);
@@ -477,6 +502,10 @@ export default function App(){
   if(showHF&&!hp)return <HealthScreen perfil={perfil} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
 
   const scores=calcScores(selected);
+  const _nrecs=history.filter(r=>r&&r.score_total!=null&&r.score_total!=="").slice(0,14);
+  const _avg=(k)=>{const v=_nrecs.filter(r=>r[k]!=null&&r[k]!=="");return v.length?Math.round(v.reduce((a,r)=>a+(Number(r[k])||0),0)/v.length):0;};
+  const eatScore=_nrecs.length?{total:_avg("score_total"),immunity:_avg("score_inmunidad"),energy:_avg("score_energia"),focus:_avg("score_concentracion"),vitality:_avg("score_vitalidad"),n:_nrecs.length}:null;
+  const scoreView=eatScore||scores;
   const today=new Date().toLocaleDateString("es-CO");
   const nivel=getNivel(streak,history.length);
   const waterPct=Math.min(100,(water/WATER_GOAL)*100);
@@ -495,14 +524,14 @@ export default function App(){
     setQuickFoods(s);localStorage.setItem(sk(perfil,"quick_foods"),JSON.stringify(s));
   };
 
-  const handleSave=async()=>{
+  const handleSave=async(foodsOverride)=>{
     const pending=customFood.trim()?[...customFoods,customFood.trim()]:[...customFoods];
     if(customFood.trim()){setCustomFoods(pending);setCustomFood("");}
-    const all=[...selected,...pending];
+    const all=(foodsOverride&&foodsOverride.length)?foodsOverride:[...selected,...pending];
     if(all.length===0){setSavedMsg("⚠️ Selecciona al menos un alimento");setTimeout(()=>setSavedMsg(""),2500);return;}
     setSaving(true);setSavedMsg("Analizando nutrición...");
     let analisis=photoResult;
-    if(!analisis&&!photoPreview){try{const r=await analizarTexto(all,hp);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
+    if(!analisis){try{const r=await analizarTexto(all,hp);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
     try{
       const res=await apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(MEALS[meal].label),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,agua_vasos:water,racha_dias:streak,notas:encodeURIComponent(analisis?.recomendacion||"")});
       if(res.ok){
@@ -516,7 +545,7 @@ export default function App(){
         setIdMsg(IDENTITY_MSGS[Math.floor(Math.random()*IDENTITY_MSGS.length)](perfil,scores.total));
         setTimeout(()=>setPildora(PILDORAS[Math.floor(Math.random()*PILDORAS.length)]),1800);
         setSavedMsg(`✅ ¡Guardado! Score: ${scores.total}%`);
-        setTimeout(()=>{setSelected([]);setCustomFoods([]);setPhotoResult(null);setPhotoPreview(null);setPhotoFoods(null);setSavedMsg("");setIdMsg("");},4500);
+        setTimeout(()=>{setSelected([]);setCustomFoods([]);setPhotoResult(null);setPhotoPreview(null);setPhotoFoods(null);setPhotoConfirmed(false);setSavedMsg("");setIdMsg("");},4500);
       }else setSavedMsg("❌ Error al guardar");
     }catch(e){setSavedMsg(`❌ ${e.message}`);}
     setSaving(false);
@@ -719,7 +748,7 @@ export default function App(){
     try{
       const b64=await new Promise((res,rej)=>{const img=new Image();img.onload=()=>{const MAX=1280,r=Math.min(MAX/img.width,MAX/img.height,1),c=document.createElement("canvas");c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext("2d").drawImage(img,0,0,c.width,c.height);res(c.toDataURL("image/jpeg",.85).split(",")[1]);};img.onerror=rej;img.src=url;});
       const result=await analizarFoto(b64,"image/jpeg",hp);
-      setPhotoResult({ok:true,...result});setPhotoFoods(result.alimentos||[]);
+      setPhotoFoods(result.alimentos||[]);setPhotoConfirmed(false);
       (result.alimentos||[]).forEach(item=>{const al=typeof item==="object"?item.nombre:item;FOOD_CATEGORIES.forEach(cat=>{const m=cat.items.find(i=>i.toLowerCase().includes(al.toLowerCase())||al.toLowerCase().includes(i.toLowerCase()));if(m&&!selected.includes(m))setSelected(p=>[...p,m]);});});
     }catch(err){setPhotoResult({ok:false,recomendacion:`Error: ${err.message}`,semaforo:"rojo"});}
     setPhotoAI(false);e.target.value="";
@@ -749,6 +778,36 @@ export default function App(){
       if(newMatch && !s.includes(newMatch)) s = [...s, newMatch];
       return s;
     });
+  };
+
+  // Corrección por voz de la foto: el usuario dicta qué cambiar
+  const applyPhotoCorrection=async(texto)=>{
+    setPhotoVoiceBusy(true);
+    try{
+      const names=(photoFoods||[]).map(f=>typeof f==="object"?f.nombre:f);
+      const r=await corregirFoto(names,texto);
+      const nf=r.alimentos||[];
+      setPhotoFoods(nf);
+      const matches=nf.map(f=>matchFood(typeof f==="object"?f.nombre:f)).filter(Boolean);
+      setSelected([...new Set(matches)]);
+    }catch(_){setSavedMsg("No pude aplicar la corrección, intenta de nuevo");setTimeout(()=>setSavedMsg(""),3000);}
+    setPhotoVoiceBusy(false);
+  };
+  const startPhotoVoiceCorrection=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){setSavedMsg("Tu navegador no soporta voz. Usa Chrome.");setTimeout(()=>setSavedMsg(""),3000);return;}
+    const r=new SR();r.lang="es-CO";r.interimResults=false;r.continuous=false;
+    let finalText="";setPhotoVoiceListening(true);
+    r.onresult=(e)=>{let t="";for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;finalText=t;};
+    r.onerror=()=>{setPhotoVoiceListening(false);};
+    r.onend=()=>{setPhotoVoiceListening(false);if(finalText.trim())applyPhotoCorrection(finalText.trim());};
+    photoRecRef.current=r;try{r.start();}catch(_){}
+  };
+  // Confirmar la foto → guardar y luego analizar
+  const confirmPhotoAndSave=()=>{
+    setPhotoConfirmed(true);
+    const names=(photoFoods||[]).map(f=>typeof f==="object"?f.nombre:f);
+    handleSave(names.length?names:undefined);
   };
 
   // Filtro de búsqueda
@@ -873,6 +932,18 @@ export default function App(){
                     );
                   })}
                 </div>
+
+                {!photoConfirmed&&(
+                  <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #F0F0F0"}}>
+                    <div style={{fontSize:13,fontWeight:800,color:"#2D6A4F",marginBottom:8,textAlign:"center"}}>¿Es correcta esta información?</div>
+                    {photoVoiceListening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:700,textAlign:"center",marginBottom:8}}>🎤 Escuchando… di qué corregir (ej: "no es mango, es plátano maduro")</div>}
+                    {photoVoiceBusy&&<div style={{fontSize:12,color:"#888",textAlign:"center",marginBottom:8}}>🤔 Aplicando tu corrección…</div>}
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={startPhotoVoiceCorrection} disabled={photoVoiceListening||photoVoiceBusy} style={{flex:1,padding:"12px",borderRadius:12,border:"2px solid #2D6A4F",background:"#fff",color:"#2D6A4F",fontSize:13,fontWeight:800,cursor:"pointer"}}>🎤 Corregir por voz</button>
+                      <button onClick={confirmPhotoAndSave} disabled={photoVoiceListening||photoVoiceBusy||saving} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>✓ Sí, guardar</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1027,29 +1098,30 @@ export default function App(){
             )}
           </div>
           <div style={{textAlign:"center",marginBottom:20}}>
+            <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{eatScore?`Qué tan bien te alimentas · ${eatScore.n} comida${eatScore.n!==1?"s":""}`:"Selecciona alimentos para ver tu score"}</div>
             <div style={{position:"relative",width:150,height:150,margin:"0 auto 14px"}}>
               <svg width="150" height="150" style={{transform:"rotate(-90deg)"}}>
                 <circle cx="75" cy="75" r="64" fill="none" stroke="#E8F4EC" strokeWidth="14"/>
-                <circle cx="75" cy="75" r="64" fill="none" stroke={scoreColor(scores.total)} strokeWidth="14"
-                  strokeDasharray={`${2*Math.PI*64}`} strokeDashoffset={`${2*Math.PI*64*(1-scores.total/100)}`}
+                <circle cx="75" cy="75" r="64" fill="none" stroke={scoreColor(scoreView.total)} strokeWidth="14"
+                  strokeDasharray={`${2*Math.PI*64}`} strokeDashoffset={`${2*Math.PI*64*(1-scoreView.total/100)}`}
                   strokeLinecap="round" style={{transition:"stroke-dashoffset 1s ease"}}/>
               </svg>
               <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-                <div style={{fontSize:36,fontWeight:900,color:scoreColor(scores.total)}}>{scores.total}</div>
+                <div style={{fontSize:36,fontWeight:900,color:scoreColor(scoreView.total)}}>{scoreView.total}</div>
                 <div style={{fontSize:10,color:"#aaa",letterSpacing:1,textTransform:"uppercase"}}>Score</div>
               </div>
             </div>
-            <div style={{color:"#555",fontSize:14,fontWeight:600}}>{scores.total>=70?"🌟 ¡Excelente alimentación!":scores.total>=40?"💪 Puedes mejorar":"🥺 Necesitas más variedad"}</div>
+            <div style={{color:"#555",fontSize:14,fontWeight:600}}>{scoreView.total>=70?"🌟 ¡Excelente alimentación!":scoreView.total>=40?"💪 Puedes mejorar":"🥺 Necesitas más variedad"}</div>
           </div>
 
           {[{label:"🛡️ Inmunidad",key:"immunity"},{label:"⚡ Energía",key:"energy"},{label:"🧠 Concentración",key:"focus"},{label:"✨ Vitalidad",key:"vitality"}].map(({label,key})=>(
             <div key={key} style={{background:"#fff",borderRadius:16,padding:"14px 16px",marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
                 <span style={{fontSize:14,fontWeight:700}}>{label}</span>
-                <span style={{fontSize:15,fontWeight:900,color:scoreColor(scores[key]),background:scoreBg(scores[key]),padding:"2px 10px",borderRadius:10}}>{scores[key]}%</span>
+                <span style={{fontSize:15,fontWeight:900,color:scoreColor(scoreView[key]),background:scoreBg(scoreView[key]),padding:"2px 10px",borderRadius:10}}>{scoreView[key]}%</span>
               </div>
               <div style={{background:"#F0F0F0",borderRadius:8,height:10,overflow:"hidden"}}>
-                <div style={{width:`${scores[key]}%`,height:10,borderRadius:8,background:scoreColor(scores[key]),transition:"width 1s ease"}}/>
+                <div style={{width:`${scoreView[key]}%`,height:10,borderRadius:8,background:scoreColor(scoreView[key]),transition:"width 1s ease"}}/>
               </div>
             </div>
           ))}
@@ -1075,26 +1147,6 @@ export default function App(){
             <div style={{fontSize:18,fontWeight:900}}>Historial</div>
             {history.length>0&&<div style={{fontSize:12,color:"#888",background:"#fff",padding:"4px 10px",borderRadius:10,boxShadow:"0 2px 8px rgba(0,0,0,0.06)"}}>{history.length} registros</div>}
           </div>
-
-          {/* Calendario */}
-          {history.length>0&&(
-            <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-              <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>🔗 No rompas la cadena</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                {Array.from({length:30},(_,i)=>{
-                  const d=new Date();d.setDate(d.getDate()-(29-i));
-                  const ds=d.toISOString().split("T")[0];
-                  const has=history.some(r=>{const f=typeof r.fecha==="string"?r.fecha.split("T")[0]:String(r.fecha);return f===ds;});
-                  const isToday=i===29;
-                  return <div key={i} title={ds} style={{width:20,height:20,borderRadius:5,background:has?"#2D6A4F":isToday?"#E8F4EC":"#F0F0F0",border:isToday?"2px solid #52B788":"none",transition:"background .2s"}}/>;
-                })}
-              </div>
-              <div style={{display:"flex",gap:12,marginTop:8}}>
-                <div style={{display:"flex",gap:4,alignItems:"center"}}><div style={{width:12,height:12,borderRadius:3,background:"#2D6A4F"}}/><span style={{fontSize:10,color:"#888"}}>Registrado</span></div>
-                <div style={{display:"flex",gap:4,alignItems:"center"}}><div style={{width:12,height:12,borderRadius:3,background:"#F0F0F0",border:"1px solid #ddd"}}/><span style={{fontSize:10,color:"#888"}}>Sin registro</span></div>
-              </div>
-            </div>
-          )}
 
           {loadingHist
             ?<div style={{textAlign:"center",color:"#888",padding:40}}>Cargando...</div>
