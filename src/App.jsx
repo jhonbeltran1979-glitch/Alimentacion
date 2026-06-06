@@ -4,6 +4,12 @@ const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxuSWQvUB377F-B
 // ⚠️ NO pegues tu API key real en un repo público. La app la carga sola por getKey() del Apps Script.
 let CLAUDE_API_KEY = "PEGA_TU_API_KEY_AQUI_SOLO_PARA_PROBAR_LOCAL";
 
+function makeNoise(ctx,kind){
+  const len=ctx.sampleRate*2,buf=ctx.createBuffer(1,len,ctx.sampleRate),d=buf.getChannelData(0);
+  let last=0;
+  for(let i=0;i<len;i++){const w=Math.random()*2-1;if(kind==="marron"){last=(last+0.02*w)/1.02;d[i]=last*3.2;}else d[i]=w;}
+  const src=ctx.createBufferSource();src.buffer=buf;src.loop=true;return src;
+}
 function jparse(text){
   let t=(text||"").trim().replace(/```json|```/g,"").trim();
   try{return JSON.parse(t);}catch(_){}
@@ -195,7 +201,7 @@ Tareas:
 REGLAS: NO diagnostiques enfermedades. No uses lenguaje alarmista. Si sugieres consultar, hazlo con calma y aclara que es solo una sugerencia, no un diagnóstico.
 
 Responde SOLO JSON sin backticks:
-{"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`}]})
+{"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resena":"reseña de UNA sola línea (máx 8 palabras), ej 'Descanso estable, despierta con energía'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`}]})
   });
   const d=await res.json();
   if(d.error)throw new Error(d.error.message);
@@ -459,6 +465,11 @@ export default function App(){
   const [habits,setHabits]=useState([]);
   const [hSignal,setHSignal]=useState("");
   const [hAction,setHAction]=useState("");
+  const [routineBed,setRoutineBed]=useState("22:30");
+  const [routineWake,setRoutineWake]=useState("06:30");
+  const [sound,setSound]=useState(null);
+  const [soundTimer,setSoundTimer]=useState(30);
+  const soundRef=useRef(null);
   const [breathing,setBreathing]=useState(false);
   const [breathPhase,setBreathPhase]=useState("Inhala");
   const breathRef=useRef(null);
@@ -515,6 +526,7 @@ export default function App(){
     const fpr=localStorage.getItem(sk(perfil,"fit_prefs"));if(fpr){try{const p=JSON.parse(fpr);setExGoal(p.goal);setExEquip(p.equip);setExDias(p.dias);setExMin(p.min);}catch(_){}}
     setVotos(parseInt(localStorage.getItem(sk(perfil,"votos"))||"0"));
     const hb=localStorage.getItem(sk(perfil,"habits"));if(hb){try{setHabits(JSON.parse(hb));}catch(_){}}
+    const rt=localStorage.getItem(sk(perfil,"sleep_routine"));if(rt){try{const r=JSON.parse(rt);setRoutineBed(r.bed);setRoutineWake(r.wake);}catch(_){}}
   },[perfil]);
 
   useEffect(()=>{smartAlarmRef.current={on:smartAlarm,time:alarmTime};},[smartAlarm,alarmTime]);
@@ -619,6 +631,25 @@ export default function App(){
     if(a==="agua"||a==="caminar"||a==="estirar"||a==="descansar")quickActivate(a);
     else if(a==="comida"){setTab(0);flashAct("📸 Registra tu comida un poco más abajo 👇");}
     else if(a==="sueno"){setTab(5);}
+  };
+
+  // ── MI RUTINA DE SUEÑO + SONIDOS PARA DORMIR (Sleep Routine) ──
+  const routineHours=()=>{const[bh,bm]=routineBed.split(":").map(Number),[wh,wm]=routineWake.split(":").map(Number);let m=(wh*60+wm)-(bh*60+bm);if(m<=0)m+=1440;return Math.round(m/6)/10;};
+  const saveRoutine=()=>{localStorage.setItem(sk(perfil,"sleep_routine"),JSON.stringify({bed:routineBed,wake:routineWake}));setAlarmTime(routineWake);flashAct("🎯 Rutina guardada: "+routineBed+" → "+routineWake+" ("+routineHours()+" h).");};
+  const stopSound=()=>{const s=soundRef.current;if(!s)return;try{clearTimeout(s.timer);s.gain.gain.cancelScheduledValues(s.ctx.currentTime);s.gain.gain.linearRampToValueAtTime(0,s.ctx.currentTime+0.6);setTimeout(()=>{try{s.src.stop();s.ctx.close();}catch(_){}},700);}catch(_){}soundRef.current=null;setSound(null);};
+  const startSound=(type)=>{
+    if(sound&&sound.type===type){stopSound();return;}
+    stopSound();
+    try{
+      const AC=window.AudioContext||window.webkitAudioContext,ctx=new AC();
+      const src=makeNoise(ctx,type==="marron"?"marron":"blanco"),gain=ctx.createGain();gain.gain.value=0;
+      if(type==="lluvia"||type==="blanco"){const lp=ctx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=type==="lluvia"?1600:7000;src.connect(lp);lp.connect(gain);}
+      else src.connect(gain);
+      gain.connect(ctx.destination);src.start();
+      gain.gain.linearRampToValueAtTime(type==="marron"?0.18:0.22,ctx.currentTime+1.5);
+      const timer=setTimeout(stopSound,soundTimer*60000);
+      soundRef.current={ctx,src,gain,timer};setSound({type,mins:soundTimer});
+    }catch(_){flashAct("Tu navegador no permite reproducir el sonido.");}
   };
 
   // ── SUEÑO ──────────────────────────────────────────────
@@ -1442,6 +1473,35 @@ export default function App(){
           <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>😴 Sueño</div>
           <div style={{fontSize:13,color:"#888",marginBottom:16}}>Registra tu noche y mira tus patrones. Meta: 7–9 h.</div>
 
+          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:14,fontWeight:900,color:"#2D3561",marginBottom:2}}>🎯 Mi rutina de sueño</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Fija tu horario objetivo. Acostarte a la misma hora es lo que más mejora el descanso.</div>
+            <div style={{display:"flex",gap:10,marginBottom:10}}>
+              <div style={{flex:1}}><div style={{fontSize:11,color:"#777",marginBottom:4}}>Acostarte</div><input type="time" value={routineBed} onChange={e=>setRoutineBed(e.target.value)} style={{width:"100%",padding:"9px",borderRadius:10,border:"1.5px solid #E0E0E0",fontSize:15,fontWeight:700,color:"#2D3561",boxSizing:"border-box"}}/></div>
+              <div style={{flex:1}}><div style={{fontSize:11,color:"#777",marginBottom:4}}>Despertar</div><input type="time" value={routineWake} onChange={e=>setRoutineWake(e.target.value)} style={{width:"100%",padding:"9px",borderRadius:10,border:"1.5px solid #E0E0E0",fontSize:15,fontWeight:700,color:"#2D3561",boxSizing:"border-box"}}/></div>
+            </div>
+            <div style={{textAlign:"center",fontSize:12,color:"#4A5899",fontWeight:700,marginBottom:10}}>Meta: {routineHours()} h de sueño</div>
+            {sleepLog[0]&&<div style={{background:sleepLog[0].hours>=routineHours()-0.5?"#E8F4EC":"#FBF3E6",borderRadius:10,padding:"9px 11px",marginBottom:10,fontSize:12,color:sleepLog[0].hours>=routineHours()-0.5?"#2D6A4F":"#7A5200",lineHeight:1.4}}>{sleepLog[0].hours>=routineHours()-0.5?`✓ Anoche cumpliste tu rutina (${sleepLog[0].hours} h). 🗳️ Un voto a quien descansa bien.`:`Anoche dormiste ${sleepLog[0].hours} h, te faltaron ${Math.max(0,Math.round((routineHours()-sleepLog[0].hours)*10)/10)} h para tu meta.`}</div>}
+            <button onClick={saveRoutine} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:"#4A5899",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Guardar mi rutina</button>
+          </div>
+
+          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:14,fontWeight:900,color:"#2D3561",marginBottom:2}}>🎵 Sonidos para dormir</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Sonidos relajantes con temporizador para conciliar el sueño.</div>
+            <div style={{display:"flex",gap:8,marginBottom:10}}>
+              {[{k:"lluvia",l:"🌧️ Lluvia"},{k:"marron",l:"🌊 Olas graves"},{k:"blanco",l:"💨 Ruido blanco"}].map(s=>(
+                <button key={s.k} onClick={()=>startSound(s.k)} style={{flex:1,padding:"12px 6px",borderRadius:12,border:"2px solid "+(sound&&sound.type===s.k?"#4A5899":"#E0E0E0"),background:sound&&sound.type===s.k?"#4A5899":"#F8F8FC",color:sound&&sound.type===s.k?"#fff":"#2D3561",fontSize:12,fontWeight:800,cursor:"pointer"}}>{s.l}</button>
+              ))}
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:sound?10:0}}>
+              <span style={{fontSize:11,color:"#777",fontWeight:700}}>Temporizador:</span>
+              {[15,30,60].map(t=>(
+                <button key={t} onClick={()=>setSoundTimer(t)} style={{padding:"5px 12px",borderRadius:16,border:"1.5px solid "+(soundTimer===t?"#4A5899":"#E0E0E0"),background:soundTimer===t?"#EEEDFB":"#fff",color:"#4A5899",fontSize:12,fontWeight:700,cursor:"pointer"}}>{t} min</button>
+              ))}
+            </div>
+            {sound&&<button onClick={stopSound} style={{width:"100%",padding:"10px",borderRadius:12,border:"none",background:"#C1121F",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>⏹️ Detener sonido</button>}
+          </div>
+
           {ss&&(
             <div style={{background:"linear-gradient(135deg,#2D3561,#4A5899)",borderRadius:20,padding:20,marginBottom:14,color:"#fff",boxShadow:"0 4px 20px rgba(45,53,97,.3)"}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -1578,6 +1638,7 @@ export default function App(){
                 <span style={{fontSize:20}}>{nightAI.semaforo==="verde"?"😴":nightAI.semaforo==="rojo"?"😪":"😌"}</span>
                 <span style={{fontSize:16,fontWeight:900,color:semColor(nightAI.semaforo)}}>{nightAI.titulo}</span>
               </div>
+              {nightAI.resena&&<div style={{fontSize:14,fontStyle:"italic",color:"#555",marginBottom:10,paddingLeft:2}}>“{nightAI.resena}”</div>}
               <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{nightAI.resumen}</div>
               <div style={{background:"#F4F4FB",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#3A3A5C",lineHeight:1.5}}>💡 {nightAI.recomendacion}</div>
               {nightAI.comida_sueno&&nightAI.comida_sueno!=="null"&&(
