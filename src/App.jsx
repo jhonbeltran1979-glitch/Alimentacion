@@ -168,16 +168,23 @@ Responde SOLO JSON sin backticks:
 
 async function resumenNoche(noche,contexto,hp,dieta){
   const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
-  const det=noche.measured?`Medición por sensor del celular (movimiento + micrófono): ${noche.moves} movimientos en ${noche.mins} min. Fases estimadas → profundo:${noche.pctDeep}%, ligero:${noche.pctLight}%, despierto:${noche.pctAwake}%. Racha de sueño profundo más larga: ${noche.still} min. Ruidos/ronquidos detectados: ${noche.snores}.`:"Registro manual (sin sensor).";
+  const det=noche.measured
+    ?(noche.tooShort
+      ?`Medición por sensor MUY CORTA (${noche.mins} min de grabación): NO alcanza para estimar duración ni fases del sueño. IGNORA por completo las fases y la duración medida; básate solo en la autoevaluación del usuario. Ruidos detectados: ${noche.snores}.`
+      :`Medición por sensor del celular (movimiento + micrófono): ${noche.moves} movimientos en ${noche.mins} min. Fases estimadas → profundo:${noche.pctDeep}%, ligero:${noche.pctLight}%, despierto:${noche.pctAwake}%. Racha de sueño profundo más larga: ${noche.still} min. Ruidos/ronquidos detectados: ${noche.snores}.`)
+    :"Registro manual (sin sensor).";
+  const durPhrase=(noche.measured&&noche.tooShort)?"duración real desconocida (la medición fue demasiado corta)":`durmió ${noche.hours}h (${noche.bed}→${noche.wake})`;
   const hist=contexto.length>1?`Contexto de noches recientes: ${contexto.map(n=>n.hours+"h cal"+n.quality).join(", ")}.`:"Es de sus primeras noches registradas.";
   const die=dieta?`Comidas recientes del usuario (de la misma app): ${dieta}.`:"Sin datos de alimentación.";
   const res=await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
     body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:700,messages:[{role:"user",content:`Eres un asistente cálido de bienestar del sueño. NO eres médico. ${ctxP}
-NOCHE A RESUMIR — ${noche.date}: durmió ${noche.hours}h (${noche.bed}→${noche.wake}), calidad autoevaluada ${noche.quality}/5, ${noche.awakenings} despertares.${noche.note?" Nota del usuario: "+noche.note:""}
+NOCHE A RESUMIR — ${noche.date}: ${durPhrase}, calidad autoevaluada ${noche.quality}/5, ${noche.awakenings} despertares.${noche.note?" Nota del usuario: "+noche.note:""}
 ${det}
 ${hist}
 ${die}
+
+IMPORTANTE: usa SOLO los datos de arriba. No inventes duraciones ni cifras que no aparezcan. Si la medición fue muy corta, dilo con naturalidad y enfócate en la autoevaluación del usuario, sin hablar de "24 horas" ni de fases.
 
 Tareas:
 1) Explica en lenguaje sencillo y empático cómo fue su noche.
@@ -447,6 +454,14 @@ export default function App(){
   const [snoreCount,setSnoreCount]=useState(0);
   const [soundLevel,setSoundLevel]=useState(0);
   const [micActive,setMicActive]=useState(false);
+  const [actMsg,setActMsg]=useState("");
+  const [votos,setVotos]=useState(0);
+  const [habits,setHabits]=useState([]);
+  const [hSignal,setHSignal]=useState("");
+  const [hAction,setHAction]=useState("");
+  const [breathing,setBreathing]=useState(false);
+  const [breathPhase,setBreathPhase]=useState("Inhala");
+  const breathRef=useRef(null);
   const [exGoal,setExGoal]=useState("Bienestar general");
   const [exEquip,setExEquip]=useState("Ninguno");
   const [exDias,setExDias]=useState(4);
@@ -498,6 +513,8 @@ export default function App(){
     const fl=localStorage.getItem(sk(perfil,"fit_log"));if(fl)setExLog(JSON.parse(fl));
     const fd=localStorage.getItem(sk(perfil,"fit_done"));if(fd)setExDone(JSON.parse(fd));
     const fpr=localStorage.getItem(sk(perfil,"fit_prefs"));if(fpr){try{const p=JSON.parse(fpr);setExGoal(p.goal);setExEquip(p.equip);setExDias(p.dias);setExMin(p.min);}catch(_){}}
+    setVotos(parseInt(localStorage.getItem(sk(perfil,"votos"))||"0"));
+    const hb=localStorage.getItem(sk(perfil,"habits"));if(hb){try{setHabits(JSON.parse(hb));}catch(_){}}
   },[perfil]);
 
   useEffect(()=>{smartAlarmRef.current={on:smartAlarm,time:alarmTime};},[smartAlarm,alarmTime]);
@@ -551,7 +568,7 @@ export default function App(){
         setStreak(ns);localStorage.setItem(sk(perfil,"streak"),ns);localStorage.setItem(sk(perfil,"streak_date"),today);
         setLastScore(scores.total);setLastCats(scores.cats);updateQF(all);
         checkBadges({streak:ns,water,lastScore:scores.total,lastCats:scores.cats},[...history,{comida:MEALS[meal].label,alimentos:all}]);
-        setConfeti(true);
+        setConfeti(true);addVoto();
         setIdMsg(IDENTITY_MSGS[Math.floor(Math.random()*IDENTITY_MSGS.length)](perfil,scores.total));
         setTimeout(()=>setPildora(PILDORAS[Math.floor(Math.random()*PILDORAS.length)]),1800);
         setSavedMsg(`✅ ¡Guardado! Score: ${scores.total}%`);
@@ -562,6 +579,47 @@ export default function App(){
   };
 
   const changeWater=d=>{const nw=Math.max(0,Math.min(12,water+d));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);if(nw>=8)checkBadges({streak,water:nw,lastScore,lastCats},history);};
+
+  // ── IDENTIDAD: cada acción es un voto a quien eliges ser ──
+  const addVoto=(n=1)=>{setVotos(prev=>{const nv=prev+n;localStorage.setItem(sk(perfil,"votos"),nv);return nv;});};
+  const identityMsg=(v)=>{
+    if(v<1)return"Hoy empiezas a votar por la persona que quieres ser.";
+    if(v<10)return"Te estás convirtiendo en alguien que se cuida.";
+    if(v<30)return"Eres una persona que cuida su energía.";
+    if(v<70)return"Cuidarte ya es parte de quien eres.";
+    if(v<150)return"Vives con bienestar — es parte de tu identidad. 💪";
+    return"Eres ejemplo de una vida que se cuida cada día. 🌟";
+  };
+
+  // ── ACTÍVATE (pausas activas) ──────────────────────────
+  const actBtn={padding:"14px 8px",borderRadius:14,border:"2px solid #E8F4EC",background:"#F8FAF5",color:"#2D6A4F",fontSize:14,fontWeight:800,cursor:"pointer"};
+  const flashAct=(m)=>{setActMsg(m);setTimeout(()=>setActMsg(""),3500);};
+  const addQuickWorkout=(tipo,min,intensidad)=>{const rec={date:today,ts:Date.now(),tipo,min,intensidad};setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});};
+  const startBreathing=()=>{setBreathing(true);setBreathPhase("Inhala");let inhale=true;if(breathRef.current)clearInterval(breathRef.current);breathRef.current=setInterval(()=>{inhale=!inhale;setBreathPhase(inhale?"Inhala":"Exhala");},5000);setTimeout(stopBreathing,60000);};
+  const stopBreathing=()=>{if(breathRef.current){clearInterval(breathRef.current);breathRef.current=null;}setBreathing(false);};
+  const quickActivate=(type)=>{
+    if(type==="agua"){changeWater(1);addVoto();flashAct("💧 +1 vaso. 🗳️ Un voto a quien cuida su cuerpo.");}
+    else if(type==="caminar"){addQuickWorkout("Caminar",10,"media");addVoto();flashAct("🚶 10 min de caminata. 🗳️ Un voto a la persona activa que eliges ser.");}
+    else if(type==="estirar"){addQuickWorkout("Estiramiento",5,"baja");addVoto();flashAct("🧘 5 min de estiramiento. 🗳️ Un voto a tu bienestar.");}
+    else if(type==="descansar"){startBreathing();}
+  };
+
+  // ── ARMAR MI HÁBITO (señal → acción → recompensa) ──────
+  const H_SIGNALS=["Al despertar","Después del almuerzo","Al llegar a casa","Antes de dormir","Cuando me estreso","En mi pausa del café"];
+  const H_ACTIONS=[{k:"agua",l:"💧 Tomar agua"},{k:"caminar",l:"🚶 Caminar 10 min"},{k:"estirar",l:"🧘 Estirarme"},{k:"descansar",l:"😌 Respirar 1 min"},{k:"comida",l:"🍽️ Registrar comida"},{k:"sueno",l:"😴 Registrar sueño"}];
+  const aLabel=(k)=>(H_ACTIONS.find(a=>a.k===k)||{}).l||k;
+  const saveHabit=()=>{
+    if(!hSignal||!hAction){flashAct("Elige una señal y una acción.");return;}
+    const rec={id:Date.now(),signal:hSignal,action:hAction};
+    setHabits(prev=>{const n=[rec,...prev].slice(0,12);localStorage.setItem(sk(perfil,"habits"),JSON.stringify(n));return n;});
+    setHSignal("");setHAction("");flashAct("🔗 ¡Hábito creado! Cuando llegue la señal, ya sabes qué hacer.");
+  };
+  const delHabit=(id)=>{setHabits(prev=>{const n=prev.filter(h=>h.id!==id);localStorage.setItem(sk(perfil,"habits"),JSON.stringify(n));return n;});};
+  const runHabit=(a)=>{
+    if(a==="agua"||a==="caminar"||a==="estirar"||a==="descansar")quickActivate(a);
+    else if(a==="comida"){setTab(0);flashAct("📸 Registra tu comida un poco más abajo 👇");}
+    else if(a==="sueno"){setTab(5);}
+  };
 
   // ── SUEÑO ──────────────────────────────────────────────
   const calcHours=(bed,wake)=>{
@@ -587,13 +645,14 @@ export default function App(){
     return{avg:Math.round(avg*10)/10,avgQ:Math.round(avgQ*10)/10,debt:Math.round(debt*10)/10,sd:Math.round(sd),consLabel,score,n:last.length};
   };
   const saveSleep=()=>{
-    const hours=calcHours(bedtime,waketime);
-    if(!hours){setSleepMsg("Pon hora de dormir y de despertar");setTimeout(()=>setSleepMsg(""),2500);return;}
+    const hours=measuredData?Math.round(measuredData.mins/6)/10:calcHours(bedtime,waketime);
+    if(!measuredData&&!hours){setSleepMsg("Pon hora de dormir y de despertar");setTimeout(()=>setSleepMsg(""),2500);return;}
     const rec={date:today,bed:bedtime,wake:waketime,hours,quality:sleepQuality,awakenings,note:sleepNote.trim()};
     if(measuredData)Object.assign(rec,{measured:true},measuredData);
     const next=[rec,...sleepLog.filter(n=>n.date!==today)].slice(0,60);
     setSleepLog(next);localStorage.setItem(sk(perfil,"sleep"),JSON.stringify(next));
     setSleepNote("");setSleepAI(null);setNightAI(null);setMeasuredData(null);setSleepMsg("✓ Noche guardada — generando resumen…");setTimeout(()=>setSleepMsg(""),2500);
+    addVoto();
     analyzeNight(next);
   };
   const analyzeSleep=async()=>{
@@ -917,6 +976,61 @@ export default function App(){
       {tab===0&&(
         <div style={{padding:"16px 14px"}}>
 
+          <div style={{background:"linear-gradient(135deg,#2D6A4F,#40916C)",borderRadius:18,padding:"16px 16px",marginBottom:14,color:"#fff",boxShadow:"0 4px 18px rgba(45,106,79,0.25)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
+              <div style={{fontSize:30,fontWeight:900,lineHeight:1}}>🗳️ {votos}</div>
+              <div style={{fontSize:11,opacity:.9,fontWeight:600}}>votos a la persona<br/>que eliges ser</div>
+            </div>
+            <div style={{fontSize:14,fontWeight:700,lineHeight:1.4}}>{identityMsg(votos)}</div>
+            <div style={{fontSize:10,opacity:.8,marginTop:8,lineHeight:1.4}}>Cada acción que registras es un pequeño voto. No es disciplina: es quien estás eligiendo ser.</div>
+          </div>
+
+          <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:14,fontWeight:900,color:"#2D6A4F",marginBottom:2}}>⚡ Actívate</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>¿Energía baja? Una pequeña acción cambia tu día.</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <button onClick={()=>quickActivate("caminar")} style={actBtn}>🚶 Caminar</button>
+              <button onClick={()=>quickActivate("estirar")} style={actBtn}>🧘 Estirarse</button>
+              <button onClick={()=>quickActivate("agua")} style={actBtn}>💧 Tomar agua</button>
+              <button onClick={()=>quickActivate("descansar")} style={actBtn}>😌 Descansar</button>
+            </div>
+            {actMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:13,fontWeight:700,color:"#2D6A4F",background:"#E8F4EC",padding:"9px 10px",borderRadius:10,lineHeight:1.4}}>{actMsg}</div>}
+          </div>
+
+          <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:14,fontWeight:900,color:"#2D6A4F",marginBottom:2}}>🔗 Mi hábito</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Une una señal a una acción. Así no depende de fuerza de voluntad.</div>
+
+            <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>1. La señal (¿cuándo?)</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {H_SIGNALS.map(s=>(
+                <button key={s} onClick={()=>setHSignal(s)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hSignal===s?"#2D6A4F":"#E0E0E0"),background:hSignal===s?"#2D6A4F":"#fff",color:hSignal===s?"#fff":"#555",fontSize:12,fontWeight:700,cursor:"pointer"}}>{s}</button>
+              ))}
+            </div>
+
+            <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>2. La acción (¿qué haré?)</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+              {H_ACTIONS.map(a=>(
+                <button key={a.k} onClick={()=>setHAction(a.k)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hAction===a.k?"#40916C":"#E0E0E0"),background:hAction===a.k?"#E8F4EC":"#fff",color:"#2D6A4F",fontSize:12,fontWeight:700,cursor:"pointer"}}>{a.l}</button>
+              ))}
+            </div>
+
+            {hSignal&&hAction&&<div style={{background:"#F0F7F2",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#2D6A4F",lineHeight:1.5}}>Cuando <b>{hSignal.toLowerCase()}</b>, voy a <b>{aLabel(hAction).replace(/^[^ ]+ /,"")}</b>.<br/><span style={{color:"#888"}}>🗳️ Recompensa: un voto a la persona que eliges ser.</span></div>}
+
+            <button onClick={saveHabit} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#2D6A4F,#40916C)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Crear hábito</button>
+
+            {habits.length>0&&<div style={{marginTop:14}}>
+              <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:8}}>Mis hábitos ({habits.length})</div>
+              {habits.map(h=>(
+                <div key={h.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F8FAF5",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                  <div style={{flex:1,fontSize:12,color:"#333",lineHeight:1.4}}><b>{h.signal}</b> → {aLabel(h.action)}</div>
+                  <button onClick={()=>runHabit(h.action)} style={{padding:"6px 10px",borderRadius:10,border:"none",background:"#40916C",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Hacer</button>
+                  <button onClick={()=>delHabit(h.id)} style={{padding:"6px 8px",borderRadius:10,border:"none",background:"#F0E0E0",color:"#C1121F",fontSize:12,fontWeight:800,cursor:"pointer"}}>✕</button>
+                </div>
+              ))}
+            </div>}
+          </div>
+
           {/* Selector comida — grid 2x2 */}
           <div style={{marginBottom:16}}>
             <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Registrar comida</div>
@@ -1132,6 +1246,7 @@ export default function App(){
                   </div>
                 )}
                 <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{weeklyAI.resumen}</div>
+                <div style={{background:"#EAF3FB",borderRadius:12,padding:"11px 13px",marginBottom:12,fontSize:12,color:"#2C5374",lineHeight:1.5}}>🧠💪 Tu salud <b>mental</b>, la de tu <b>cuerpo</b> y la <b>metabólica</b> van juntas: lo que comes, cómo duermes y cómo te mueves se afectan entre sí. Por eso VitalTrack los mira en conjunto.</div>
                 {(weeklyAI.habitos||[]).map((h,i)=>(
                   <div key={i} style={{background:"#F8FAF5",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
                     <div style={{fontSize:11,fontWeight:800,color:"#2D6A4F",marginBottom:3}}>{h.area}</div>
@@ -1588,6 +1703,16 @@ export default function App(){
       })()}
 
       {/* ══ MICRÓFONO FLOTANTE GLOBAL ═════════════════════════════ */}
+      {breathing&&(
+        <div onClick={stopBreathing} style={{position:"fixed",inset:0,zIndex:80,background:"rgba(18,40,30,.93)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+          <style>{`@keyframes vtbreath{0%,100%{transform:scale(.65)}50%{transform:scale(1.25)}}`}</style>
+          <div style={{width:170,height:170,borderRadius:"50%",background:"radial-gradient(circle,#74C69D,#2D6A4F)",animation:"vtbreath 10s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <span style={{color:"#fff",fontSize:22,fontWeight:800}}>{breathPhase}</span>
+          </div>
+          <div style={{color:"#fff",fontSize:16,marginTop:34,fontWeight:600}}>Respira un minuto y vuelve con energía</div>
+          <div style={{color:"rgba(255,255,255,.6)",fontSize:12,marginTop:10}}>Toca para salir</div>
+        </div>
+      )}
       <style>{`@keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(193,18,31,.55)}70%{box-shadow:0 0 0 22px rgba(193,18,31,0)}100%{box-shadow:0 0 0 0 rgba(193,18,31,0)}}`}</style>
       <div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult)&&(
