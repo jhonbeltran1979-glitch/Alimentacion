@@ -702,14 +702,11 @@ export default function App(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
     const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
-    let acc="";r._userStop=false;
+    let acc="",current="";r._userStop=false;
     setVoiceText("");setVoiceResult(null);setListening(true);
-    r.onresult=(e)=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)acc+=t+" ";else interim+=t;}setVoiceText((acc+interim).trim());};
+    r.onresult=(e)=>{let txt="";for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript+" ";}current=txt.trim();setVoiceText((acc+" "+current).trim());};
     r.onerror=(ev)=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});}};
-    r.onend=()=>{
-      if(r._userStop){setListening(false);const t=acc.trim();if(t)processVoice(t);else setVoiceResult(null);}
-      else{try{r.start();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}
-    };
+    r.onend=()=>{acc=(acc+" "+current).trim();current="";if(r._userStop){setListening(false);if(acc.trim())processVoice(acc.trim());else setVoiceResult(null);}else{try{r.start();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}};
     recRef.current=r;try{r.start();}catch(_){}
   };
   const stopVoice=()=>{const r=recRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
@@ -882,10 +879,10 @@ export default function App(){
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setSavedMsg("Tu navegador no soporta voz. Usa Chrome.");setTimeout(()=>setSavedMsg(""),3000);return;}
     const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
-    let acc="";r._userStop=false;setPhotoVoiceListening(true);
-    r.onresult=(e)=>{for(let i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)acc+=e.results[i][0].transcript+" ";}};
+    let acc="",current="";r._userStop=false;setPhotoVoiceListening(true);
+    r.onresult=(e)=>{let txt="";for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript+" ";}current=txt.trim();};
     r.onerror=(ev)=>{if(ev.error==="not-allowed"){setPhotoVoiceListening(false);}};
-    r.onend=()=>{if(r._userStop){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}else{try{r.start();}catch(_){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}}};
+    r.onend=()=>{acc=(acc+" "+current).trim();current="";if(r._userStop){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}else{try{r.start();}catch(_){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}}};
     photoRecRef.current=r;try{r.start();}catch(_){}
   };
   const stopPhotoVoice=()=>{const r=photoRecRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
