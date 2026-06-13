@@ -103,15 +103,20 @@ async function apiGet(p){
   try{return JSON.parse(await res.text());}catch(_){return{ok:false};}
 }
 
-async function analizarTexto(alimentos,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,messages:[{role:"user",content:`Nutricionista experto en gastronomía colombiana. ${ctx}\nAlimentos: ${alimentos.join(", ")}.\nJSON sin backticks:\n{"recomendacion":"consejo personalizado según perfil 2-3 oraciones concretas","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes faltantes según perfil"]}`}]})
+async function iaText(prompt){
+  const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/ai-text",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt})
   });
   const d=await res.json();
-  if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+  if(d.error)throw new Error(d.error);
+  return d.result;
+}
+
+async function analizarTexto(alimentos,hp){
+  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  return iaText(`Nutricionista experto en gastronomía colombiana. ${ctx}\nAlimentos: ${alimentos.join(", ")}.\nJSON sin backticks:\n{"recomendacion":"consejo personalizado según perfil 2-3 oraciones concretas","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes faltantes según perfil"]}`);
 }
 
 async function analizarFoto(b64,type,hp){
@@ -128,20 +133,14 @@ async function analizarFoto(b64,type,hp){
 async function analizarSueno(noches,hp){
   const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const resumen=noches.map(n=>`${n.date}: durmió ${n.hours}h (${n.bed}→${n.wake}), calidad ${n.quality}/5, ${n.awakenings} despertares${n.note?", nota: "+n.note:""}`).join("\n");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:600,messages:[{role:"user",content:`Eres experto en higiene del sueño en Colombia. ${ctx}
+  return iaText(`Eres experto en higiene del sueño en Colombia. ${ctx}
 Últimas noches del usuario:
 ${resumen}
 
 Analiza el patrón: duración promedio, calidad, consistencia de horarios (acostarse/levantarse a la misma hora) y despertares. Da consejos concretos y accionables adaptados a Colombia. NO diagnostiques enfermedades; si ves señales preocupantes (insomnio persistente, somnolencia diurna severa), sugiere consultar a un profesional de salud.
 
 Responde SOLO JSON sin backticks:
-{"resumen":"diagnóstico breve y empático del patrón en 2 oraciones","semaforo":"verde|amarillo|rojo","consejos":["consejo accionable 1","consejo accionable 2","consejo accionable 3"]}`}]})
-  });
-  const d=await res.json();
-  if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"resumen":"diagnóstico breve y empático del patrón en 2 oraciones","semaforo":"verde|amarillo|rojo","consejos":["consejo accionable 1","consejo accionable 2","consejo accionable 3"]}`);
 }
 
 async function resumenNoche(noche,contexto,hp,dieta){
@@ -154,9 +153,7 @@ async function resumenNoche(noche,contexto,hp,dieta){
   const durPhrase=(noche.measured&&noche.tooShort)?"duración real desconocida (la medición fue demasiado corta)":`durmió ${noche.hours}h (${noche.bed}→${noche.wake})`;
   const hist=contexto.length>1?`Contexto de noches recientes: ${contexto.map(n=>n.hours+"h cal"+n.quality).join(", ")}.`:"Es de sus primeras noches registradas.";
   const die=dieta?`Comidas recientes del usuario (de la misma app): ${dieta}.`:"Sin datos de alimentación.";
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:700,messages:[{role:"user",content:`Eres un asistente cálido de bienestar del sueño. NO eres médico. ${ctxP}
+  return iaText(`Eres un asistente cálido de bienestar del sueño. NO eres médico. ${ctxP}
 NOCHE A RESUMIR — ${noche.date}: ${durPhrase}, calidad autoevaluada ${noche.quality}/5, ${noche.awakenings} despertares.${noche.note?" Nota del usuario: "+noche.note:""}
 ${det}
 ${hist}
@@ -173,18 +170,12 @@ Tareas:
 REGLAS: NO diagnostiques enfermedades. No uses lenguaje alarmista. Si sugieres consultar, hazlo con calma y aclara que es solo una sugerencia, no un diagnóstico.
 
 Responde SOLO JSON sin backticks:
-{"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resena":"reseña de UNA sola línea (máx 8 palabras), ej 'Descanso estable, despierta con energía'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`}]})
-  });
-  const d=await res.json();
-  if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resena":"reseña de UNA sola línea (máx 8 palabras), ej 'Descanso estable, despierta con energía'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`);
 }
 
 async function planSemana(prefs,hp,contexto){
   const ctxP=hp?`Perfil: ${hp.edad} años, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1200,messages:[{role:"user",content:`Eres un entrenador personal certificado y prudente. ${ctxP}
+  return iaText(`Eres un entrenador personal certificado y prudente. ${ctxP}
 Objetivo: ${prefs.goal}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
 ${contexto||""}
 
@@ -197,30 +188,19 @@ SEGURIDAD (importante): respeta la condición de salud.
 No prometas resultados médicos ni de pérdida de peso garantizada.
 
 Responde SOLO JSON sin backticks:
-{"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","actividades":["actividad concreta 1","actividad concreta 2"],"duracion":"X min","intensidad":"baja|media|alta"}]}`}]})
-  });
-  const d=await res.json();
-  if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","actividades":["actividad concreta 1","actividad concreta 2"],"duracion":"X min","intensidad":"baja|media|alta"}]}`);
 }
 
 async function interpretarVoz(texto){
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,messages:[{role:"user",content:`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".
+  return iaText(`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".
 Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimentos), ejercicio (tipo, minutos, intensidad) y vasos de agua. Alimentos en español colombiano. Si algo no se menciona: comidas=[], ejercicio=null, agua_vasos=null.
 Responde SOLO JSON sin backticks:
-{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida de lo que entendiste"}`}]})
-  });
-  const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida de lo que entendiste"}`);
 }
 
 async function analisisSemanal(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:800,messages:[{role:"user",content:`Eres un coach de salud integral, cálido y realista. ${ctxP}
+  return iaText(`Eres un coach de salud integral, cálido y realista. ${ctxP}
 Datos de la última semana del usuario (todo lo que registró):
 - Alimentación: ${datos.comida}
 - Sueño: ${datos.sueno}
@@ -230,23 +210,15 @@ Datos de la última semana del usuario (todo lo que registró):
 Analiza de forma integral su energía y vitalidad. Da sugerencias CONCRETAS de cambio de hábitos y CONECTA las áreas entre sí (ej: dormir mejor mejora el rendimiento en el ejercicio; hidratarse y comer mejor sube la energía). Motivador, sin alarmismo ni diagnósticos médicos.
 
 Responde SOLO JSON sin backticks:
-{"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`}]})
-  });
-  const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`);
 }
 
 async function corregirFoto(detectados,correccion){
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:500,messages:[{role:"user",content:`Detecté estos alimentos en una foto: ${detectados.join(", ")||"ninguno"}.
+  return iaText(`Detecté estos alimentos en una foto: ${detectados.join(", ")||"ninguno"}.
 El usuario corrige por voz: "${correccion}".
 Aplica su corrección: cambia, agrega o quita alimentos según lo que dijo, y mantén los que no menciona. Nombres en español colombiano.
 Responde SOLO JSON sin backticks:
-{"alimentos":[{"nombre":"...","porcion":"Xg","confianza":"alta","alternativa":"segunda opción o null"}],"respuesta":"confirmación corta y cálida de lo que corregiste"}`}]})
-  });
-  const d=await res.json();if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+{"alimentos":[{"nombre":"...","porcion":"Xg","confianza":"alta","alternativa":"segunda opción o null"}],"respuesta":"confirmación corta y cálida de lo que corregiste"}`);
 }
 
 const sk=(p,k)=>`vt_${p}_${k}`;
