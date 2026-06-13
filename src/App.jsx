@@ -115,44 +115,16 @@ async function analizarTexto(alimentos,hp){
 }
 
 async function analizarFoto(b64,type,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",headers:{"Content-Type":"application/json","x-api-key":CLAUDE_API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-    body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:900,messages:[{role:"user",content:[
-      {type:"image",source:{type:"base64",media_type:type,data:b64}},
-      {type:"text",text:`Eres nutricionista experto en gastronomía colombiana. ${ctx}
-
-PASO 1 — Observa textura, brillo, forma y color de cada alimento antes de decidir.
-PASO 2 — Distingue explícitamente los pares que más se confunden:
-- PAPA CRIOLLA: amarilla pálida MATE, granulada, redonda/pequeña, interior harinoso seco. SIN brillo.
-- PLÁTANO MADURO COCIDO: amarillo-dorado intenso, superficie BRILLANTE/húmeda, alargado o en tajadas, bordes oscuros caramelizados, textura blanda lisa.
-  Regla: si brilla y es alargado/curvo → plátano maduro. Si es mate, redondo y granulado → papa criolla.
-- AHUYAMA: calabaza naranja-amarilla cremosa, diferente a zanahoria (naranja brillante, alargada, firme).
-- PAPA vs CALABACÍN: la PAPA es opaca, almidonada, color crema/café, firme. El CALABACÍN (zucchini) cocido o pelado es verde pálido o blanquecino, más acuoso y blando, suele venir en rodajas o trozos alargados y a veces conserva piel verde. Regla: si es alargado, acuoso o con piel verdosa → calabacín, NO papa.
-- YUCA: blanca fibrosa. ARROZ: blanco granulado suelto. AREPA: disco plano de maíz.
-- FRÍJOLES: rojos/negros/pintados en caldo o secos.
-- PLATOS PREPARADOS COLOMBIANOS: reconócelos por su nombre, no solo por ingredientes sueltos.
-  • PETO / MAZAMORRA: sopa o colada CREMOSA y espesa de maíz blanco con leche, servida en pocillo o taza. Si ves una sopa blanca lechosa con granos de maíz → es "Peto", NO "sopa láctea" ni leche+maíz por separado.
-  • Otros: Ajiaco, Sancocho, Changua, Avena, Arroz con leche.
-- AMARILLOS QUE SE CONFUNDEN (plátano maduro cocido vs mango vs papa):
-  • PLÁTANO MADURO COCIDO: trozo o tajada ALARGADA u ovalada, amarillo-dorado, textura firme y densa (almidón), NO jugoso ni fibroso. Es el acompañamiento típico de un almuerzo colombiano (junto a carne, papa, arroz).
-  • MANGO: FRUTA jugosa y fibrosa, tajada irregular, color más intenso y húmedo/brillante; suele ir aparte como fruta o postre.
-  • PAPA: opaca, pálida crema, almidonada, sin brillo.
-  Pista de contexto: en un plato principal con carne y papa, una pieza amarilla casi siempre es PLÁTANO MADURO COCIDO, no mango. Ante la duda entre plátano y mango, pon el otro en "alternativa".
-
-Para CADA alimento da tu mejor identificación y SIEMPRE la segunda opción más probable en "alternativa" (nunca null), aunque estés seguro, para que el usuario pueda corregir si te equivocaste.
-
-RECOMENDACIÓN: personalizada según perfil. Sedentario→porciones carbohidratos. Diabetes→índice glucémico. Hipertensión→sodio. Máximo 2 oraciones útiles.
-
-Responde SOLO JSON sin backticks:
-{"alimentos":[{"nombre":"nombre exacto colombiano","porcion":"Xg","confianza":"alta|media|baja","alternativa":"segunda opción más probable (siempre un alimento, nunca null)"}],"recomendacion":"consejo personalizado","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal"}`}
-    ]}]})
+  const ctx=hp?`${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}"`:"";
+  const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/ai-analyze-photo",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({user_id:"web",image_base64:b64,perfil:ctx})
   });
   const d=await res.json();
-  if(d.error)throw new Error(d.error.message);
-  return jparse(d.content[0].text);
+  if(d.error)throw new Error(d.error);
+  return d.analysis;
 }
-
 async function analizarSueno(noches,hp){
   const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const resumen=noches.map(n=>`${n.date}: durmió ${n.hours}h (${n.bed}→${n.wake}), calidad ${n.quality}/5, ${n.awakenings} despertares${n.note?", nota: "+n.note:""}`).join("\n");
