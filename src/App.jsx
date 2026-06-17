@@ -951,59 +951,26 @@ export default function App(){
       {tab===0&&(
         <div style={{padding:"16px 14px"}}>
 
-          <div style={{background:"linear-gradient(135deg,#6D5BD0,#5B49C0)",borderRadius:18,padding:"16px 16px",marginBottom:14,color:"#fff",boxShadow:"0 4px 18px rgba(45,106,79,0.25)"}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
-              <div style={{fontSize:30,fontWeight:900,lineHeight:1}}>🗳️ {votos}</div>
-              <div style={{fontSize:11,opacity:.9,fontWeight:600}}>votos a la persona<br/>que eliges ser</div>
-            </div>
-            <div style={{fontSize:14,fontWeight:700,lineHeight:1.4}}>{identityMsg(votos)}</div>
-            <div style={{fontSize:10,opacity:.8,marginTop:8,lineHeight:1.4}}>Cada acción que registras es un pequeño voto. No es disciplina: es quien estás eligiendo ser.</div>
-          </div>
-
-          <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:14,fontWeight:900,color:"#6D5BD0",marginBottom:2}}>⚡ Actívate</div>
-            <div style={{fontSize:12,color:"#888",marginBottom:12}}>¿Energía baja? Una pequeña acción cambia tu día.</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-              <button onClick={()=>quickActivate("caminar")} style={actBtn}>🚶 Caminar</button>
-              <button onClick={()=>quickActivate("estirar")} style={actBtn}>🧘 Estirarse</button>
-              <button onClick={()=>quickActivate("agua")} style={actBtn}>💧 Tomar agua</button>
-              <button onClick={()=>quickActivate("descansar")} style={actBtn}>😌 Descansar</button>
-            </div>
-            {actMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:13,fontWeight:700,color:"#6D5BD0",background:"#EFEDFC",padding:"9px 10px",borderRadius:10,lineHeight:1.4}}>{actMsg}</div>}
-          </div>
-
-          <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:14,fontWeight:900,color:"#6D5BD0",marginBottom:2}}>🔗 Mi hábito</div>
-            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Une una señal a una acción. Así no depende de fuerza de voluntad.</div>
-
-            <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>1. La señal (¿cuándo?)</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-              {H_SIGNALS.map(s=>(
-                <button key={s} onClick={()=>setHSignal(s)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hSignal===s?"#6D5BD0":"#E0E0E0"),background:hSignal===s?"#6D5BD0":"#fff",color:hSignal===s?"#fff":"#555",fontSize:12,fontWeight:700,cursor:"pointer"}}>{s}</button>
-              ))}
-            </div>
-
-            <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>2. La acción (¿qué haré?)</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-              {H_ACTIONS.map(a=>(
-                <button key={a.k} onClick={()=>setHAction(a.k)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hAction===a.k?"#5B49C0":"#E0E0E0"),background:hAction===a.k?"#EFEDFC":"#fff",color:"#6D5BD0",fontSize:12,fontWeight:700,cursor:"pointer"}}>{a.l}</button>
-              ))}
-            </div>
-
-            {hSignal&&hAction&&<div style={{background:"#F0F7F2",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#6D5BD0",lineHeight:1.5}}>Cuando <b>{hSignal.toLowerCase()}</b>, voy a <b>{aLabel(hAction).replace(/^[^ ]+ /,"")}</b>.<br/><span style={{color:"#888"}}>🗳️ Recompensa: un voto a la persona que eliges ser.</span></div>}
-
-            <button onClick={saveHabit} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#6D5BD0,#5B49C0)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Crear hábito</button>
-
-            {habits.length>0&&<div style={{marginTop:14}}>
-              <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:8}}>Mis hábitos ({habits.length})</div>
-              {habits.map(h=>(
-                <div key={h.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F8F7FE",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
-                  <div style={{flex:1,fontSize:12,color:"#333",lineHeight:1.4}}><b>{h.signal}</b> → {aLabel(h.action)}</div>
-                  <button onClick={()=>runHabit(h.action)} style={{padding:"6px 10px",borderRadius:10,border:"none",background:"#5B49C0",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Hacer</button>
-                  <button onClick={()=>delHabit(h.id)} style={{padding:"6px 8px",borderRadius:10,border:"none",background:"#F0E0E0",color:"#C1121F",fontSize:12,fontWeight:800,cursor:"pointer"}}>✕</button>
+          {/* ¿Cómo funciona? — 6 pasos */}
+          <div style={{background:"#fff",borderRadius:18,padding:"18px 16px",marginBottom:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+            <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0",marginBottom:16}}>¿Cómo funciona?</div>
+            {[
+              {n:1,e:"🩺",t:"Elige tu condición",d:"Selecciona tu condición de salud o tu objetivo."},
+              {n:2,e:"📋",t:"Registra tu información",d:"Ingresa tus datos personales, hábitos y preferencias."},
+              {n:3,e:"🍽️",t:"Registra tus comidas",d:"Cuéntanos qué comiste en desayuno, almuerzo y cena."},
+              {n:4,e:"🧠",t:"IA analiza por ti",d:"Nuestra IA analiza tus nutrientes según tu condición."},
+              {n:5,e:"🥗",t:"Recibe recomendaciones",d:"Sugerencias de alimentos, ejercicios y hábitos a tu medida."},
+              {n:6,e:"📈",t:"Sigue tu progreso",d:"Visualiza tu evolución y logra tus objetivos."},
+            ].map((p,i)=>(
+              <div key={p.n} style={{display:"flex",alignItems:"flex-start",gap:12,paddingBottom:i<5?14:0,marginBottom:i<5?14:0,borderBottom:i<5?"1px solid #F0EFF7":"none"}}>
+                <div style={{width:30,height:30,borderRadius:"50%",background:"#3DAE5A",color:"#fff",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{p.n}</div>
+                <div style={{fontSize:22,flexShrink:0,lineHeight:1.2}}>{p.e}</div>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#1A1A1A",marginBottom:2}}>{p.t}</div>
+                  <div style={{fontSize:12,color:"#888",lineHeight:1.4}}>{p.d}</div>
                 </div>
-              ))}
-            </div>}
+              </div>
+            ))}
           </div>
 
           {/* Selector comida — grid 2x2 */}
