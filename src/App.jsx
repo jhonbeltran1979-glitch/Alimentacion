@@ -921,34 +921,27 @@ export default function App(){
         <div style={{height:3,background:"rgba(255,255,255,0.2)",borderRadius:2,marginBottom:14,overflow:"hidden"}}>
           <div style={{height:3,width:`${waterPct}%`,background:"rgba(255,255,255,0.8)",borderRadius:2,transition:"width .5s"}}/>
         </div>
-        {/* User row */}
-        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:16}}>
-          <div style={{width:50,height:50,borderRadius:16,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26,backdropFilter:"blur(10px)",border:"2px solid rgba(255,255,255,0.3)",flexShrink:0}}>{nivel.icon}</div>
+        {/* Saludo */}
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+          <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28,backdropFilter:"blur(10px)",border:"2px solid rgba(255,255,255,0.3)",flexShrink:0}}>{nivel.icon}</div>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{color:"#fff",fontSize:18,fontWeight:900,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{perfil}</div>
-            <div style={{display:"flex",alignItems:"center",gap:6,marginTop:2}}>
-              <span style={{background:"rgba(255,255,255,0.2)",color:"#fff",fontSize:10,fontWeight:700,padding:"2px 8px",borderRadius:10}}>{nivel.nivel}</span>
-              {hp&&<span style={{color:"rgba(255,255,255,.6)",fontSize:10}}>{hp.edad}a · {hp.enfermedad}</span>}
-            </div>
+            <div style={{color:"#fff",fontSize:19,fontWeight:900,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>¡Hola, {perfil}! 👋</div>
+            <div style={{color:"rgba(255,255,255,.85)",fontSize:12,marginTop:2}}>Hoy es un buen día para cuidar de ti 🌟</div>
           </div>
-          <div style={{display:"flex",gap:6,flexShrink:0}}>
-            {streak>0&&<div style={{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"6px 10px",textAlign:"center",backdropFilter:"blur(10px)"}}>
-              <div style={{color:"#FFD166",fontSize:16,lineHeight:1}}>🔥</div>
-              <div style={{color:"#fff",fontSize:11,fontWeight:800}}>{streak}</div>
-            </div>}
-            <div style={{background:"rgba(255,255,255,0.15)",borderRadius:10,padding:"6px 10px",textAlign:"center",backdropFilter:"blur(10px)"}}>
-              <div style={{color:"#fff",fontSize:16,lineHeight:1}}>🏅</div>
-              <div style={{color:"#fff",fontSize:11,fontWeight:800}}>{badges.length}</div>
-            </div>
-            <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");setPerfil(null);setHp(null);setShowHF(false);}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:10,padding:"6px 10px",color:"rgba(255,255,255,.7)",fontSize:10,cursor:"pointer",backdropFilter:"blur(10px)"}}>Salir</button>
-          </div>
+          <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");setPerfil(null);setHp(null);setShowHF(false);}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:10,padding:"6px 10px",color:"rgba(255,255,255,.8)",fontSize:10,fontWeight:700,cursor:"pointer",backdropFilter:"blur(10px)",flexShrink:0}}>Salir</button>
+        </div>
+        {/* Chips de estado */}
+        <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:14}}>
+          <span style={{background:"rgba(255,255,255,0.22)",color:"#fff",fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20}}>{nivel.icon} {nivel.nivel}</span>
+          {hp&&<span style={{background:"rgba(255,255,255,0.12)",color:"rgba(255,255,255,.9)",fontSize:11,fontWeight:600,padding:"4px 10px",borderRadius:20}}>{hp.edad} años · {hp.enfermedad}</span>}
+          {streak>0&&<span style={{background:"rgba(255,255,255,0.12)",color:"#FFD166",fontSize:11,fontWeight:800,padding:"4px 10px",borderRadius:20}}>🔥 {streak} días</span>}
         </div>
         {/* Stats row */}
-        <div style={{display:"flex",gap:8,marginBottom:14}}>
+        <div style={{display:"flex",gap:8}}>
           {[{v:history.length,l:"Registros"},{v:streak,l:"Días racha"},{v:badges.length,l:"Logros"},{v:water,l:"Vasos agua"}].map(({v,l})=>(
-            <div key={l} style={{flex:1,background:"rgba(255,255,255,0.12)",borderRadius:14,padding:"10px 6px",textAlign:"center",backdropFilter:"blur(10px)"}}>
-              <div style={{color:"#fff",fontSize:18,fontWeight:900,lineHeight:1}}>{v}</div>
-              <div style={{color:"rgba(255,255,255,.65)",fontSize:9,marginTop:3}}>{l}</div>
+            <div key={l} style={{flex:1,background:"rgba(255,255,255,0.14)",borderRadius:14,padding:"11px 6px",textAlign:"center",backdropFilter:"blur(10px)"}}>
+              <div style={{color:"#fff",fontSize:19,fontWeight:900,lineHeight:1}}>{v}</div>
+              <div style={{color:"rgba(255,255,255,.7)",fontSize:9,marginTop:3}}>{l}</div>
             </div>
           ))}
         </div>
