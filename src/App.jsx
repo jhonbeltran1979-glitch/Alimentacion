@@ -50,10 +50,10 @@ const BADGES = [
 ];
 
 const getNivel = (streak,total) => {
-  if(streak>=30||total>=50)return{nivel:"Maestro",icon:"🧘",color:"#2D6A4F",badge:"#FFD700"};
-  if(streak>=7 ||total>=20)return{nivel:"Guerrero",icon:"⚔️",color:"#2D6A4F",badge:"#C0C0C0"};
-  if(streak>=3 ||total>=5) return{nivel:"Explorador",icon:"🌱",color:"#2D6A4F",badge:"#CD7F32"};
-  return{nivel:"Principiante",icon:"🌟",color:"#2D6A4F",badge:"#95A5A6"};
+  if(streak>=30||total>=50)return{nivel:"Maestro",icon:"🧘",color:"#6D5BD0",badge:"#FFD700"};
+  if(streak>=7 ||total>=20)return{nivel:"Guerrero",icon:"⚔️",color:"#6D5BD0",badge:"#C0C0C0"};
+  if(streak>=3 ||total>=5) return{nivel:"Explorador",icon:"🌱",color:"#6D5BD0",badge:"#CD7F32"};
+  return{nivel:"Principiante",icon:"🌟",color:"#6D5BD0",badge:"#95A5A6"};
 };
 
 const NUTRIENT_MAP = {
@@ -74,7 +74,7 @@ const NUTRIENT_MAP = {
 };
 
 const FOOD_CATEGORIES = [
-  {key:"verduras",  label:"Verduras",     emoji:"🥦", bg:"#D8F3DC", color:"#2D6A4F", items:["Brócoli","Espinaca","Kale","Zanahoria","Tomate","Pimentón","Ajo","Champiñones","Aguacate","Repollo","Lechuga","Acelga","Cebolla","Remolacha","Ahuyama","Calabacín","Zapallo","Habichuela","Pepino","Coliflor"], nutrients:["Vitamina C","Vitamina A","Fibra","Antioxidantes","Hierro"]},
+  {key:"verduras",  label:"Verduras",     emoji:"🥦", bg:"#EDEAFB", color:"#6D5BD0", items:["Brócoli","Espinaca","Kale","Zanahoria","Tomate","Pimentón","Ajo","Champiñones","Aguacate","Repollo","Lechuga","Acelga","Cebolla","Remolacha","Ahuyama","Calabacín","Zapallo","Habichuela","Pepino","Coliflor"], nutrients:["Vitamina C","Vitamina A","Fibra","Antioxidantes","Hierro"]},
   {key:"frutas",    label:"Frutas",       emoji:"🍎", bg:"#FFE8D6", color:"#C44B00", items:["Naranja","Mango","Papaya","Banano","Fresas","Arándanos","Guayaba","Maracuyá","Piña","Manzana","Uvas","Kiwi"], nutrients:["Vitamina C","Antioxidantes","Fibra","Potasio"]},
   {key:"proteinas", label:"Proteínas",    emoji:"🥩", bg:"#FFD7D7", color:"#9B2226", items:["Pollo","Res","Cerdo","Huevo","Atún","Sardinas","Salmón","Tofu","Lentejas","Fríjoles","Garbanzo"], nutrients:["Proteína","Hierro","Vitamina B12","Zinc","Omega-3"]},
   {key:"lacteos",   label:"Lácteos",      emoji:"🥛", bg:"#D4E8FF", color:"#1A6FA8", items:["Leche","Yogur","Queso","Kéfir","Kumis"], nutrients:["Calcio","Vitamina D","Probióticos","Proteína"]},
@@ -85,7 +85,7 @@ const FOOD_CATEGORIES = [
 
 const MEALS = [
   {label:"Desayuno",emoji:"☀️",color:"#F4A261"},
-  {label:"Almuerzo",emoji:"🍽️",color:"#2D6A4F"},
+  {label:"Almuerzo",emoji:"🍽️",color:"#6D5BD0"},
   {label:"Cena",    emoji:"🌙",color:"#457B9D"},
   {label:"Merienda",emoji:"🍎",color:"#E76F51"},
 ];
@@ -226,7 +226,7 @@ const sk=(p,k)=>`vt_${p}_${k}`;
 // ══ CONFETI ══════════════════════════════════════════════════════
 function Confeti({onDone}){
   useEffect(()=>{const t=setTimeout(onDone,2500);return()=>clearTimeout(t);},[]);
-  const colors=["#2D6A4F","#52B788","#F4A261","#FFD166","#FF6B9D"];
+  const colors=["#6D5BD0","#8B7BE8","#F4A261","#FFD166","#FF6B9D"];
   return(
     <div style={{position:"fixed",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:9999,overflow:"hidden"}}>
       {Array.from({length:28},(_,i)=>(
@@ -263,9 +263,9 @@ function ProfileScreen({onEnter}){
     setLoading(false);onEnter(t);
   };
   return(
-    <div style={{minHeight:"100vh",background:"#F8FAF5",fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
+    <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",display:"flex",flexDirection:"column"}}>
       {/* Header verde */}
-      <div style={{background:"linear-gradient(160deg,#2D6A4F,#52B788)",padding:"48px 24px 60px",textAlign:"center"}}>
+      <div style={{background:"linear-gradient(160deg,#6D5BD0,#8B7BE8)",padding:"48px 24px 60px",textAlign:"center"}}>
         <div style={{width:80,height:80,borderRadius:24,background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:40,margin:"0 auto 16px",backdropFilter:"blur(10px)"}}>🥗</div>
         <div style={{color:"#fff",fontSize:28,fontWeight:900,letterSpacing:-1}}>VitalTrack</div>
         <div style={{color:"rgba(255,255,255,0.75)",fontSize:14,marginTop:6}}>Tu guía nutricional personalizada con IA</div>
@@ -277,9 +277,9 @@ function ProfileScreen({onEnter}){
           <div style={{color:"#888",fontSize:13,marginBottom:20}}>Crea tu perfil para comenzar tu journey saludable</div>
           <input ref={ref} value={name} onChange={e=>{setName(e.target.value);setErr("");}} onKeyDown={e=>e.key==="Enter"&&go()}
             placeholder="Tu nombre..."
-            style={{width:"100%",padding:"16px",borderRadius:14,border:`2px solid ${err?"#FF4757":"#E8F4EC"}`,background:"#F8FAF5",color:"#1A1A1A",fontSize:16,fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:err?6:16}}/>
+            style={{width:"100%",padding:"16px",borderRadius:14,border:`2px solid ${err?"#FF4757":"#EFEDFC"}`,background:"#F8F7FE",color:"#1A1A1A",fontSize:16,fontWeight:600,outline:"none",boxSizing:"border-box",marginBottom:err?6:16}}/>
           {err&&<div style={{color:"#FF4757",fontSize:12,marginBottom:12}}>{err}</div>}
-          <button onClick={go} disabled={loading} style={{width:"100%",padding:16,borderRadius:14,border:"none",background:loading?"#ccc":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:16,fontWeight:800,cursor:loading?"not-allowed":"pointer",boxShadow:loading?"none":"0 4px 20px #2D6A4F44",letterSpacing:.3}}>
+          <button onClick={go} disabled={loading} style={{width:"100%",padding:16,borderRadius:14,border:"none",background:loading?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:16,fontWeight:800,cursor:loading?"not-allowed":"pointer",boxShadow:loading?"none":"0 4px 20px #6D5BD044",letterSpacing:.3}}>
             {loading?"Preparando perfil...":"Empezar →"}
           </button>
         </div>
@@ -304,8 +304,8 @@ function HealthScreen({perfil,onComplete}){
     setLoading(false);onComplete({edad,ejercicio,enfermedad:e2});
   };
   return(
-    <div style={{minHeight:"100vh",background:"#F8FAF5",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
-      <div style={{background:"linear-gradient(160deg,#2D6A4F,#52B788)",padding:"40px 24px 50px",textAlign:"center"}}>
+    <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
+      <div style={{background:"linear-gradient(160deg,#6D5BD0,#8B7BE8)",padding:"40px 24px 50px",textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:10}}>🩺</div>
         <div style={{color:"#fff",fontSize:22,fontWeight:900}}>Tu perfil de salud</div>
         <div style={{color:"rgba(255,255,255,.75)",fontSize:13,marginTop:4}}>Hola <b>{perfil}</b> — personalizamos tus recomendaciones</div>
@@ -313,21 +313,21 @@ function HealthScreen({perfil,onComplete}){
       <div style={{padding:"0 16px 24px",marginTop:-20}}>
         {/* Edad */}
         <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-          <div style={{color:"#2D6A4F",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Edad</div>
+          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Edad</div>
           <input type="number" value={edad} onChange={e=>{setEdad(e.target.value);setErr("");}} placeholder="Ej: 32"
-            style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #E8F4EC",background:"#F8FAF5",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+            style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
         </div>
         {/* Ejercicio */}
         <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-          <div style={{color:"#2D6A4F",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Actividad física</div>
+          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Actividad física</div>
           <div style={{display:"flex",flexDirection:"column",gap:8}}>
             {EJERCICIOS.map(({e,d})=>(
-              <div key={e} onClick={()=>{setEjercicio(e);setErr("");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:`2px solid ${ejercicio===e?"#2D6A4F":"#E8F4EC"}`,background:ejercicio===e?"#E8F4EC":"#F8FAF5",cursor:"pointer",transition:"all .15s"}}>
+              <div key={e} onClick={()=>{setEjercicio(e);setErr("");}} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 14px",borderRadius:14,border:`2px solid ${ejercicio===e?"#6D5BD0":"#EFEDFC"}`,background:ejercicio===e?"#EFEDFC":"#F8F7FE",cursor:"pointer",transition:"all .15s"}}>
                 <div style={{flex:1}}>
-                  <div style={{color:ejercicio===e?"#2D6A4F":"#333",fontWeight:700,fontSize:14}}>{e}</div>
+                  <div style={{color:ejercicio===e?"#6D5BD0":"#333",fontWeight:700,fontSize:14}}>{e}</div>
                   <div style={{color:"#888",fontSize:11,marginTop:1}}>{d}</div>
                 </div>
-                <div style={{width:22,height:22,borderRadius:"50%",border:`2.5px solid ${ejercicio===e?"#2D6A4F":"#ccc"}`,background:ejercicio===e?"#2D6A4F":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
+                <div style={{width:22,height:22,borderRadius:"50%",border:`2.5px solid ${ejercicio===e?"#6D5BD0":"#ccc"}`,background:ejercicio===e?"#6D5BD0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>
                   {ejercicio===e&&<div style={{width:8,height:8,borderRadius:"50%",background:"#fff"}}/>}
                 </div>
               </div>
@@ -336,16 +336,16 @@ function HealthScreen({perfil,onComplete}){
         </div>
         {/* Condición */}
         <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:16,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-          <div style={{color:"#2D6A4F",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Condición de salud</div>
+          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Condición de salud</div>
           <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
             {ENFERMEDADES.map(e=>(
-              <button key={e} onClick={()=>{setEnf(e);setErr("");}} style={{padding:"9px 16px",borderRadius:20,border:`2px solid ${enf===e?"#2D6A4F":"#E8F4EC"}`,background:enf===e?"#2D6A4F":"#F8FAF5",color:enf===e?"#fff":"#555",fontSize:13,cursor:"pointer",fontWeight:enf===e?800:400,transition:"all .15s"}}>{e}</button>
+              <button key={e} onClick={()=>{setEnf(e);setErr("");}} style={{padding:"9px 16px",borderRadius:20,border:`2px solid ${enf===e?"#6D5BD0":"#EFEDFC"}`,background:enf===e?"#6D5BD0":"#F8F7FE",color:enf===e?"#fff":"#555",fontSize:13,cursor:"pointer",fontWeight:enf===e?800:400,transition:"all .15s"}}>{e}</button>
             ))}
           </div>
-          {enf==="Otra"&&<input value={otra} onChange={e=>setOtra(e.target.value)} placeholder="¿Cuál condición?" style={{marginTop:10,width:"100%",padding:"12px",borderRadius:12,border:"2px solid #E8F4EC",background:"#F8FAF5",color:"#1A1A1A",fontSize:13,outline:"none",boxSizing:"border-box"}}/>}
+          {enf==="Otra"&&<input value={otra} onChange={e=>setOtra(e.target.value)} placeholder="¿Cuál condición?" style={{marginTop:10,width:"100%",padding:"12px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:13,outline:"none",boxSizing:"border-box"}}/>}
         </div>
         {err&&<div style={{color:"#FF4757",fontSize:13,marginBottom:12,textAlign:"center",fontWeight:600}}>{err}</div>}
-        <button onClick={save} disabled={loading} style={{width:"100%",padding:16,borderRadius:16,border:"none",background:loading?"#ccc":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:16,fontWeight:800,cursor:loading?"not-allowed":"pointer",boxShadow:loading?"none":"0 4px 20px #2D6A4F44"}}>
+        <button onClick={save} disabled={loading} style={{width:"100%",padding:16,borderRadius:16,border:"none",background:loading?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:16,fontWeight:800,cursor:loading?"not-allowed":"pointer",boxShadow:loading?"none":"0 4px 20px #6D5BD044"}}>
           {loading?"Guardando...":"Guardar y empezar 🚀"}
         </button>
       </div>
@@ -492,8 +492,8 @@ export default function App(){
   const today=new Date().toLocaleDateString("es-CO");
   const nivel=getNivel(streak,history.length);
   const waterPct=Math.min(100,(water/WATER_GOAL)*100);
-  const scoreColor=v=>v>=70?"#2D6A4F":v>=40?"#E9C46A":"#E76F51";
-  const scoreBg=v=>v>=70?"#D8F3DC":v>=40?"#FFF3CD":"#FFE5DE";
+  const scoreColor=v=>v>=70?"#6D5BD0":v>=40?"#E9C46A":"#E76F51";
+  const scoreBg=v=>v>=70?"#EDEAFB":v>=40?"#FFF3CD":"#FFE5DE";
   const toggle=f=>setSelected(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
 
   const checkBadges=(state,hist)=>{
@@ -548,7 +548,7 @@ export default function App(){
   };
 
   // ── ACTÍVATE (pausas activas) ──────────────────────────
-  const actBtn={padding:"14px 8px",borderRadius:14,border:"2px solid #E8F4EC",background:"#F8FAF5",color:"#2D6A4F",fontSize:14,fontWeight:800,cursor:"pointer"};
+  const actBtn={padding:"14px 8px",borderRadius:14,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#6D5BD0",fontSize:14,fontWeight:800,cursor:"pointer"};
   const flashAct=(m)=>{setActMsg(m);setTimeout(()=>setActMsg(""),3500);};
   const addQuickWorkout=(tipo,min,intensidad)=>{const rec={date:today,ts:Date.now(),tipo,min,intensidad};setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});};
   const startBreathing=()=>{setBreathing(true);setBreathPhase("Inhala");let inhale=true;if(breathRef.current)clearInterval(breathRef.current);breathRef.current=setInterval(()=>{inhale=!inhale;setBreathPhase(inhale?"Inhala":"Exhala");},5000);setTimeout(stopBreathing,60000);};
@@ -701,15 +701,20 @@ export default function App(){
   const startVoice=()=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
-    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
-    let acc="",current="";r._userStop=false;
+    let acc="";
+    recRef.userStop=false;
     setVoiceText("");setVoiceResult(null);setListening(true);
-    r.onresult=(e)=>{let txt="";for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript+" ";}current=txt.trim();setVoiceText((acc+" "+current).trim());};
-    r.onerror=(ev)=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});}};
-    r.onend=()=>{acc=(acc+" "+current).trim();current="";if(r._userStop){setListening(false);if(acc.trim())processVoice(acc.trim());else setVoiceResult(null);}else{try{r.start();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}};
-    recRef.current=r;try{r.start();}catch(_){}
+    const run=()=>{
+      const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=false;r._fin="";
+      recRef.current=r;
+      r.onresult=(e)=>{let fin="",inter="";for(let i=0;i<e.results.length;i++){const seg=e.results[i];if(seg.isFinal)fin+=seg[0].transcript+" ";else inter=seg[0].transcript;}r._fin=fin.trim();setVoiceText((acc+" "+(fin?fin:inter)).trim());};
+      r.onerror=(ev)=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){recRef.userStop=true;setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});}};
+      r.onend=()=>{if(r._fin)acc=(acc+" "+r._fin).trim();if(recRef.userStop){setListening(false);if(acc.trim())processVoice(acc.trim());else setVoiceResult(null);}else{try{run();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}};
+      try{r.start();}catch(_){}
+    };
+    run();
   };
-  const stopVoice=()=>{const r=recRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
+  const stopVoice=()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}};
 
   // ── ANÁLISIS SEMANAL INTEGRAL ──────────────────────────
   const analizarSemana=async()=>{
@@ -878,14 +883,19 @@ export default function App(){
   const startPhotoVoiceCorrection=()=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setSavedMsg("Tu navegador no soporta voz. Usa Chrome.");setTimeout(()=>setSavedMsg(""),3000);return;}
-    const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=true;
-    let acc="",current="";r._userStop=false;setPhotoVoiceListening(true);
-    r.onresult=(e)=>{let txt="";for(let i=0;i<e.results.length;i++){txt+=e.results[i][0].transcript+" ";}current=txt.trim();};
-    r.onerror=(ev)=>{if(ev.error==="not-allowed"){setPhotoVoiceListening(false);}};
-    r.onend=()=>{acc=(acc+" "+current).trim();current="";if(r._userStop){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}else{try{r.start();}catch(_){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}}};
-    photoRecRef.current=r;try{r.start();}catch(_){}
+    let acc="";
+    photoRecRef.userStop=false;setPhotoVoiceListening(true);
+    const run=()=>{
+      const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=false;r._fin="";
+      photoRecRef.current=r;
+      r.onresult=(e)=>{let fin="";for(let i=0;i<e.results.length;i++){const seg=e.results[i];if(seg.isFinal)fin+=seg[0].transcript+" ";}r._fin=fin.trim();};
+      r.onerror=(ev)=>{if(ev.error==="not-allowed"){photoRecRef.userStop=true;setPhotoVoiceListening(false);}};
+      r.onend=()=>{if(r._fin)acc=(acc+" "+r._fin).trim();if(photoRecRef.userStop){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}else{try{run();}catch(_){setPhotoVoiceListening(false);if(acc.trim())applyPhotoCorrection(acc.trim());}}};
+      try{r.start();}catch(_){}
+    };
+    run();
   };
-  const stopPhotoVoice=()=>{const r=photoRecRef.current;if(r){r._userStop=true;try{r.stop();}catch(_){}}};
+  const stopPhotoVoice=()=>{photoRecRef.userStop=true;try{photoRecRef.current&&photoRecRef.current.stop();}catch(_){}};
   // Confirmar la foto → guardar y luego analizar
   const confirmPhotoAndSave=()=>{
     setPhotoConfirmed(true);
@@ -899,14 +909,14 @@ export default function App(){
   const TABS=[{icon:"🏠",label:"Inicio"},{icon:"📊",label:"Score"},{icon:"📅",label:"Historial"},{icon:"🏅",label:"Logros"},{icon:"💧",label:"Agua"},{icon:"😴",label:"Sueño"},{icon:"💪",label:"Ejercicio"}];
 
   return(
-    <div style={{minHeight:"100vh",background:"#F8FAF5",fontFamily:"'Segoe UI',system-ui,sans-serif",color:"#1A1A1A",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
+    <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",color:"#1A1A1A",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
 
       {confeti&&<Confeti onDone={()=>setConfeti(false)}/>}
-      {newBadge&&<Toast icon={newBadge.icon} title="¡Insignia desbloqueada!" sub={`${newBadge.nombre} — ${newBadge.desc}`} color="#2D6A4F" onClose={()=>setNewBadge(null)}/>}
+      {newBadge&&<Toast icon={newBadge.icon} title="¡Insignia desbloqueada!" sub={`${newBadge.nombre} — ${newBadge.desc}`} color="#6D5BD0" onClose={()=>setNewBadge(null)}/>}
       {pildora&&<Toast icon="💡" title="Píldora de sabiduría" sub={pildora} color="#F4A261" onClose={()=>setPildora(null)}/>}
 
       {/* ══ HEADER VERDE ══════════════════════════════════════════ */}
-      <div style={{background:"linear-gradient(160deg,#1B4332,#2D6A4F)",padding:"16px 16px 28px",position:"sticky",top:0,zIndex:10}}>
+      <div style={{background:"linear-gradient(160deg,#4A3B9E,#6D5BD0)",padding:"16px 16px 28px",position:"sticky",top:0,zIndex:10}}>
         {/* Barra agua top */}
         <div style={{height:3,background:"rgba(255,255,255,0.2)",borderRadius:2,marginBottom:14,overflow:"hidden"}}>
           <div style={{height:3,width:`${waterPct}%`,background:"rgba(255,255,255,0.8)",borderRadius:2,transition:"width .5s"}}/>
@@ -948,7 +958,7 @@ export default function App(){
       {tab===0&&(
         <div style={{padding:"16px 14px"}}>
 
-          <div style={{background:"linear-gradient(135deg,#2D6A4F,#40916C)",borderRadius:18,padding:"16px 16px",marginBottom:14,color:"#fff",boxShadow:"0 4px 18px rgba(45,106,79,0.25)"}}>
+          <div style={{background:"linear-gradient(135deg,#6D5BD0,#5B49C0)",borderRadius:18,padding:"16px 16px",marginBottom:14,color:"#fff",boxShadow:"0 4px 18px rgba(45,106,79,0.25)"}}>
             <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:6}}>
               <div style={{fontSize:30,fontWeight:900,lineHeight:1}}>🗳️ {votos}</div>
               <div style={{fontSize:11,opacity:.9,fontWeight:600}}>votos a la persona<br/>que eliges ser</div>
@@ -958,7 +968,7 @@ export default function App(){
           </div>
 
           <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:14,fontWeight:900,color:"#2D6A4F",marginBottom:2}}>⚡ Actívate</div>
+            <div style={{fontSize:14,fontWeight:900,color:"#6D5BD0",marginBottom:2}}>⚡ Actívate</div>
             <div style={{fontSize:12,color:"#888",marginBottom:12}}>¿Energía baja? Una pequeña acción cambia tu día.</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               <button onClick={()=>quickActivate("caminar")} style={actBtn}>🚶 Caminar</button>
@@ -966,37 +976,37 @@ export default function App(){
               <button onClick={()=>quickActivate("agua")} style={actBtn}>💧 Tomar agua</button>
               <button onClick={()=>quickActivate("descansar")} style={actBtn}>😌 Descansar</button>
             </div>
-            {actMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:13,fontWeight:700,color:"#2D6A4F",background:"#E8F4EC",padding:"9px 10px",borderRadius:10,lineHeight:1.4}}>{actMsg}</div>}
+            {actMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:13,fontWeight:700,color:"#6D5BD0",background:"#EFEDFC",padding:"9px 10px",borderRadius:10,lineHeight:1.4}}>{actMsg}</div>}
           </div>
 
           <div style={{background:"#fff",borderRadius:18,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:14,fontWeight:900,color:"#2D6A4F",marginBottom:2}}>🔗 Mi hábito</div>
+            <div style={{fontSize:14,fontWeight:900,color:"#6D5BD0",marginBottom:2}}>🔗 Mi hábito</div>
             <div style={{fontSize:12,color:"#888",marginBottom:12}}>Une una señal a una acción. Así no depende de fuerza de voluntad.</div>
 
             <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>1. La señal (¿cuándo?)</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
               {H_SIGNALS.map(s=>(
-                <button key={s} onClick={()=>setHSignal(s)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hSignal===s?"#2D6A4F":"#E0E0E0"),background:hSignal===s?"#2D6A4F":"#fff",color:hSignal===s?"#fff":"#555",fontSize:12,fontWeight:700,cursor:"pointer"}}>{s}</button>
+                <button key={s} onClick={()=>setHSignal(s)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hSignal===s?"#6D5BD0":"#E0E0E0"),background:hSignal===s?"#6D5BD0":"#fff",color:hSignal===s?"#fff":"#555",fontSize:12,fontWeight:700,cursor:"pointer"}}>{s}</button>
               ))}
             </div>
 
             <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:6}}>2. La acción (¿qué haré?)</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
               {H_ACTIONS.map(a=>(
-                <button key={a.k} onClick={()=>setHAction(a.k)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hAction===a.k?"#40916C":"#E0E0E0"),background:hAction===a.k?"#E8F4EC":"#fff",color:"#2D6A4F",fontSize:12,fontWeight:700,cursor:"pointer"}}>{a.l}</button>
+                <button key={a.k} onClick={()=>setHAction(a.k)} style={{padding:"7px 11px",borderRadius:20,border:"1.5px solid "+(hAction===a.k?"#5B49C0":"#E0E0E0"),background:hAction===a.k?"#EFEDFC":"#fff",color:"#6D5BD0",fontSize:12,fontWeight:700,cursor:"pointer"}}>{a.l}</button>
               ))}
             </div>
 
-            {hSignal&&hAction&&<div style={{background:"#F0F7F2",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#2D6A4F",lineHeight:1.5}}>Cuando <b>{hSignal.toLowerCase()}</b>, voy a <b>{aLabel(hAction).replace(/^[^ ]+ /,"")}</b>.<br/><span style={{color:"#888"}}>🗳️ Recompensa: un voto a la persona que eliges ser.</span></div>}
+            {hSignal&&hAction&&<div style={{background:"#F0F7F2",borderRadius:10,padding:"10px 12px",marginBottom:10,fontSize:12,color:"#6D5BD0",lineHeight:1.5}}>Cuando <b>{hSignal.toLowerCase()}</b>, voy a <b>{aLabel(hAction).replace(/^[^ ]+ /,"")}</b>.<br/><span style={{color:"#888"}}>🗳️ Recompensa: un voto a la persona que eliges ser.</span></div>}
 
-            <button onClick={saveHabit} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#2D6A4F,#40916C)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Crear hábito</button>
+            <button onClick={saveHabit} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#6D5BD0,#5B49C0)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Crear hábito</button>
 
             {habits.length>0&&<div style={{marginTop:14}}>
               <div style={{fontSize:11,fontWeight:800,color:"#555",marginBottom:8}}>Mis hábitos ({habits.length})</div>
               {habits.map(h=>(
-                <div key={h.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F8FAF5",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                <div key={h.id} style={{display:"flex",alignItems:"center",gap:8,background:"#F8F7FE",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
                   <div style={{flex:1,fontSize:12,color:"#333",lineHeight:1.4}}><b>{h.signal}</b> → {aLabel(h.action)}</div>
-                  <button onClick={()=>runHabit(h.action)} style={{padding:"6px 10px",borderRadius:10,border:"none",background:"#40916C",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Hacer</button>
+                  <button onClick={()=>runHabit(h.action)} style={{padding:"6px 10px",borderRadius:10,border:"none",background:"#5B49C0",color:"#fff",fontSize:11,fontWeight:800,cursor:"pointer",whiteSpace:"nowrap"}}>Hacer</button>
                   <button onClick={()=>delHabit(h.id)} style={{padding:"6px 8px",borderRadius:10,border:"none",background:"#F0E0E0",color:"#C1121F",fontSize:12,fontWeight:800,cursor:"pointer"}}>✕</button>
                 </div>
               ))}
@@ -1005,7 +1015,7 @@ export default function App(){
 
           {/* Selector comida — grid 2x2 */}
           <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Registrar comida</div>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Registrar comida</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
               {MEALS.map((m,i)=>(
                 <div key={i} onClick={()=>setMeal(i)} style={{background:meal===i?m.color:"#fff",borderRadius:16,padding:"14px",display:"flex",alignItems:"center",gap:10,cursor:"pointer",boxShadow:meal===i?`0 4px 16px ${m.color}55`:"0 2px 8px rgba(0,0,0,0.06)",border:`2px solid ${meal===i?m.color:"transparent"}`,transition:"all .2s"}}>
@@ -1022,7 +1032,7 @@ export default function App(){
           {/* Foto IA */}
           <div style={{marginBottom:14}}>
             <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={handlePhoto}/>
-            <button onClick={()=>fileRef.current?.click()} disabled={photoAI} style={{width:"100%",padding:15,borderRadius:16,border:"2px dashed #52B788",background:photoAI?"#E8F4EC":"#F0FBF4",color:"#2D6A4F",fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            <button onClick={()=>fileRef.current?.click()} disabled={photoAI} style={{width:"100%",padding:15,borderRadius:16,border:"2px dashed #8B7BE8",background:photoAI?"#EFEDFC":"#F0FBF4",color:"#6D5BD0",fontSize:14,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
               <span style={{fontSize:22}}>📷</span>
               {photoAI?"🔍 Analizando con IA...":"Tomar foto y detectar alimentos"}
             </button>
@@ -1031,8 +1041,8 @@ export default function App(){
 
             {/* Confirmación foto */}
             {photoFoods&&photoFoods.length>0&&(
-              <div style={{marginTop:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"2px solid #E8F4EC"}}>
-                <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:10}}>✨ IA detectó — confirma o corrige con un toque:</div>
+              <div style={{marginTop:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",border:"2px solid #EFEDFC"}}>
+                <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:10}}>✨ IA detectó — confirma o corrige con un toque:</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
                   {photoFoods.map((item,i)=>{
                     const nombre=typeof item==="object"?item.nombre:item;
@@ -1042,14 +1052,14 @@ export default function App(){
                     const matchApp=matchFood(nombre);
                     const isSel=matchApp&&selected.includes(matchApp);
                     return(
-                      <div key={i} style={{display:"flex",flexDirection:"column",gap:6,background:isSel?"#E8F4EC":"#F8FAF5",borderRadius:12,padding:"10px 12px",border:`1.5px solid ${confianza==="baja"?"#E9C46A55":isSel?"#2D6A4F33":"transparent"}`}}>
+                      <div key={i} style={{display:"flex",flexDirection:"column",gap:6,background:isSel?"#EFEDFC":"#F8F7FE",borderRadius:12,padding:"10px 12px",border:`1.5px solid ${confianza==="baja"?"#E9C46A55":isSel?"#6D5BD033":"transparent"}`}}>
                         <div style={{display:"flex",alignItems:"center",gap:10}}>
                           <div style={{flex:1}}>
                             <span style={{fontSize:13,fontWeight:700,color:"#1A1A1A"}}>{nombre}</span>
                             {confianza==="baja"&&<span style={{marginLeft:6,fontSize:9,background:"#E9C46A22",color:"#856404",padding:"1px 5px",borderRadius:4,fontWeight:600}}>?dudoso</span>}
                             {porcion&&<span style={{marginLeft:6,fontSize:10,color:"#888"}}>{porcion}</span>}
                           </div>
-                          <button onClick={()=>{if(matchApp)toggle(matchApp);}} style={{padding:"5px 12px",borderRadius:10,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",background:isSel?"#2D6A4F":"#eee",color:isSel?"#fff":"#888",transition:"all .15s"}}>
+                          <button onClick={()=>{if(matchApp)toggle(matchApp);}} style={{padding:"5px 12px",borderRadius:10,border:"none",fontSize:11,fontWeight:800,cursor:"pointer",background:isSel?"#6D5BD0":"#eee",color:isSel?"#fff":"#888",transition:"all .15s"}}>
                             {isSel?"✓ Sí":"✗ No"}
                           </button>
                         </div>
@@ -1065,14 +1075,14 @@ export default function App(){
 
                 {!photoConfirmed&&(
                   <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid #F0F0F0"}}>
-                    <div style={{fontSize:13,fontWeight:800,color:"#2D6A4F",marginBottom:8,textAlign:"center"}}>¿Es correcta esta información?</div>
+                    <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:8,textAlign:"center"}}>¿Es correcta esta información?</div>
                     {photoVoiceListening&&<div style={{fontSize:12,color:"#C1121F",fontWeight:700,textAlign:"center",marginBottom:8}}>🎤 Escuchando… di qué corregir y toca Detener</div>}
                     {photoVoiceBusy&&<div style={{fontSize:12,color:"#888",textAlign:"center",marginBottom:8}}>🤔 Aplicando tu corrección…</div>}
                     <div style={{display:"flex",gap:8}}>
                       {photoVoiceListening
                         ?<button onClick={stopPhotoVoice} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"#C1121F",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>⏹️ Detener</button>
-                        :<button onClick={startPhotoVoiceCorrection} disabled={photoVoiceBusy} style={{flex:1,padding:"12px",borderRadius:12,border:"2px solid #2D6A4F",background:"#fff",color:"#2D6A4F",fontSize:13,fontWeight:800,cursor:"pointer"}}>🎤 Corregir por voz</button>}
-                      <button onClick={confirmPhotoAndSave} disabled={photoVoiceListening||photoVoiceBusy||saving} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>✓ Sí, guardar</button>
+                        :<button onClick={startPhotoVoiceCorrection} disabled={photoVoiceBusy} style={{flex:1,padding:"12px",borderRadius:12,border:"2px solid #6D5BD0",background:"#fff",color:"#6D5BD0",fontSize:13,fontWeight:800,cursor:"pointer"}}>🎤 Corregir por voz</button>}
+                      <button onClick={confirmPhotoAndSave} disabled={photoVoiceListening||photoVoiceBusy||saving} style={{flex:1,padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>✓ Sí, guardar</button>
                     </div>
                   </div>
                 )}
@@ -1080,10 +1090,10 @@ export default function App(){
             )}
 
             {photoResult&&(
-              <div style={{marginTop:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`4px solid ${photoResult.semaforo==="verde"?"#2D6A4F":photoResult.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
+              <div style={{marginTop:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`4px solid ${photoResult.semaforo==="verde"?"#2E9E5B":photoResult.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                   <span style={{fontWeight:800,fontSize:13}}>{photoResult.semaforo==="verde"?"🟢":photoResult.semaforo==="rojo"?"🔴":"🟡"} Análisis IA</span>
-                  {photoResult.calorias_aprox&&<span style={{fontSize:11,color:"#2D6A4F",background:"#E8F4EC",padding:"3px 8px",borderRadius:8,fontWeight:700}}>{photoResult.calorias_aprox}</span>}
+                  {photoResult.calorias_aprox&&<span style={{fontSize:11,color:"#6D5BD0",background:"#EFEDFC",padding:"3px 8px",borderRadius:8,fontWeight:700}}>{photoResult.calorias_aprox}</span>}
                 </div>
                 <div style={{fontSize:12,color:"#555",lineHeight:1.6}}>{photoResult.recomendacion}</div>
               </div>
@@ -1093,10 +1103,10 @@ export default function App(){
           {/* Frecuentes */}
           {quickFoods.length>0&&(
             <div style={{background:"#fff",borderRadius:16,padding:14,marginBottom:12,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-              <div style={{fontSize:11,color:"#2D6A4F",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>⚡ Frecuentes</div>
+              <div style={{fontSize:11,color:"#6D5BD0",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>⚡ Frecuentes</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                 {quickFoods.map(f=>(
-                  <button key={f} onClick={()=>{if(!selected.includes(f))setSelected(p=>[...p,f]);}} style={{padding:"7px 14px",borderRadius:20,border:`2px solid ${selected.includes(f)?"#2D6A4F":"#E8F4EC"}`,background:selected.includes(f)?"#2D6A4F":"#F8FAF5",color:selected.includes(f)?"#fff":"#555",fontSize:12,cursor:"pointer",fontWeight:700,transition:"all .15s"}}>
+                  <button key={f} onClick={()=>{if(!selected.includes(f))setSelected(p=>[...p,f]);}} style={{padding:"7px 14px",borderRadius:20,border:`2px solid ${selected.includes(f)?"#6D5BD0":"#EFEDFC"}`,background:selected.includes(f)?"#6D5BD0":"#F8F7FE",color:selected.includes(f)?"#fff":"#555",fontSize:12,cursor:"pointer",fontWeight:700,transition:"all .15s"}}>
                     {f}{selected.includes(f)?" ✓":""}
                   </button>
                 ))}
@@ -1106,7 +1116,7 @@ export default function App(){
 
           {/* Categorías — estilo cards con emoji grande */}
           <div style={{marginBottom:12}}>
-            <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Seleccionar alimentos</div>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,textTransform:"uppercase",letterSpacing:1,marginBottom:10}}>Seleccionar alimentos</div>
             {/* Chips rápidos */}
             <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:10,scrollbarWidth:"none"}}>
               {FOOD_CATEGORIES.map(c=>{
@@ -1149,10 +1159,10 @@ export default function App(){
 
           {/* Seleccionados */}
           {(selected.length>0||customFoods.length>0)&&(
-            <div style={{background:"#fff",borderRadius:16,padding:14,marginBottom:10,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #E8F4EC"}}>
-              <div style={{fontSize:11,color:"#2D6A4F",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{selected.length+customFoods.length} seleccionados</div>
+            <div style={{background:"#fff",borderRadius:16,padding:14,marginBottom:10,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #EFEDFC"}}>
+              <div style={{fontSize:11,color:"#6D5BD0",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{selected.length+customFoods.length} seleccionados</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                {selected.map(f=><span key={f} onClick={()=>toggle(f)} style={{fontSize:12,padding:"5px 12px",borderRadius:20,background:"#E8F4EC",color:"#2D6A4F",cursor:"pointer",fontWeight:700,border:"1.5px solid #52B78844"}}>{f} ✕</span>)}
+                {selected.map(f=><span key={f} onClick={()=>toggle(f)} style={{fontSize:12,padding:"5px 12px",borderRadius:20,background:"#EFEDFC",color:"#6D5BD0",cursor:"pointer",fontWeight:700,border:"1.5px solid #8B7BE844"}}>{f} ✕</span>)}
                 {customFoods.map((f,i)=><span key={`c${i}`} onClick={()=>setCustomFoods(p=>p.filter((_,j)=>j!==i))} style={{fontSize:12,padding:"5px 12px",borderRadius:20,background:"#FFE8D6",color:"#C44B00",cursor:"pointer",fontWeight:700,border:"1.5px solid #F4A26144"}}>{f} ✕</span>)}
               </div>
             </div>
@@ -1163,25 +1173,25 @@ export default function App(){
             <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8}}>➕ Agregar alimento no listado</div>
             <div style={{display:"flex",gap:8}}>
               <input value={customFood} onChange={e=>setCustomFood(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&customFood.trim()){setCustomFoods(p=>[...p,customFood.trim()]);setCustomFood("");}}} placeholder="Ej: ahuyama, mazorca, aguapanela..."
-                style={{flex:1,padding:"10px 14px",borderRadius:12,border:"2px solid #E8F4EC",background:"#F8FAF5",color:"#1A1A1A",fontSize:13,outline:"none"}}/>
-              <button onClick={()=>{if(customFood.trim()){setCustomFoods(p=>[...p,customFood.trim()]);setCustomFood("");}}} style={{padding:"10px 16px",borderRadius:12,border:"none",background:"#2D6A4F",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>+</button>
+                style={{flex:1,padding:"10px 14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:13,outline:"none"}}/>
+              <button onClick={()=>{if(customFood.trim()){setCustomFoods(p=>[...p,customFood.trim()]);setCustomFood("");}}} style={{padding:"10px 16px",borderRadius:12,border:"none",background:"#6D5BD0",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>+</button>
             </div>
           </div>
 
           {/* Analizar sin foto */}
           {(selected.length>0||customFoods.length>0)&&!photoPreview&&(
             <button onClick={async()=>{const all=[...selected,...customFoods];setAnalyzingText(true);setPhotoResult(null);try{const r=await analizarTexto(all,hp);setPhotoResult({ok:true,...r});}catch(_){}setAnalyzingText(false);}} disabled={analyzingText}
-              style={{width:"100%",padding:13,borderRadius:14,border:"2px solid #52B788",background:"#F0FBF4",color:"#2D6A4F",fontSize:13,fontWeight:800,cursor:"pointer",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              style={{width:"100%",padding:13,borderRadius:14,border:"2px solid #8B7BE8",background:"#F0FBF4",color:"#6D5BD0",fontSize:13,fontWeight:800,cursor:"pointer",marginBottom:8,display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               🧠 {analyzingText?"Analizando...":"Analizar nutrición de lo seleccionado"}
             </button>
           )}
 
           {/* Resultado análisis texto */}
           {photoResult&&!photoPreview&&(
-            <div style={{background:"#fff",borderRadius:16,padding:14,marginBottom:10,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`4px solid ${photoResult.semaforo==="verde"?"#2D6A4F":photoResult.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
+            <div style={{background:"#fff",borderRadius:16,padding:14,marginBottom:10,boxShadow:"0 4px 20px rgba(0,0,0,0.08)",borderLeft:`4px solid ${photoResult.semaforo==="verde"?"#2E9E5B":photoResult.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                 <span style={{fontWeight:800,fontSize:13}}>{photoResult.semaforo==="verde"?"🟢":photoResult.semaforo==="rojo"?"🔴":"🟡"} Análisis Nutricional</span>
-                {photoResult.calorias_aprox&&<span style={{fontSize:11,color:"#2D6A4F",background:"#E8F4EC",padding:"3px 8px",borderRadius:8,fontWeight:700}}>{photoResult.calorias_aprox}</span>}
+                {photoResult.calorias_aprox&&<span style={{fontSize:11,color:"#6D5BD0",background:"#EFEDFC",padding:"3px 8px",borderRadius:8,fontWeight:700}}>{photoResult.calorias_aprox}</span>}
               </div>
               <div style={{fontSize:12,color:"#555",lineHeight:1.6,marginBottom:photoResult.faltantes?.length>0?8:0}}>{photoResult.recomendacion}</div>
               {photoResult.faltantes?.length>0&&(
@@ -1194,13 +1204,13 @@ export default function App(){
           )}
 
           {/* Mensaje identidad */}
-          {idMsg&&<div style={{background:"#E8F4EC",borderRadius:14,padding:12,marginBottom:10,border:"1.5px solid #52B78844"}}><div style={{fontSize:13,color:"#2D6A4F",fontWeight:600,lineHeight:1.5}}>✨ {idMsg}</div></div>}
+          {idMsg&&<div style={{background:"#EFEDFC",borderRadius:14,padding:12,marginBottom:10,border:"1.5px solid #8B7BE844"}}><div style={{fontSize:13,color:"#6D5BD0",fontWeight:600,lineHeight:1.5}}>✨ {idMsg}</div></div>}
 
           {/* Botón guardar */}
-          <button onClick={handleSave} disabled={saving} style={{width:"100%",padding:17,borderRadius:16,border:"none",background:saving?"#ccc":"linear-gradient(135deg,#1B4332,#2D6A4F)",color:"#fff",fontSize:16,fontWeight:900,cursor:saving?"not-allowed":"pointer",boxShadow:saving?"none":"0 6px 24px #2D6A4F44",letterSpacing:.5}}>
+          <button onClick={handleSave} disabled={saving} style={{width:"100%",padding:17,borderRadius:16,border:"none",background:saving?"#ccc":"linear-gradient(135deg,#4A3B9E,#6D5BD0)",color:"#fff",fontSize:16,fontWeight:900,cursor:saving?"not-allowed":"pointer",boxShadow:saving?"none":"0 6px 24px #6D5BD044",letterSpacing:.5}}>
             {saving?savedMsg||"Procesando...":"💾 Guardar en mi pestaña"}
           </button>
-          {savedMsg&&!saving&&<div style={{marginTop:8,padding:12,borderRadius:14,textAlign:"center",fontSize:13,fontWeight:700,background:savedMsg.includes("✅")?"#E8F4EC":"#FFE5DE",color:savedMsg.includes("✅")?"#2D6A4F":"#E76F51"}}>{savedMsg}</div>}
+          {savedMsg&&!saving&&<div style={{marginTop:8,padding:12,borderRadius:14,textAlign:"center",fontSize:13,fontWeight:700,background:savedMsg.includes("✅")?"#EFEDFC":"#FFE5DE",color:savedMsg.includes("✅")?"#6D5BD0":"#E76F51"}}>{savedMsg}</div>}
         </div>
       )}
 
@@ -1208,33 +1218,33 @@ export default function App(){
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
           <div style={{marginBottom:18}}>
-            <button onClick={analizarSemana} disabled={weeklyBusy} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:weeklyBusy?"#ccc":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #2D6A4F33"}}>{weeklyBusy?"🔍 Analizando tu semana…":"✨ Mi semana: energía y vitalidad"}</button>
+            <button onClick={analizarSemana} disabled={weeklyBusy} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:weeklyBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #6D5BD033"}}>{weeklyBusy?"🔍 Analizando tu semana…":"✨ Mi semana: energía y vitalidad"}</button>
             {weeklyAI&&(
               <div style={{background:"#fff",borderRadius:16,padding:18,marginTop:12,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
                 {typeof weeklyAI.energia==="number"&&(
                   <div style={{textAlign:"center",marginBottom:12}}>
-                    <span style={{fontSize:36,fontWeight:900,color:"#2D6A4F"}}>{weeklyAI.energia}</span>
+                    <span style={{fontSize:36,fontWeight:900,color:"#6D5BD0"}}>{weeklyAI.energia}</span>
                     <span style={{fontSize:14,color:"#aaa"}}>/100 energía</span>
                   </div>
                 )}
                 <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{weeklyAI.resumen}</div>
                 <div style={{background:"#EAF3FB",borderRadius:12,padding:"11px 13px",marginBottom:12,fontSize:12,color:"#2C5374",lineHeight:1.5}}>🧠💪 Tu salud <b>mental</b>, la de tu <b>cuerpo</b> y la <b>metabólica</b> van juntas: lo que comes, cómo duermes y cómo te mueves se afectan entre sí. Por eso VitalTrack los mira en conjunto.</div>
                 {(weeklyAI.habitos||[]).map((h,i)=>(
-                  <div key={i} style={{background:"#F8FAF5",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
-                    <div style={{fontSize:11,fontWeight:800,color:"#2D6A4F",marginBottom:3}}>{h.area}</div>
+                  <div key={i} style={{background:"#F8F7FE",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                    <div style={{fontSize:11,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>{h.area}</div>
                     <div style={{fontSize:13,color:"#555",lineHeight:1.5}}>{h.cambio}</div>
                   </div>
                 ))}
-                {weeklyAI.mensaje&&<div style={{marginTop:8,textAlign:"center",fontSize:13,fontWeight:800,color:"#2D6A4F"}}>💚 {weeklyAI.mensaje}</div>}
+                {weeklyAI.mensaje&&<div style={{marginTop:8,textAlign:"center",fontSize:13,fontWeight:800,color:"#6D5BD0"}}>💚 {weeklyAI.mensaje}</div>}
                 <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center"}}>Sugerencias de bienestar, no consejo médico.</div>
               </div>
             )}
           </div>
           <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{eatScore?`Qué tan bien te alimentas · ${eatScore.n} comida${eatScore.n!==1?"s":""}`:"Selecciona alimentos para ver tu score"}</div>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{eatScore?`Qué tan bien te alimentas · ${eatScore.n} comida${eatScore.n!==1?"s":""}`:"Selecciona alimentos para ver tu score"}</div>
             <div style={{position:"relative",width:150,height:150,margin:"0 auto 14px"}}>
               <svg width="150" height="150" style={{transform:"rotate(-90deg)"}}>
-                <circle cx="75" cy="75" r="64" fill="none" stroke="#E8F4EC" strokeWidth="14"/>
+                <circle cx="75" cy="75" r="64" fill="none" stroke="#EFEDFC" strokeWidth="14"/>
                 <circle cx="75" cy="75" r="64" fill="none" stroke={scoreColor(scoreView.total)} strokeWidth="14"
                   strokeDasharray={`${2*Math.PI*64}`} strokeDashoffset={`${2*Math.PI*64*(1-scoreView.total/100)}`}
                   strokeLinecap="round" style={{transition:"stroke-dashoffset 1s ease"}}/>
@@ -1278,10 +1288,10 @@ export default function App(){
           })()}
 
           {hp&&(
-            <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #E8F4EC"}}>
-              <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>Tu perfil activo</div>
+            <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #EFEDFC"}}>
+              <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>Tu perfil activo</div>
               {[{icon:"🎂",l:"Edad",v:`${hp.edad} años`},{icon:"🏃",l:"Actividad",v:hp.ejercicio},{icon:"💊",l:"Condición",v:hp.enfermedad}].map(({icon,l,v})=>(
-                <div key={l} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#F8FAF5",borderRadius:12,marginBottom:6}}>
+                <div key={l} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#F8F7FE",borderRadius:12,marginBottom:6}}>
                   <span style={{fontSize:18}}>{icon}</span>
                   <div style={{flex:1}}><div style={{fontSize:10,color:"#aaa"}}>{l}</div><div style={{fontSize:13,fontWeight:700}}>{v}</div></div>
                 </div>
@@ -1311,7 +1321,7 @@ export default function App(){
                 <div key={i} style={{background:"#fff",borderRadius:16,padding:16,marginBottom:10,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
                     <span style={{fontSize:15,fontWeight:900}}>{r.comida||"Comida"}</span>
-                    <span style={{fontSize:11,color:"#888",background:"#F8FAF5",padding:"3px 8px",borderRadius:8,fontWeight:600}}>{typeof r.fecha==="string"?r.fecha.split("T")[0]:r.fecha}</span>
+                    <span style={{fontSize:11,color:"#888",background:"#F8F7FE",padding:"3px 8px",borderRadius:8,fontWeight:600}}>{typeof r.fecha==="string"?r.fecha.split("T")[0]:r.fecha}</span>
                   </div>
                   <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
                     {[{l:"Total",v:r.score_total,ic:"⭐"},{l:"Inmunidad",v:r.score_inmunidad,ic:"🛡️"},{l:"Energía",v:r.score_energia,ic:"⚡"}].map(({l,v,ic})=>(
@@ -1323,9 +1333,9 @@ export default function App(){
                   </div>
                   {r.alimentos&&<div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:r.notas?8:0}}>{(Array.isArray(r.alimentos)?r.alimentos:[]).slice(0,6).map((f,j)=><span key={j} style={{fontSize:10,padding:"3px 8px",borderRadius:20,background:"#F0F0F0",color:"#666",fontWeight:500}}>{typeof f==="object"?f.name:f}</span>)}</div>}
                   {r.notas&&(
-                    <div style={{background:"#E8F4EC",borderRadius:12,padding:"10px 12px",border:"1px solid #52B78833"}}>
-                      <div style={{fontSize:10,color:"#2D6A4F",fontWeight:800,marginBottom:3,textTransform:"uppercase",letterSpacing:.5}}>💡 Recomendación IA</div>
-                      <div style={{fontSize:12,color:"#2D6A4F",lineHeight:1.5}}>{r.notas}</div>
+                    <div style={{background:"#EFEDFC",borderRadius:12,padding:"10px 12px",border:"1px solid #8B7BE833"}}>
+                      <div style={{fontSize:10,color:"#6D5BD0",fontWeight:800,marginBottom:3,textTransform:"uppercase",letterSpacing:.5}}>💡 Recomendación IA</div>
+                      <div style={{fontSize:12,color:"#6D5BD0",lineHeight:1.5}}>{r.notas}</div>
                     </div>
                   )}
                 </div>
@@ -1340,12 +1350,12 @@ export default function App(){
           <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>Mis Logros</div>
           <div style={{fontSize:13,color:"#888",marginBottom:14}}>{badges.length} de {BADGES.length} desbloqueados</div>
 
-          <div style={{background:"#E8F4EC",borderRadius:6,height:10,marginBottom:16,overflow:"hidden"}}>
-            <div style={{width:`${(badges.length/BADGES.length)*100}%`,height:10,borderRadius:6,background:"linear-gradient(90deg,#2D6A4F,#52B788)",transition:"width .5s"}}/>
+          <div style={{background:"#EFEDFC",borderRadius:6,height:10,marginBottom:16,overflow:"hidden"}}>
+            <div style={{width:`${(badges.length/BADGES.length)*100}%`,height:10,borderRadius:6,background:"linear-gradient(90deg,#6D5BD0,#8B7BE8)",transition:"width .5s"}}/>
           </div>
 
           {/* Nivel card */}
-          <div style={{background:"linear-gradient(135deg,#1B4332,#2D6A4F)",borderRadius:20,padding:20,marginBottom:16,textAlign:"center",boxShadow:"0 6px 24px #2D6A4F44"}}>
+          <div style={{background:"linear-gradient(135deg,#4A3B9E,#6D5BD0)",borderRadius:20,padding:20,marginBottom:16,textAlign:"center",boxShadow:"0 6px 24px #6D5BD044"}}>
             <div style={{fontSize:40,marginBottom:8}}>{nivel.icon}</div>
             <div style={{fontSize:18,fontWeight:900,color:"#fff"}}>{nivel.nivel}</div>
             <div style={{fontSize:12,color:"rgba(255,255,255,.7)",marginTop:4}}>{streak>0?`🔥 ${streak} días de racha consecutiva`:"Registra hoy para empezar tu racha"}</div>
@@ -1359,11 +1369,11 @@ export default function App(){
             {BADGES.map(b=>{
               const earned=badges.includes(b.id);
               return(
-                <div key={b.id} style={{background:"#fff",borderRadius:16,padding:16,textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",opacity:earned?1:.5,border:`2px solid ${earned?"#52B78844":"transparent"}`,transition:"all .3s"}}>
+                <div key={b.id} style={{background:"#fff",borderRadius:16,padding:16,textAlign:"center",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",opacity:earned?1:.5,border:`2px solid ${earned?"#8B7BE844":"transparent"}`,transition:"all .3s"}}>
                   <div style={{fontSize:32,marginBottom:8,filter:earned?"none":"grayscale(1)"}}>{b.icon}</div>
                   <div style={{fontSize:13,fontWeight:800,color:earned?"#1A1A1A":"#aaa"}}>{b.nombre}</div>
                   <div style={{fontSize:10,color:"#aaa",marginTop:3}}>{b.desc}</div>
-                  {earned&&<div style={{marginTop:8,fontSize:10,color:"#2D6A4F",fontWeight:800,background:"#E8F4EC",padding:"3px 10px",borderRadius:20,display:"inline-block"}}>✓ Obtenida</div>}
+                  {earned&&<div style={{marginTop:8,fontSize:10,color:"#6D5BD0",fontWeight:800,background:"#EFEDFC",padding:"3px 10px",borderRadius:20,display:"inline-block"}}>✓ Obtenida</div>}
                 </div>
               );
             })}
@@ -1380,10 +1390,10 @@ export default function App(){
           <div style={{background:"#fff",borderRadius:20,padding:20,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
               <span style={{fontSize:14,fontWeight:800}}>💧 Progreso del día</span>
-              <span style={{fontSize:14,fontWeight:900,color:waterPct>=100?"#2D6A4F":"#1A6FA8"}}>{water}/{WATER_GOAL}</span>
+              <span style={{fontSize:14,fontWeight:900,color:waterPct>=100?"#6D5BD0":"#1A6FA8"}}>{water}/{WATER_GOAL}</span>
             </div>
-            <div style={{background:"#E8F4EC",borderRadius:10,height:14,marginBottom:16,overflow:"hidden"}}>
-              <div style={{width:`${waterPct}%`,height:14,borderRadius:10,background:"linear-gradient(90deg,#1A6FA8,#52B788)",transition:"width .5s"}}/>
+            <div style={{background:"#EFEDFC",borderRadius:10,height:14,marginBottom:16,overflow:"hidden"}}>
+              <div style={{width:`${waterPct}%`,height:14,borderRadius:10,background:"linear-gradient(90deg,#1A6FA8,#8B7BE8)",transition:"width .5s"}}/>
             </div>
             <div style={{display:"flex",justifyContent:"center",flexWrap:"wrap",gap:8,marginBottom:16}}>
               {Array.from({length:WATER_GOAL}).map((_,i)=>(
@@ -1391,14 +1401,14 @@ export default function App(){
               ))}
             </div>
             <div style={{display:"flex",gap:12,justifyContent:"center"}}>
-              <button onClick={()=>changeWater(-1)} style={{width:56,height:56,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8FAF5",color:"#333",fontSize:24,cursor:"pointer",fontWeight:700}}>−</button>
-              <button onClick={()=>changeWater(1)} style={{width:56,height:56,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#1A6FA8,#52B788)",color:"#fff",fontSize:24,cursor:"pointer",fontWeight:700,boxShadow:"0 4px 16px #1A6FA844"}}>+</button>
+              <button onClick={()=>changeWater(-1)} style={{width:56,height:56,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8F7FE",color:"#333",fontSize:24,cursor:"pointer",fontWeight:700}}>−</button>
+              <button onClick={()=>changeWater(1)} style={{width:56,height:56,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#1A6FA8,#8B7BE8)",color:"#fff",fontSize:24,cursor:"pointer",fontWeight:700,boxShadow:"0 4px 16px #1A6FA844"}}>+</button>
             </div>
-            {water>=WATER_GOAL&&<div style={{marginTop:14,color:"#2D6A4F",fontSize:14,fontWeight:800,textAlign:"center",background:"#E8F4EC",padding:"10px",borderRadius:12}}>🎉 ¡Meta de agua cumplida hoy!</div>}
+            {water>=WATER_GOAL&&<div style={{marginTop:14,color:"#6D5BD0",fontSize:14,fontWeight:800,textAlign:"center",background:"#EFEDFC",padding:"10px",borderRadius:12}}>🎉 ¡Meta de agua cumplida hoy!</div>}
           </div>
 
-          <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #E8F4EC"}}>
-            <div style={{fontSize:12,color:"#2D6A4F",fontWeight:800,marginBottom:6}}>💡 Habit Stacking</div>
+          <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #EFEDFC"}}>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:6}}>💡 Habit Stacking</div>
             <div style={{fontSize:13,color:"#555",lineHeight:1.6}}>"Después de servirme mi café de la mañana, registraré mi primer vaso de agua en VitalTrack."</div>
           </div>
         </div>
@@ -1408,7 +1418,7 @@ export default function App(){
         const ss=sleepStats();
         const dur=calcHours(bedtime,waketime);
         const chart=sleepLog.slice(0,7).slice().reverse();
-        const semColor=s=>s==="verde"?"#2D6A4F":s==="rojo"?"#C1121F":"#E9A23B";
+        const semColor=s=>s==="verde"?"#2E9E5B":s==="rojo"?"#C1121F":"#E9A23B";
         return(
         <div style={{padding:"16px 14px 90px"}}>
           <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>😴 Sueño</div>
@@ -1422,7 +1432,7 @@ export default function App(){
               <div style={{flex:1}}><div style={{fontSize:11,color:"#777",marginBottom:4}}>Despertar</div><input type="time" value={routineWake} onChange={e=>setRoutineWake(e.target.value)} style={{width:"100%",padding:"9px",borderRadius:10,border:"1.5px solid #E0E0E0",fontSize:15,fontWeight:700,color:"#2D3561",boxSizing:"border-box"}}/></div>
             </div>
             <div style={{textAlign:"center",fontSize:12,color:"#4A5899",fontWeight:700,marginBottom:10}}>Meta: {routineHours()} h de sueño</div>
-            {sleepLog[0]&&<div style={{background:sleepLog[0].hours>=routineHours()-0.5?"#E8F4EC":"#FBF3E6",borderRadius:10,padding:"9px 11px",marginBottom:10,fontSize:12,color:sleepLog[0].hours>=routineHours()-0.5?"#2D6A4F":"#7A5200",lineHeight:1.4}}>{sleepLog[0].hours>=routineHours()-0.5?`✓ Anoche cumpliste tu rutina (${sleepLog[0].hours} h). 🗳️ Un voto a quien descansa bien.`:`Anoche dormiste ${sleepLog[0].hours} h, te faltaron ${Math.max(0,Math.round((routineHours()-sleepLog[0].hours)*10)/10)} h para tu meta.`}</div>}
+            {sleepLog[0]&&<div style={{background:sleepLog[0].hours>=routineHours()-0.5?"#EFEDFC":"#FBF3E6",borderRadius:10,padding:"9px 11px",marginBottom:10,fontSize:12,color:sleepLog[0].hours>=routineHours()-0.5?"#6D5BD0":"#7A5200",lineHeight:1.4}}>{sleepLog[0].hours>=routineHours()-0.5?`✓ Anoche cumpliste tu rutina (${sleepLog[0].hours} h). 🗳️ Un voto a quien descansa bien.`:`Anoche dormiste ${sleepLog[0].hours} h, te faltaron ${Math.max(0,Math.round((routineHours()-sleepLog[0].hours)*10)/10)} h para tu meta.`}</div>}
             <button onClick={saveRoutine} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:"#4A5899",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer"}}>Guardar mi rutina</button>
           </div>
 
@@ -1499,7 +1509,7 @@ export default function App(){
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div style={{fontSize:11,color:"#888",fontWeight:700}}>😣 Veces que desperté</div>
               <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <button onClick={()=>setAwakenings(Math.max(0,awakenings-1))} style={{width:36,height:36,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8FAF5",fontSize:18,cursor:"pointer",fontWeight:700}}>−</button>
+                <button onClick={()=>setAwakenings(Math.max(0,awakenings-1))} style={{width:36,height:36,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8F7FE",fontSize:18,cursor:"pointer",fontWeight:700}}>−</button>
                 <span style={{fontSize:18,fontWeight:900,minWidth:20,textAlign:"center"}}>{awakenings}</span>
                 <button onClick={()=>setAwakenings(Math.min(9,awakenings+1))} style={{width:36,height:36,borderRadius:"50%",border:"none",background:"#4A5899",color:"#fff",fontSize:18,cursor:"pointer",fontWeight:700}}>+</button>
               </div>
@@ -1533,7 +1543,7 @@ export default function App(){
                     ?<div style={{marginBottom:10}}>
                        <div style={{fontSize:10,color:"#999",marginBottom:4}}>Nivel de sonido (habla o ronca para probarlo)</div>
                        <div style={{background:"#EEE",borderRadius:8,height:14,overflow:"hidden"}}>
-                         <div style={{width:`${Math.min(100,soundLevel*1.6)}%`,height:14,borderRadius:8,background:soundLevel>30?"#C1121F":soundLevel>15?"#E9A23B":"#52B788",transition:"width .12s"}}/>
+                         <div style={{width:`${Math.min(100,soundLevel*1.6)}%`,height:14,borderRadius:8,background:soundLevel>30?"#C1121F":soundLevel>15?"#E9A23B":"#8B7BE8",transition:"width .12s"}}/>
                        </div>
                      </div>
                     :<div style={{fontSize:11,color:"#C1121F",fontWeight:700,marginBottom:10}}>🔇 Micrófono no activo — acepta el permiso para detectar ronquidos</div>}
@@ -1564,7 +1574,7 @@ export default function App(){
                   <div style={{flex:1,textAlign:"center",background:"#FBF3E6",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#E9A23B"}}>{sd.pctAwake}%</div><div style={{fontSize:9,color:"#999"}}>Despierto</div></div>
                   <div style={{flex:1,textAlign:"center",background:"#EEEDFB",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#6C63FF"}}>{sd.pctLight}%</div><div style={{fontSize:9,color:"#999"}}>Ligero</div></div>
                   <div style={{flex:1,textAlign:"center",background:"#E6E8F2",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D3561"}}>{sd.pctDeep}%</div><div style={{fontSize:9,color:"#999"}}>Profundo</div></div>
-                  <div style={{flex:1,textAlign:"center",background:"#F0F4F1",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#2D6A4F"}}>{sd.snores}</div><div style={{fontSize:9,color:"#999"}}>Ruidos</div></div>
+                  <div style={{flex:1,textAlign:"center",background:"#F0F4F1",borderRadius:12,padding:"8px"}}><div style={{fontSize:16,fontWeight:900,color:"#6D5BD0"}}>{sd.snores}</div><div style={{fontSize:9,color:"#999"}}>Ruidos</div></div>
                 </div>
                 <div style={{marginTop:10,fontSize:10,color:"#aaa",textAlign:"center",lineHeight:1.4}}>Estimación por movimiento y sonido (el profundo se infiere de las rachas largas sin moverte). No es un estudio de sueño clínico.</div>
               </div>
@@ -1583,7 +1593,7 @@ export default function App(){
               <div style={{fontSize:13,color:"#444",lineHeight:1.6,marginBottom:12}}>{nightAI.resumen}</div>
               <div style={{background:"#F4F4FB",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#3A3A5C",lineHeight:1.5}}>💡 {nightAI.recomendacion}</div>
               {nightAI.comida_sueno&&nightAI.comida_sueno!=="null"&&(
-                <div style={{marginTop:10,background:"#E8F4EC",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#1B5E3A",lineHeight:1.5}}>🍽️↔😴 {nightAI.comida_sueno}</div>
+                <div style={{marginTop:10,background:"#EFEDFC",borderRadius:12,padding:"10px 12px",fontSize:13,color:"#1B5E3A",lineHeight:1.5}}>🍽️↔😴 {nightAI.comida_sueno}</div>
               )}
               {nightAI.ver_medico&&(
                 <div style={{marginTop:12,background:"#FFF4E5",border:"1.5px solid #E9A23B",borderRadius:12,padding:"12px 14px"}}>
@@ -1613,7 +1623,7 @@ export default function App(){
               {sleepLog.slice(0,10).map((n,i)=>(
                 <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 0",borderBottom:i<Math.min(9,sleepLog.length-1)?"1px solid #F2F2F2":"none"}}>
                   <div><div style={{fontSize:13,fontWeight:700}}>{n.date}</div><div style={{fontSize:10,color:"#aaa"}}>{n.bed} → {n.wake}{n.awakenings?` · ${n.awakenings} despertares`:""}</div></div>
-                  <div style={{textAlign:"right"}}><span style={{fontSize:15,fontWeight:900,color:n.hours>=7?"#2D6A4F":"#E9A23B"}}>{n.hours}h</span><div style={{fontSize:11}}>{"⭐".repeat(n.quality||0)}</div></div>
+                  <div style={{textAlign:"right"}}><span style={{fontSize:15,fontWeight:900,color:n.hours>=7?"#6D5BD0":"#E9A23B"}}>{n.hours}h</span><div style={{fontSize:11}}>{"⭐".repeat(n.quality||0)}</div></div>
                 </div>
               ))}
             </div>
@@ -1624,7 +1634,7 @@ export default function App(){
 
       {tab===6&&(()=>{
         const WHO=150,wm=weekMinutes(),wpct=Math.min(100,Math.round(wm/WHO*100)),wd=weekDaysActive();
-        const intColor=v=>v==="alta"?"#C1121F":v==="baja"?"#2D6A4F":"#E76F51";
+        const intColor=v=>v==="alta"?"#C1121F":v==="baja"?"#6D5BD0":"#E76F51";
         const chip=(val,cur,set)=>({padding:"7px 12px",borderRadius:10,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:val===cur?"#E76F51":"#F0F0F0",color:val===cur?"#fff":"#666"});
         return(
         <div style={{padding:"16px 14px 90px"}}>
@@ -1668,7 +1678,7 @@ export default function App(){
                   <div key={i} style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:8,boxShadow:"0 2px 10px rgba(0,0,0,0.05)",opacity:done?.6:1,borderLeft:`4px solid ${rest?"#bbb":intColor(d.intensidad)}`}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
                       <div style={{fontSize:14,fontWeight:900,color:"#333"}}>{d.dia} · <span style={{color:"#E76F51"}}>{d.foco}</span></div>
-                      {!rest&&<button onClick={()=>toggleDone(i)} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#2D6A4F":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
+                      {!rest&&<button onClick={()=>toggleDone(i)} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#6D5BD0":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
                     </div>
                     {(d.actividades||[]).map((a,j)=><div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>)}
                     {!rest&&<div style={{fontSize:11,color:"#999",marginTop:6}}>⏱️ {d.duracion} · intensidad {d.intensidad}</div>}
@@ -1708,7 +1718,7 @@ export default function App(){
       {breathing&&(
         <div onClick={stopBreathing} style={{position:"fixed",inset:0,zIndex:80,background:"rgba(18,40,30,.93)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
           <style>{`@keyframes vtbreath{0%,100%{transform:scale(.65)}50%{transform:scale(1.25)}}`}</style>
-          <div style={{width:170,height:170,borderRadius:"50%",background:"radial-gradient(circle,#74C69D,#2D6A4F)",animation:"vtbreath 10s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <div style={{width:170,height:170,borderRadius:"50%",background:"radial-gradient(circle,#B3A8F0,#6D5BD0)",animation:"vtbreath 10s ease-in-out infinite",display:"flex",alignItems:"center",justifyContent:"center"}}>
             <span style={{color:"#fff",fontSize:22,fontWeight:800}}>{breathPhase}</span>
           </div>
           <div style={{color:"#fff",fontSize:16,marginTop:34,fontWeight:600}}>Respira un minuto y vuelve con energía</div>
@@ -1718,30 +1728,30 @@ export default function App(){
       <style>{`@keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(193,18,31,.55)}70%{box-shadow:0 0 0 22px rgba(193,18,31,0)}100%{box-shadow:0 0 0 0 rgba(193,18,31,0)}}`}</style>
       <div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult)&&(
-          <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#E8F4EC"}`,pointerEvents:"auto"}}>
+          <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#EFEDFC"}`,pointerEvents:"auto"}}>
             {listening&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#C1121F",fontWeight:800}}><span style={{width:10,height:10,borderRadius:"50%",background:"#C1121F",animation:"vtpulse 1.3s infinite"}}/>Escuchando… habla tranquilo</div>}
             {listening&&<div style={{fontSize:11,color:"#888",marginTop:4}}>Cuando termines, toca ⏹️ para guardar y analizar.</div>}
             {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:8,fontStyle:"italic",lineHeight:1.4}}>"{voiceText}"</div>}
             {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:8}}>🤔 Guardando y analizando…</div>}
-            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#2D6A4F",fontWeight:700,marginTop:8,background:"#E8F4EC",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
+            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#6D5BD0",fontWeight:700,marginTop:8,background:"#EFEDFC",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
             {voiceResult&&voiceResult.analisis&&(
-              <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8FAF5",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2D6A4F":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
-                <div style={{fontSize:12,fontWeight:800,color:"#2D6A4F",marginBottom:3}}>{voiceResult.analisis.semaforo==="verde"?"🟢":voiceResult.analisis.semaforo==="rojo"?"🔴":"🟡"} Análisis de lo que comiste</div>
+              <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8F7FE",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2E9E5B":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>{voiceResult.analisis.semaforo==="verde"?"🟢":voiceResult.analisis.semaforo==="rojo"?"🔴":"🟡"} Análisis de lo que comiste</div>
                 <div style={{fontSize:12,color:"#555",lineHeight:1.5}}>{voiceResult.analisis.recomendacion}</div>
               </div>
             )}
             {voiceResult&&<div style={{textAlign:"right",marginTop:8}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
           </div>
         )}
-        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#2D6A4F,#52B788)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
+        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
       </div>
 
       {/* ══ NAV INFERIOR ══════════════════════════════════════════ */}
       <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #F0F0F0",display:"flex",zIndex:20,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
         {TABS.map((t,i)=>(
           <button key={i} onClick={()=>setTab(i)} style={{flex:1,padding:"10px 4px 8px",background:"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s"}}>
-            <div style={{width:38,height:38,borderRadius:12,background:tab===i?"#2D6A4F":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,transition:"all .2s",boxShadow:tab===i?"0 4px 12px #2D6A4F44":"none"}}>{t.icon}</div>
-            <div style={{fontSize:9,fontWeight:tab===i?800:500,color:tab===i?"#2D6A4F":"#aaa",letterSpacing:.3}}>{t.label}</div>
+            <div style={{width:38,height:38,borderRadius:12,background:tab===i?"#6D5BD0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,transition:"all .2s",boxShadow:tab===i?"0 4px 12px #6D5BD044":"none"}}>{t.icon}</div>
+            <div style={{fontSize:9,fontWeight:tab===i?800:500,color:tab===i?"#6D5BD0":"#aaa",letterSpacing:.3}}>{t.label}</div>
           </button>
         ))}
       </div>
