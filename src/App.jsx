@@ -354,8 +354,8 @@ function HealthScreen({perfil,onComplete}){
 }
 
 // ══ APP PRINCIPAL ═════════════════════════════════════════════════
-function PatientApp(){
-  const [perfil,setPerfil]=useState(null);
+function PatientApp({onLogout,user}){
+  const [perfil,setPerfil]=useState(()=>(user&&user.user_metadata&&user.user_metadata.nombre)||localStorage.getItem("vt_perfil_actual")||null);
   const [hp,setHp]=useState(null);
   const [showHF,setShowHF]=useState(false);
   const [tab,setTab]=useState(0);
@@ -444,8 +444,8 @@ function PatientApp(){
   const fileRef=useRef();
 
   useEffect(()=>{
-    const saved=localStorage.getItem("vt_perfil_actual");
-    if(saved){
+    const saved=((user&&user.user_metadata&&user.user_metadata.nombre)||localStorage.getItem("vt_perfil_actual")||"").trim();
+    if(saved){localStorage.setItem("vt_perfil_actual",saved);
       setPerfil(saved);
       const h=localStorage.getItem(sk(saved,"perfil_salud"));
       if(h)setHp(JSON.parse(h));
@@ -928,7 +928,7 @@ function PatientApp(){
             <div style={{color:"#fff",fontSize:19,fontWeight:900,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>¡Hola, {perfil}! 👋</div>
             <div style={{color:"rgba(255,255,255,.85)",fontSize:12,marginTop:2}}>Hoy es un buen día para cuidar de ti 🌟</div>
           </div>
-          <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");setPerfil(null);setHp(null);setShowHF(false);}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:10,padding:"6px 10px",color:"rgba(255,255,255,.8)",fontSize:10,fontWeight:700,cursor:"pointer",backdropFilter:"blur(10px)",flexShrink:0}}>Salir</button>
+          <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");onLogout&&onLogout();}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:10,padding:"6px 10px",color:"rgba(255,255,255,.8)",fontSize:10,fontWeight:700,cursor:"pointer",backdropFilter:"blur(10px)",flexShrink:0}}>Salir</button>
         </div>
         {/* Chips de estado */}
         <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",marginBottom:14}}>
@@ -1951,5 +1951,5 @@ export default function App(){
   if(!sesion||!sesion.access_token) return <AuthScreen onLogin={guardar}/>;
   const role=(sesion.user&&sesion.user.user_metadata&&sesion.user.user_metadata.role)||"paciente";
   if(role==="especialista") return <NutritionistPanel user={sesion.user} token={sesion.access_token} onLogout={salir}/>;
-  return <PatientApp onLogout={salir}/>;
+  return <PatientApp onLogout={salir} user={sesion.user}/>;
 }
