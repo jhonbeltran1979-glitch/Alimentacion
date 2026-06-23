@@ -354,7 +354,7 @@ function HealthScreen({perfil,onComplete}){
 }
 
 // ══ APP PRINCIPAL ═════════════════════════════════════════════════
-export default function App(){
+function PatientApp(){
   const [perfil,setPerfil]=useState(null);
   const [hp,setHp]=useState(null);
   const [showHF,setShowHF]=useState(false);
@@ -1717,4 +1717,239 @@ export default function App(){
       </div>
     </div>
   );
+}
+
+/* ════════════════════════════════════════════════════════════
+   VitalTrack — FASE 1: Login + Registro (Supabase Auth vía REST)
+   Sin dependencias nuevas. role: paciente | especialista.
+   ════════════════════════════════════════════════════════════ */
+const SB_URL  = "https://xhplpwcfdtiarrpypyif.supabase.co";
+const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhocGxwd2NmZHRpYXJycHlweWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjM5MDksImV4cCI6MjA5NjMzOTkwOX0.tlCAIDo43LIShwFeGdP3kCSZTjPMV0s9_Ox6ana7Q3s";
+
+const VT = { violeta:"#6D5BD0", violetaO:"#5B49C0", lila:"#EDEAFB", verde:"#3DAE5A",
+             bg:"#F6F5FF", txt:"#1F2433", gris:"#7A7E8C", linea:"#E7E4F7" };
+
+async function sbAuth(path, body){
+  const res = await fetch(`${SB_URL}/auth/v1/${path}`, {
+    method:"POST",
+    headers:{ apikey:SB_ANON, "Content-Type":"application/json" },
+    body: JSON.stringify(body)
+  });
+  const d = await res.json();
+  if(!res.ok) throw new Error(d.error_description||d.msg||d.error||"No se pudo autenticar");
+  return d;
+}
+const sbSignup = (email,password,nombre,role)=>sbAuth("signup",{ email, password, data:{ nombre, role } });
+const sbLogin  = (email,password)=>sbAuth("token?grant_type=password",{ email, password });
+async function sbGetUser(token){
+  const res = await fetch(`${SB_URL}/auth/v1/user`,{ headers:{ apikey:SB_ANON, Authorization:`Bearer ${token}` }});
+  if(!res.ok) throw new Error("sesión inválida");
+  return res.json();
+}
+async function sbInsertProfile(token, user, nombre, role){
+  try{
+    await fetch(`${SB_URL}/rest/v1/profiles`,{
+      method:"POST",
+      headers:{ apikey:SB_ANON, Authorization:`Bearer ${token}`, "Content-Type":"application/json", Prefer:"return=minimal" },
+      body: JSON.stringify({ id:user.id, role, nombre, email:user.email })
+    });
+  }catch(_){}
+}
+
+function VTCampo({label,...p}){
+  return (
+    <label style={{display:"block",marginBottom:14}}>
+      <span style={{display:"block",fontSize:13,fontWeight:700,color:VT.txt,marginBottom:6}}>{label}</span>
+      <input {...p} style={{width:"100%",boxSizing:"border-box",padding:"13px 14px",borderRadius:12,border:`1.5px solid ${VT.linea}`,fontSize:15,outline:"none",background:"#fff"}}/>
+    </label>
+  );
+}
+
+function AuthScreen({onLogin}){
+  const [modo,setModo]=useState("login");
+  const [email,setEmail]=useState("");
+  const [pass,setPass]=useState("");
+  const [nombre,setNombre]=useState("");
+  const [role,setRole]=useState("paciente");
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const submit=async()=>{
+    setErr(""); setBusy(true);
+    try{
+      if(modo==="registro"){
+        if(!nombre.trim()) throw new Error("Escribe tu nombre");
+        if(pass.length<6) throw new Error("La contraseña debe tener al menos 6 caracteres");
+        const d=await sbSignup(email.trim(),pass,nombre.trim(),role);
+        if(d.access_token){
+          await sbInsertProfile(d.access_token, d.user, nombre.trim(), role);
+          onLogin(d);
+        } else {
+          setErr("Cuenta creada ✓. Si Supabase pide confirmar el correo, desactívalo para probar (Authentication → Sign In/Providers → Email → Confirm email OFF), o confírmalo desde tu correo. Luego ingresa.");
+          setModo("login");
+        }
+      } else {
+        const d=await sbLogin(email.trim(),pass);
+        onLogin(d);
+      }
+    }catch(e){ setErr(e.message); }
+    setBusy(false);
+  };
+  return (
+    <div style={{minHeight:"100vh",background:VT.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20,fontFamily:"system-ui,-apple-system,sans-serif"}}>
+      <div style={{width:"100%",maxWidth:380}}>
+        <div style={{textAlign:"center",marginBottom:22}}>
+          <div style={{display:"inline-flex",alignItems:"center",gap:10}}>
+            <div style={{width:46,height:46,borderRadius:14,background:VT.violeta,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24}}>🥗</div>
+            <div style={{textAlign:"left"}}>
+              <div style={{fontSize:24,fontWeight:900,color:VT.violeta,lineHeight:1}}>VitalTrack</div>
+              <div style={{fontSize:12,fontWeight:700,color:VT.verde}}>Salud Inteligente 🌱</div>
+            </div>
+          </div>
+          <p style={{color:VT.gris,fontSize:14,marginTop:14,lineHeight:1.5}}>Tu nutrición personalizada,<br/>tu mejor versión.</p>
+        </div>
+        <div style={{background:"#fff",borderRadius:20,padding:22,boxShadow:"0 10px 40px rgba(109,91,208,.12)"}}>
+          <div style={{display:"flex",background:VT.lila,borderRadius:12,padding:4,marginBottom:20}}>
+            {["login","registro"].map(m=>(
+              <button key={m} onClick={()=>{setModo(m);setErr("");}} style={{flex:1,padding:"9px",borderRadius:9,border:"none",cursor:"pointer",fontWeight:800,fontSize:13,background:modo===m?"#fff":"transparent",color:modo===m?VT.violeta:VT.gris,boxShadow:modo===m?"0 2px 8px rgba(0,0,0,.06)":"none"}}>{m==="login"?"Ingresar":"Crear cuenta"}</button>
+            ))}
+          </div>
+          {modo==="registro" && <VTCampo label="Nombre" value={nombre} onChange={e=>setNombre(e.target.value)} placeholder="Tu nombre"/>}
+          <VTCampo label="Correo" type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="tucorreo@ejemplo.com" autoCapitalize="none"/>
+          <VTCampo label="Contraseña" type="password" value={pass} onChange={e=>setPass(e.target.value)} placeholder="Mínimo 6 caracteres"/>
+          {modo==="registro" &&
+            <div style={{marginBottom:16}}>
+              <span style={{display:"block",fontSize:13,fontWeight:700,color:VT.txt,marginBottom:8}}>¿Quién eres?</span>
+              <div style={{display:"flex",gap:10}}>
+                {[["paciente","🧑 Paciente"],["especialista","👩‍⚕️ Especialista"]].map(([v,l])=>(
+                  <button key={v} onClick={()=>setRole(v)} style={{flex:1,padding:"12px",borderRadius:12,border:`1.5px solid ${role===v?VT.violeta:VT.linea}`,background:role===v?VT.lila:"#fff",color:role===v?VT.violeta:VT.gris,fontWeight:800,fontSize:13,cursor:"pointer"}}>{l}</button>
+                ))}
+              </div>
+            </div>
+          }
+          {err && <div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginBottom:14,lineHeight:1.4}}>{err}</div>}
+          <button onClick={submit} disabled={busy} style={{width:"100%",padding:"14px",borderRadius:12,border:"none",background:busy?VT.gris:VT.violeta,color:"#fff",fontWeight:900,fontSize:15,cursor:busy?"default":"pointer"}}>{busy?"Un momento...":(modo==="login"?"Ingresar":"Crear mi cuenta")}</button>
+        </div>
+        <p style={{textAlign:"center",color:VT.gris,fontSize:11,marginTop:16}}>Tu salud es única, tu nutrición también. 💜</p>
+      </div>
+    </div>
+  );
+}
+
+function VTTarjeta({titulo,valor,sub}){
+  return (
+    <div style={{background:"#fff",borderRadius:14,padding:"14px 16px",boxShadow:"0 3px 12px rgba(0,0,0,.04)"}}>
+      <div style={{fontSize:12,color:VT.gris,fontWeight:700}}>{titulo}</div>
+      <div style={{fontSize:26,fontWeight:900,color:VT.violeta,margin:"2px 0"}}>{valor}</div>
+      <div style={{fontSize:11,color:VT.gris}}>{sub}</div>
+    </div>
+  );
+}
+function VTConstruccion({titulo}){
+  return (
+    <div style={{background:"#fff",borderRadius:16,padding:30,textAlign:"center"}}>
+      <div style={{fontSize:40,marginBottom:10}}>🚧</div>
+      <h3 style={{color:VT.txt,margin:"0 0 6px"}}>{titulo}</h3>
+      <p style={{color:VT.gris,fontSize:13,margin:0}}>Esta sección se construye en la siguiente fase.</p>
+    </div>
+  );
+}
+
+function NutritionistPanel({user,token,onLogout}){
+  const [sec,setSec]=useState("inicio");
+  const [pac,setPac]=useState(null);
+  const [cargando,setCargando]=useState(false);
+  const nombre=(user&&user.user_metadata&&user.user_metadata.nombre)||"Especialista";
+  const SECS=[["inicio","🏠 Inicio"],["pacientes","👥 Pacientes"],["planes","📋 Planes"],["seguimiento","📈 Seguimiento"],["mensajes","💬 Mensajes"],["config","⚙️ Configuración"]];
+  const cargarPacientes=async()=>{
+    setCargando(true);
+    try{
+      const res=await fetch(`${SB_URL}/rest/v1/profiles?role=eq.paciente&select=id,nombre,email`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+      const d=await res.json();
+      setPac(Array.isArray(d)?d:[]);
+    }catch(e){ setPac([]); }
+    setCargando(false);
+  };
+  useEffect(()=>{ if(sec==="pacientes"&&pac===null) cargarPacientes(); },[sec]);
+  return (
+    <div style={{minHeight:"100vh",background:VT.bg,fontFamily:"system-ui,-apple-system,sans-serif",paddingBottom:30}}>
+      <div style={{background:VT.violeta,color:"#fff",padding:"16px 18px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:38,height:38,borderRadius:11,background:"rgba(255,255,255,.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>🥗</div>
+          <div>
+            <div style={{fontWeight:900,fontSize:17,lineHeight:1}}>VitalTrack</div>
+            <div style={{fontSize:11,opacity:.85}}>Panel del Especialista</div>
+          </div>
+        </div>
+        <button onClick={onLogout} style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",padding:"8px 12px",borderRadius:10,fontWeight:700,fontSize:12,cursor:"pointer"}}>Salir</button>
+      </div>
+      <div style={{display:"flex",gap:8,overflowX:"auto",padding:"12px 14px",background:"#fff",borderBottom:`1px solid ${VT.linea}`}}>
+        {SECS.map(([k,l])=>(
+          <button key={k} onClick={()=>setSec(k)} style={{whiteSpace:"nowrap",padding:"9px 14px",borderRadius:11,border:"none",cursor:"pointer",fontWeight:800,fontSize:13,background:sec===k?VT.violeta:VT.lila,color:sec===k?"#fff":VT.violetaO}}>{l}</button>
+        ))}
+      </div>
+      <div style={{padding:18,maxWidth:560,margin:"0 auto"}}>
+        {sec==="inicio" && (
+          <div>
+            <h2 style={{color:VT.txt,fontSize:22,margin:"4px 0 4px"}}>¡Hola, {nombre}! 👋</h2>
+            <p style={{color:VT.gris,fontSize:14,marginBottom:18}}>Este es tu panel para acompañar a tus pacientes.</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <VTTarjeta titulo="Pacientes" valor={pac?String(pac.length):"—"} sub="vinculados"/>
+              <VTTarjeta titulo="Planes activos" valor="0" sub="esta semana"/>
+              <VTTarjeta titulo="Mensajes" valor="0" sub="sin leer"/>
+              <VTTarjeta titulo="Seguimientos" valor="0" sub="pendientes"/>
+            </div>
+            <div style={{marginTop:18,background:VT.lila,borderRadius:14,padding:16,color:VT.violetaO,fontSize:13,lineHeight:1.5}}>
+              <b>Fase 1 lista ✓</b><br/>Login con roles funcionando. Las demás secciones se conectan en las siguientes fases.
+            </div>
+          </div>
+        )}
+        {sec==="pacientes" && (
+          <div>
+            <h2 style={{color:VT.txt,fontSize:20,marginBottom:12}}>Mis pacientes</h2>
+            {cargando && <p style={{color:VT.gris}}>Cargando...</p>}
+            {pac && pac.length===0 && !cargando && (
+              <div style={{background:"#fff",borderRadius:14,padding:22,textAlign:"center",color:VT.gris,fontSize:14}}>
+                Aún no tienes pacientes vinculados.<br/><span style={{fontSize:12}}>La vinculación paciente↔especialista (tabla care_links) se construye en la siguiente fase.</span>
+              </div>
+            )}
+            {pac && pac.map((p,i)=>(
+              <div key={i} style={{background:"#fff",borderRadius:14,padding:14,marginBottom:10,boxShadow:"0 3px 12px rgba(0,0,0,.04)"}}>
+                <div style={{fontWeight:800,color:VT.txt}}>{p.nombre||"Paciente"}</div>
+                <div style={{fontSize:12,color:VT.gris,marginTop:2}}>{p.email||""}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {["planes","seguimiento","mensajes","config"].includes(sec) && (
+          <VTConstruccion titulo={SECS.find(s=>s[0]===sec)[1]}/>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function App(){
+  const [sesion,setSesion]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("vt_session")||"null"); }catch(_){ return null; } });
+  const [verif,setVerif]=useState(true);
+  useEffect(()=>{
+    (async()=>{
+      if(sesion&&sesion.access_token){
+        try{ const u=await sbGetUser(sesion.access_token); setSesion(s=>({...s,user:u})); }
+        catch(_){ localStorage.removeItem("vt_session"); setSesion(null); }
+      }
+      setVerif(false);
+    })();
+  // eslint-disable-next-line
+  },[]);
+  const guardar=(d)=>{
+    const ses={ access_token:d.access_token, refresh_token:d.refresh_token, user:d.user };
+    localStorage.setItem("vt_session",JSON.stringify(ses));
+    setSesion(ses);
+  };
+  const salir=()=>{ localStorage.removeItem("vt_session"); setSesion(null); };
+  if(verif) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F6F5FF",color:"#6D5BD0",fontWeight:800,fontFamily:"system-ui"}}>Cargando VitalTrack…</div>;
+  if(!sesion||!sesion.access_token) return <AuthScreen onLogin={guardar}/>;
+  const role=(sesion.user&&sesion.user.user_metadata&&sesion.user.user_metadata.role)||"paciente";
+  if(role==="especialista") return <NutritionistPanel user={sesion.user} token={sesion.access_token} onLogout={salir}/>;
+  return <PatientApp onLogout={salir}/>;
 }
