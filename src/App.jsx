@@ -1781,7 +1781,7 @@ function AuthScreen({onLogin}){
         if(pass.length<6) throw new Error("La contraseña debe tener al menos 6 caracteres");
         const d=await sbSignup(email.trim(),pass,nombre.trim(),role);
         if(d.access_token){
-          await sbInsertProfile(d.access_token, d.user, nombre.trim(), role);
+          // El perfil lo crea automáticamente el trigger handle_new_user en Supabase.
           onLogin(d);
         } else {
           setErr("Cuenta creada ✓. Si Supabase pide confirmar el correo, desactívalo para probar (Authentication → Sign In/Providers → Email → Confirm email OFF), o confírmalo desde tu correo. Luego ingresa.");
