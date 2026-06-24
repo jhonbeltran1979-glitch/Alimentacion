@@ -354,7 +354,7 @@ function HealthScreen({perfil,onComplete}){
 }
 
 // ══ APP PRINCIPAL ═════════════════════════════════════════════════
-function PatientApp({onLogout,user}){
+function PatientApp({onLogout,user,token}){
   const [perfil,setPerfil]=useState(()=>(user&&user.user_metadata&&user.user_metadata.nombre)||localStorage.getItem("vt_perfil_actual")||null);
   const [hp,setHp]=useState(null);
   const [showHF,setShowHF]=useState(false);
@@ -442,6 +442,25 @@ function PatientApp({onLogout,user}){
   const measureRef=useRef({start:null,moves:0,lastMove:0,prevMag:null,handler:null,wake:null});
   const smartAlarmRef=useRef({on:false,time:"06:30"});
   const fileRef=useRef();
+  const [prefsEditor,setPrefsEditor]=useState(false);
+  const [plan,setPlan]=useState(null);
+  const [planBusy,setPlanBusy]=useState(false);
+  const [planErr,setPlanErr]=useState("");
+  const fetchPlan=async()=>{ try{ const r=await fetch(`${SB_URL}/rest/v1/plans?user_id=eq.${user.id}&select=*`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}}); const d=await r.json(); if(Array.isArray(d)&&d.length){ setPlan(d[0]); return true; } }catch(_){ } return false; };
+  const genMiPlan=async()=>{
+    setPlanBusy(true);setPlanErr("");
+    try{
+      const r=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${user.id}&select=*`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+      const pr=((await r.json())[0])||{};
+      const cond=hp?`Condición de salud: ${hp.enfermedad}. Edad: ${hp.edad}. Nivel de actividad: ${hp.ejercicio}.`:"";
+      const prompt=`Eres nutricionista experto en gastronomía colombiana. Crea un plan personalizado y realista.\n${cond}\nLe gustan: ${(pr.alimentos_gustan||[]).join(", ")||"no especificado"}.\nNo le gustan (evítalos): ${(pr.alimentos_no_gustan||[]).join(", ")||"ninguno"}.\nTipo de dieta: ${pr.tipo_dieta||"omnívoro"}.\nEstilo de vida: ${pr.estilo_vida||"no especificado"}.\nObjetivo: ${pr.objetivo||"mejorar salud"}.\nAlergias (NUNCA las incluyas en ninguna comida): ${(pr.alergias||[]).join(", ")||"ninguna"}.\nPresupuesto: ${pr.presupuesto||"medio"}. Tiempo para cocinar: ${pr.tiempo_cocinar||"medio"}.\nUsa ingredientes colombianos accesibles. Respeta gustos, dieta, alergias y condición de salud.\nResponde SOLO JSON sin backticks ni texto extra:\n{"desayuno":"desayuno ideal concreto con porciones","almuerzo":"almuerzo ideal con porciones","cena":"cena ideal con porciones","evitar":["alimento a evitar segun su condicion de salud"],"ejercicio":"rutina recomendada segun su estilo de vida y objetivo, 2-3 oraciones","resumen":"1 oracion motivadora y personal"}`;
+      const p=await iaText(prompt);
+      await fetch(`${SB_URL}/rest/v1/plans`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({user_id:user.id,desayuno:p.desayuno||"",almuerzo:p.almuerzo||"",cena:p.cena||"",evitar:p.evitar||[],ejercicio:p.ejercicio||"",resumen:p.resumen||"",generado_at:new Date().toISOString()})});
+      setPlan({desayuno:p.desayuno,almuerzo:p.almuerzo,cena:p.cena,evitar:p.evitar||[],ejercicio:p.ejercicio,resumen:p.resumen});
+    }catch(e){ setPlanErr("No se pudo generar el plan: "+(e.message||e)); }
+    setPlanBusy(false);
+  };
+  useEffect(()=>{ if(!user||!token)return; (async()=>{ const has=await fetchPlan(); if(!has) genMiPlan(); })(); /* eslint-disable-next-line */ },[]);
 
   useEffect(()=>{
     const saved=((user&&user.user_metadata&&user.user_metadata.nombre)||localStorage.getItem("vt_perfil_actual")||"").trim();
@@ -483,6 +502,7 @@ function PatientApp({onLogout,user}){
 
   if(!perfil)return <ProfileScreen onEnter={p=>{setPerfil(p);setShowHF(true);}}/>;
   if(showHF&&!hp)return <HealthScreen perfil={perfil} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
+  if(prefsEditor) return <OnboardingPreferences user={user} token={token} onDone={()=>{setPrefsEditor(false);setTab(0);}}/>;
 
   const scores=calcScores(selected);
   const _nrecs=history.filter(r=>r&&r.score_total!=null&&r.score_total!=="").slice(0,14);
@@ -951,6 +971,16 @@ function PatientApp({onLogout,user}){
       {tab===0&&(
         <div style={{padding:"16px 14px"}}>
 
+          {/* Accesos rápidos */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
+            {[["💧","Agua",4,"#3DAEE6"],["😴","Sueño",5,"#6D5BD0"],["💪","Ejercicio",6,"#E76F51"]].map(([ic,lb,tb,cl])=>(
+              <button key={lb} onClick={()=>setTab(tb)} style={{background:"#fff",border:"none",borderRadius:16,padding:"16px 8px",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+                <span style={{fontSize:26}}>{ic}</span>
+                <span style={{fontSize:12,fontWeight:800,color:cl}}>{lb}</span>
+              </button>
+            ))}
+          </div>
+
           {/* ¿Cómo funciona? — 6 pasos */}
           <div style={{background:"#fff",borderRadius:18,padding:"18px 16px",marginBottom:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
             <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0",marginBottom:16}}>¿Cómo funciona?</div>
@@ -1175,6 +1205,13 @@ function PatientApp({onLogout,user}){
       )}
 
       {/* ══ TAB 1: SCORE ══════════════════════════════════════════ */}
+      {(tab===1||tab===2||tab===3)&&(
+        <div style={{padding:"14px 14px 0",display:"flex",gap:8}}>
+          {[["📊","Score",1],["📅","Historial",2],["🏅","Logros",3]].map(([ic,lb,tb])=>(
+            <button key={tb} onClick={()=>setTab(tb)} style={{flex:1,padding:"10px 4px",borderRadius:12,border:"none",background:tab===tb?"#6D5BD0":"#fff",color:tab===tb?"#fff":"#888",fontWeight:800,fontSize:12,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>{ic} {lb}</button>
+          ))}
+        </div>
+      )}
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
           <div style={{marginBottom:18}}>
@@ -1706,14 +1743,88 @@ function PatientApp({onLogout,user}){
         <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
       </div>
 
-      {/* ══ NAV INFERIOR ══════════════════════════════════════════ */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #F0F0F0",display:"flex",zIndex:20,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
-        {TABS.map((t,i)=>(
-          <button key={i} onClick={()=>setTab(i)} style={{flex:1,padding:"10px 4px 8px",background:"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,transition:"all .15s"}}>
-            <div style={{width:38,height:38,borderRadius:12,background:tab===i?"#6D5BD0":"transparent",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,transition:"all .2s",boxShadow:tab===i?"0 4px 12px #6D5BD044":"none"}}>{t.icon}</div>
-            <div style={{fontSize:9,fontWeight:tab===i?800:500,color:tab===i?"#6D5BD0":"#aaa",letterSpacing:.3}}>{t.label}</div>
-          </button>
-        ))}
+      {tab===7&&(
+        <div style={{padding:"16px 14px 90px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+            <h2 style={{fontSize:20,fontWeight:900,color:"#1A1A1A",margin:0}}>Tu plan 📋</h2>
+            <button onClick={genMiPlan} disabled={planBusy} style={{background:"#6D5BD0",color:"#fff",border:"none",borderRadius:10,padding:"8px 12px",fontWeight:800,fontSize:12,cursor:planBusy?"default":"pointer",opacity:planBusy?.6:1}}>{planBusy?"Generando…":"🔄 Regenerar"}</button>
+          </div>
+          {planErr&&<div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginBottom:12}}>{planErr}</div>}
+          {planBusy&&!plan&&<div style={{textAlign:"center",color:"#6D5BD0",padding:"40px 20px",fontWeight:700}}>🤖 Generando tu plan con IA…<div style={{fontSize:12,color:"#999",fontWeight:500,marginTop:6}}>Esto toma unos segundos</div></div>}
+          {plan?(
+            <div>
+              {plan.resumen&&<div style={{background:"#EDEAFB",borderRadius:14,padding:14,color:"#5B49C0",fontSize:14,fontWeight:700,marginBottom:14}}>{plan.resumen}</div>}
+              {[["🌅 Desayuno",plan.desayuno],["☀️ Almuerzo",plan.almuerzo],["🌙 Cena",plan.cena]].map(([t,txt])=>(
+                <div key={t} style={{background:"#fff",borderRadius:14,padding:14,marginBottom:10,boxShadow:"0 2px 10px rgba(0,0,0,.05)"}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#6D5BD0",marginBottom:4}}>{t}</div>
+                  <div style={{fontSize:13,color:"#444",lineHeight:1.5}}>{txt||"—"}</div>
+                </div>
+              ))}
+              {plan.evitar&&plan.evitar.length>0&&(
+                <div style={{background:"#FEECEC",borderRadius:14,padding:14,marginBottom:10}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#C0392B",marginBottom:8}}>🚫 Alimentos a evitar</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{plan.evitar.map((x,i)=>(<span key={i} style={{fontSize:12,background:"#fff",color:"#C0392B",padding:"5px 10px",borderRadius:14,border:"1px solid #F0C0C0"}}>{x}</span>))}</div>
+                </div>
+              )}
+              {plan.ejercicio&&(
+                <div style={{background:"#fff",borderRadius:14,padding:14,boxShadow:"0 2px 10px rgba(0,0,0,.05)"}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#6D5BD0",marginBottom:4}}>💪 Ejercicio recomendado</div>
+                  <div style={{fontSize:13,color:"#444",lineHeight:1.5}}>{plan.ejercicio}</div>
+                </div>
+              )}
+            </div>
+          ):(!planBusy&&(
+            <div style={{textAlign:"center",padding:"40px 20px"}}>
+              <div style={{fontSize:42,marginBottom:10}}>📋</div>
+              <p style={{color:"#888",fontSize:14,marginBottom:18}}>Aún no tienes un plan generado.</p>
+              <button onClick={genMiPlan} style={{background:"#6D5BD0",color:"#fff",border:"none",borderRadius:12,padding:"13px 24px",fontWeight:800,fontSize:15,cursor:"pointer"}}>Generar mi plan</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab===9&&(
+        <div style={{padding:"16px 14px 90px"}}>
+          <div style={{background:"#fff",borderRadius:18,padding:"22px 16px",boxShadow:"0 2px 12px rgba(0,0,0,0.06)",textAlign:"center",marginBottom:14}}>
+            <div style={{width:72,height:72,borderRadius:20,background:"#EDEAFB",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,margin:"0 auto 12px"}}>{nivel.icon}</div>
+            <div style={{fontSize:21,fontWeight:900,color:"#1A1A1A"}}>{perfil}</div>
+            <div style={{fontSize:13,color:"#888",marginTop:2}}>Paciente · VitalTrack</div>
+          </div>
+          <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>Tus datos de salud</div>
+            {[["Edad",hp?hp.edad+" años":"—"],["Condición",hp?hp.enfermedad:"—"],["Actividad",hp?hp.ejercicio:"—"]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #F2F2F2"}}>
+                <span style={{fontSize:13,color:"#888"}}>{k}</span>
+                <span style={{fontSize:13,fontWeight:700,color:"#444"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>setPrefsEditor(true)} style={{width:"100%",background:"#fff",border:"2px solid #6D5BD0",color:"#6D5BD0",borderRadius:14,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",marginBottom:10}}>✏️ Editar mis preferencias</button>
+          <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");onLogout&&onLogout();}} style={{width:"100%",background:"#FEECEC",border:"none",color:"#C0392B",borderRadius:14,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer"}}>🚪 Cerrar sesión</button>
+        </div>
+      )}
+
+      {/* ══ NAV INFERIOR (5 botones) ══════════════════════════════ */}
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:480,background:"#fff",borderTop:"1px solid #F0F0F0",display:"flex",alignItems:"flex-end",zIndex:20,boxShadow:"0 -4px 20px rgba(0,0,0,0.08)",paddingBottom:"env(safe-area-inset-bottom,0px)"}}>
+        {(()=>{
+          const navBtn=(ic,lb,activo,onClick)=>(
+            <button key={lb} onClick={onClick} style={{flex:1,padding:"10px 4px 8px",background:"transparent",border:"none",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+              <span style={{fontSize:21,opacity:activo?1:.45,filter:activo?"none":"grayscale(40%)"}}>{ic}</span>
+              <span style={{fontSize:10,fontWeight:activo?800:500,color:activo?"#6D5BD0":"#aaa"}}>{lb}</span>
+            </button>
+          );
+          return (<>
+            {navBtn("🏠","Inicio",tab===0||tab===4||tab===5||tab===6,()=>setTab(0))}
+            {navBtn("📋","Plan",tab===7,()=>setTab(7))}
+            <div style={{flex:1,display:"flex",justifyContent:"center"}}>
+              <button onClick={()=>setPrefsEditor(true)} style={{width:54,height:54,borderRadius:"50%",background:"#6D5BD0",border:"none",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-26,boxShadow:"0 6px 16px rgba(109,91,208,0.45)",cursor:"pointer"}}>
+                <span style={{fontSize:30,color:"#fff",fontWeight:300,lineHeight:1,marginTop:-2}}>＋</span>
+              </button>
+            </div>
+            {navBtn("📈","Progreso",tab===1||tab===2||tab===3,()=>setTab(1))}
+            {navBtn("👤","Perfil",tab===9,()=>setTab(9))}
+          </>);
+        })()}
       </div>
     </div>
   );
@@ -2090,5 +2201,5 @@ export default function App(){
   if(role==="especialista") return <NutritionistPanel user={sesion.user} token={sesion.access_token} onLogout={salir}/>;
   if(prefsDone===null) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F6F5FF",color:"#6D5BD0",fontWeight:800,fontFamily:"system-ui"}}>Cargando VitalTrack…</div>;
   if(prefsDone===false) return <OnboardingPreferences user={sesion.user} token={sesion.access_token} onDone={()=>setPrefsDone(true)}/>;
-  return <PatientApp onLogout={salir} user={sesion.user}/>;
+  return <PatientApp onLogout={salir} user={sesion.user} token={sesion.access_token}/>;
 }
