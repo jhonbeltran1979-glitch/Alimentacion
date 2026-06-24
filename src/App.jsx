@@ -1928,9 +1928,135 @@ function NutritionistPanel({user,token,onLogout}){
   );
 }
 
+
+/* ════════════════════════════════════════════════════════════
+   VitalTrack — FASE 2: Onboarding de preferencias (paso a paso)
+   ════════════════════════════════════════════════════════════ */
+async function sbGetPrefs(token, uid){
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${uid}&select=completado`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+    const d=await res.json();
+    return Array.isArray(d)&&d.length?d[0]:null;
+  }catch(_){ return null; }
+}
+async function sbSavePrefs(token, uid, data){
+  const res=await fetch(`${SB_URL}/rest/v1/preferences`,{
+    method:"POST",
+    headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},
+    body:JSON.stringify({user_id:uid,...data,completado:true,updated_at:new Date().toISOString()})
+  });
+  if(!res.ok){ const e=await res.text(); throw new Error(e||"No se pudo guardar"); }
+}
+
+function OnboardingPreferences({user,token,onDone}){
+  const [paso,setPaso]=useState(0);
+  const [busy,setBusy]=useState(false);
+  const [err,setErr]=useState("");
+  const [nuevo,setNuevo]=useState("");
+  const [d,setD]=useState({alimentos_gustan:[],alimentos_no_gustan:[],tipo_dieta:"",horario_desayuno:"07:00",horario_almuerzo:"12:30",horario_cena:"19:00",estilo_vida:"",objetivo:"",alergias:[],presupuesto:"",tiempo_cocinar:""});
+  const set=(k,v)=>setD(p=>({...p,[k]:v}));
+  const toggle=(k,v)=>setD(p=>({...p,[k]:p[k].includes(v)?p[k].filter(x=>x!==v):[...p[k],v]}));
+  const addNuevo=(k)=>{const t=nuevo.trim();if(t){setD(p=>({...p,[k]:p[k].includes(t)?p[k]:[...p[k],t]}));setNuevo("");}};
+  const TOTAL=8;
+  const finalizar=async()=>{setErr("");setBusy(true);try{await sbSavePrefs(token,user.id,d);onDone();}catch(e){setErr("No se pudo guardar: "+e.message);}setBusy(false);};
+  const siguiente=()=>{ if(paso<TOTAL-1)setPaso(paso+1); else finalizar(); };
+  const TITULOS=[
+    ["¿Qué alimentos te gustan?","Toca los que disfrutas (o agrega)"],
+    ["¿Cuáles NO te gustan?","Para no incluirlos en tu plan"],
+    ["¿Qué tipo de alimentación llevas?","Elige la más cercana"],
+    ["¿A qué hora comes?","Tus horarios habituales"],
+    ["¿Cómo es tu estilo de vida?","Tu nivel de actividad"],
+    ["¿Cuál es tu objetivo?","Lo que quieres lograr"],
+    ["¿Tienes alergias o intolerancias?","Importante para tu seguridad"],
+    ["Un par de cosas más","Presupuesto y tiempo para cocinar"]
+  ];
+  const chip=(sel,label,onClick)=>(<button key={label} onClick={onClick} style={{fontSize:13,padding:"8px 14px",borderRadius:20,border:sel?("2px solid "+VT.violeta):("1px solid "+VT.linea),background:sel?VT.lila:"#fff",color:sel?VT.violeta:VT.gris,fontWeight:sel?800:500,cursor:"pointer"}}>{label}</button>);
+  const opcion=(sel,label,sub,onClick)=>(<button key={label} onClick={onClick} style={{width:"100%",textAlign:"left",padding:"14px",borderRadius:14,border:sel?("2px solid "+VT.violeta):("1px solid "+VT.linea),background:sel?VT.lila:"#fff",cursor:"pointer",marginBottom:10}}><div style={{fontSize:15,fontWeight:800,color:sel?VT.violeta:VT.txt}}>{label}</div>{sub&&<div style={{fontSize:12,color:VT.gris,marginTop:2}}>{sub}</div>}</button>);
+
+  const cuerpo=()=>{
+    if(paso===0||paso===1){
+      const k=paso===0?"alimentos_gustan":"alimentos_no_gustan";
+      const sug=["Pollo","Pescado","Huevo","Aguacate","Arroz","Frijoles","Plátano","Arepa","Verduras","Frutas","Lentejas","Yogur"];
+      return (<div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+          {sug.map(s=>chip(d[k].includes(s),s,()=>toggle(k,s)))}
+          {d[k].filter(x=>!sug.includes(x)).map(s=>chip(true,s,()=>toggle(k,s)))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={nuevo} onChange={e=>setNuevo(e.target.value)} placeholder="Otro…" style={{flex:1,boxSizing:"border-box",padding:"11px 12px",borderRadius:10,border:"1px solid "+VT.linea,fontSize:14,outline:"none"}}/>
+          <button onClick={()=>addNuevo(k)} style={{padding:"0 16px",borderRadius:10,border:"none",background:VT.violeta,color:"#fff",fontWeight:800,cursor:"pointer"}}>Agregar</button>
+        </div>
+      </div>);
+    }
+    if(paso===2){
+      const opts=[["omnivoro","🍖 Omnívoro","Como de todo"],["vegetariano","🥗 Vegetariano","Sin carne"],["vegano","🌱 Vegano","Sin productos animales"],["sin_gluten","🌾 Sin gluten","Evito el gluten"]];
+      return <div>{opts.map(([v,l,s])=>opcion(d.tipo_dieta===v,l,s,()=>set("tipo_dieta",v)))}</div>;
+    }
+    if(paso===3){
+      const campo=(lbl,k)=>(<div key={k} style={{marginBottom:12}}><div style={{fontSize:13,fontWeight:700,color:VT.txt,marginBottom:6}}>{lbl}</div><input type="time" value={d[k]} onChange={e=>set(k,e.target.value)} style={{width:"100%",boxSizing:"border-box",padding:"12px",borderRadius:10,border:"1px solid "+VT.linea,fontSize:15,outline:"none"}}/></div>);
+      return <div>{campo("🌅 Desayuno","horario_desayuno")}{campo("☀️ Almuerzo","horario_almuerzo")}{campo("🌙 Cena","horario_cena")}</div>;
+    }
+    if(paso===4){
+      const opts=[["sedentario","🪑 Sedentario","Poco movimiento"],["activo","🚶 Activo","Me muevo a diario"],["atleta","🏃 Atleta","Entreno fuerte"]];
+      return <div>{opts.map(([v,l,s])=>opcion(d.estilo_vida===v,l,s,()=>set("estilo_vida",v)))}</div>;
+    }
+    if(paso===5){
+      const opts=[["bajar_peso","⚖️ Bajar de peso",""],["masa_muscular","💪 Aumentar masa muscular",""],["salud","❤️ Mejorar mi salud",""]];
+      return <div>{opts.map(([v,l,s])=>opcion(d.objetivo===v,l,s,()=>set("objetivo",v)))}</div>;
+    }
+    if(paso===6){
+      const sug=["Lactosa","Gluten","Maní","Mariscos","Huevo","Soya","Frutos secos"];
+      return (<div>
+        <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:14}}>
+          {sug.map(s=>chip(d.alergias.includes(s),s,()=>toggle("alergias",s)))}
+          {d.alergias.filter(x=>!sug.includes(x)).map(s=>chip(true,s,()=>toggle("alergias",s)))}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <input value={nuevo} onChange={e=>setNuevo(e.target.value)} placeholder="Otra…" style={{flex:1,boxSizing:"border-box",padding:"11px 12px",borderRadius:10,border:"1px solid "+VT.linea,fontSize:14,outline:"none"}}/>
+          <button onClick={()=>addNuevo("alergias")} style={{padding:"0 16px",borderRadius:10,border:"none",background:VT.violeta,color:"#fff",fontWeight:800,cursor:"pointer"}}>Agregar</button>
+        </div>
+        <button onClick={()=>set("alergias",[])} style={{marginTop:12,background:"none",border:"none",color:VT.gris,fontSize:12,textDecoration:"underline",cursor:"pointer"}}>No tengo alergias</button>
+      </div>);
+    }
+    const presu=[["bajo","💵 Bajo"],["medio","💰 Medio"],["alto","💳 Alto"]];
+    const coc=[["poco","⏱️ Poco tiempo"],["medio","🕐 Tiempo medio"],["mucho","👨‍🍳 Me gusta cocinar"],["fuera","🍽️ Como por fuera"]];
+    return (<div>
+      <div style={{fontSize:13,fontWeight:700,color:VT.txt,marginBottom:8}}>Presupuesto para alimentos</div>
+      <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>{presu.map(([v,l])=>chip(d.presupuesto===v,l,()=>set("presupuesto",v)))}</div>
+      <div style={{fontSize:13,fontWeight:700,color:VT.txt,marginBottom:8}}>Tiempo para cocinar</div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>{coc.map(([v,l])=>chip(d.tiempo_cocinar===v,l,()=>set("tiempo_cocinar",v)))}</div>
+    </div>);
+  };
+
+  return (
+    <div style={{minHeight:"100vh",background:VT.bg,fontFamily:"system-ui,-apple-system,sans-serif",display:"flex",flexDirection:"column"}}>
+      <div style={{background:VT.violeta,padding:"16px 18px"}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,maxWidth:420,marginLeft:"auto",marginRight:"auto"}}>
+          <span style={{color:"#fff",fontSize:14,fontWeight:800}}>Tus preferencias</span>
+          <span style={{color:"rgba(255,255,255,.8)",fontSize:12}}>Paso {paso+1} de {TOTAL}</span>
+        </div>
+        <div style={{maxWidth:420,marginLeft:"auto",marginRight:"auto",height:6,background:"rgba(255,255,255,.25)",borderRadius:6,overflow:"hidden"}}>
+          <div style={{height:6,width:((paso+1)/TOTAL*100)+"%",background:"#fff",borderRadius:6,transition:"width .3s"}}/>
+        </div>
+      </div>
+      <div style={{flex:1,padding:"22px 18px",maxWidth:420,marginLeft:"auto",marginRight:"auto",width:"100%",boxSizing:"border-box"}}>
+        <h2 style={{fontSize:20,color:VT.txt,margin:"0 0 4px"}}>{TITULOS[paso][0]}</h2>
+        <p style={{fontSize:13,color:VT.gris,margin:"0 0 18px"}}>{TITULOS[paso][1]}</p>
+        {cuerpo()}
+        {err&&<div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginTop:14}}>{err}</div>}
+      </div>
+      <div style={{padding:"14px 18px calc(18px + env(safe-area-inset-bottom,0px))",display:"flex",gap:10,maxWidth:420,marginLeft:"auto",marginRight:"auto",width:"100%",boxSizing:"border-box"}}>
+        {paso>0&&<button onClick={()=>setPaso(paso-1)} style={{padding:"14px 18px",borderRadius:12,border:"1px solid "+VT.linea,background:"#fff",color:VT.gris,fontWeight:800,cursor:"pointer"}}>Atrás</button>}
+        <button onClick={siguiente} disabled={busy} style={{flex:1,padding:"14px",borderRadius:12,border:"none",background:busy?VT.gris:VT.violeta,color:"#fff",fontWeight:900,fontSize:15,cursor:busy?"default":"pointer"}}>{busy?"Guardando...":(paso<TOTAL-1?"Continuar →":"Finalizar ✓")}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function App(){
   const [sesion,setSesion]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("vt_session")||"null"); }catch(_){ return null; } });
   const [verif,setVerif]=useState(true);
+  const [prefsDone,setPrefsDone]=useState(null);
   useEffect(()=>{
     (async()=>{
       if(sesion&&sesion.access_token){
@@ -1941,6 +2067,17 @@ export default function App(){
     })();
   // eslint-disable-next-line
   },[]);
+  useEffect(()=>{
+    (async()=>{
+      if(sesion&&sesion.access_token){
+        const r=(sesion.user&&sesion.user.user_metadata&&sesion.user.user_metadata.role)||"paciente";
+        if(r!=="paciente"){ setPrefsDone(true); return; }
+        const p=await sbGetPrefs(sesion.access_token, sesion.user.id);
+        setPrefsDone(p&&p.completado?true:false);
+      }
+    })();
+  // eslint-disable-next-line
+  },[sesion]);
   const guardar=(d)=>{
     const ses={ access_token:d.access_token, refresh_token:d.refresh_token, user:d.user };
     localStorage.setItem("vt_session",JSON.stringify(ses));
@@ -1951,5 +2088,7 @@ export default function App(){
   if(!sesion||!sesion.access_token) return <AuthScreen onLogin={guardar}/>;
   const role=(sesion.user&&sesion.user.user_metadata&&sesion.user.user_metadata.role)||"paciente";
   if(role==="especialista") return <NutritionistPanel user={sesion.user} token={sesion.access_token} onLogout={salir}/>;
+  if(prefsDone===null) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#F6F5FF",color:"#6D5BD0",fontWeight:800,fontFamily:"system-ui"}}>Cargando VitalTrack…</div>;
+  if(prefsDone===false) return <OnboardingPreferences user={sesion.user} token={sesion.access_token} onDone={()=>setPrefsDone(true)}/>;
   return <PatientApp onLogout={salir} user={sesion.user}/>;
 }
