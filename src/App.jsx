@@ -981,26 +981,53 @@ function PatientApp({onLogout,user,token}){
             ))}
           </div>
 
-          {/* ¿Cómo funciona? — 6 pasos */}
+          {/* Resumen del día */}
           <div style={{background:"#fff",borderRadius:18,padding:"18px 16px",marginBottom:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0",marginBottom:16}}>¿Cómo funciona?</div>
-            {[
-              {n:1,e:"🩺",t:"Elige tu condición",d:"Selecciona tu condición de salud o tu objetivo."},
-              {n:2,e:"📋",t:"Registra tu información",d:"Ingresa tus datos personales, hábitos y preferencias."},
-              {n:3,e:"🍽️",t:"Registra tus comidas",d:"Cuéntanos qué comiste en desayuno, almuerzo y cena."},
-              {n:4,e:"🧠",t:"IA analiza por ti",d:"Nuestra IA analiza tus nutrientes según tu condición."},
-              {n:5,e:"🥗",t:"Recibe recomendaciones",d:"Sugerencias de alimentos, ejercicios y hábitos a tu medida."},
-              {n:6,e:"📈",t:"Sigue tu progreso",d:"Visualiza tu evolución y logra tus objetivos."},
-            ].map((p,i)=>(
-              <div key={p.n} style={{display:"flex",alignItems:"flex-start",gap:12,paddingBottom:i<5?14:0,marginBottom:i<5?14:0,borderBottom:i<5?"1px solid #F0EFF7":"none"}}>
-                <div style={{width:30,height:30,borderRadius:"50%",background:"#3DAE5A",color:"#fff",fontWeight:900,fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{p.n}</div>
-                <div style={{fontSize:22,flexShrink:0,lineHeight:1.2}}>{p.e}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#1A1A1A",marginBottom:2}}>{p.t}</div>
-                  <div style={{fontSize:12,color:"#888",lineHeight:1.4}}>{p.d}</div>
+            <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0",marginBottom:14}}>Tu resumen de hoy</div>
+            {(()=>{
+              const exHoy=exLog.filter(w=>w.date===today).reduce((a,w)=>a+(w.min||0),0);
+              const suenoH=(sleepLog[0]&&sleepLog[0].date===today)?(sleepLog[0].hours||0):0;
+              const pNutri=Math.max(0,Math.min(100,Math.round(lastScore)));
+              const pAgua=Math.max(0,Math.min(100,Math.round(water/WATER_GOAL*100)));
+              const pEjer=Math.max(0,Math.min(100,Math.round(exHoy/30*100)));
+              const pSueno=Math.max(0,Math.min(100,Math.round(suenoH/8*100)));
+              const dia=Math.round((pNutri+pAgua+pEjer+pSueno)/4);
+              const R=46,C=2*Math.PI*R;
+              const barras=[
+                ["Nutrición",pNutri,"#6D5BD0",lastScore?`${Math.round(lastScore)}/100`:"—"],
+                ["Hidratación",pAgua,"#3DAEE6",`${water}/${WATER_GOAL} vasos`],
+                ["Ejercicio",pEjer,"#E76F51",`${exHoy} min`],
+                ["Sueño",pSueno,"#5B49C0",suenoH?`${suenoH} h`:"—"],
+              ];
+              return (<div>
+                <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>
+                  <div style={{position:"relative",width:112,height:112,flexShrink:0}}>
+                    <svg width="112" height="112" viewBox="0 0 112 112">
+                      <circle cx="56" cy="56" r="46" fill="none" stroke="#EDEAFB" strokeWidth="11"/>
+                      <circle cx="56" cy="56" r="46" fill="none" stroke="#6D5BD0" strokeWidth="11" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-dia/100)} transform="rotate(-90 56 56)" style={{transition:"stroke-dashoffset .6s"}}/>
+                    </svg>
+                    <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+                      <div style={{fontSize:26,fontWeight:900,color:"#6D5BD0",lineHeight:1}}>{dia}<span style={{fontSize:13}}>%</span></div>
+                      <div style={{fontSize:10,color:"#999",marginTop:2,fontWeight:700}}>del día</div>
+                    </div>
+                  </div>
+                  <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:11}}>
+                    {barras.map(([lb,pct,cl,val])=>(
+                      <div key={lb}>
+                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                          <span style={{fontSize:12,fontWeight:700,color:"#555"}}>{lb}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:cl}}>{val}</span>
+                        </div>
+                        <div style={{height:7,background:"#F0EFF7",borderRadius:6,overflow:"hidden"}}>
+                          <div style={{height:7,width:pct+"%",background:cl,borderRadius:6,transition:"width .6s"}}/>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+                <div style={{fontSize:12,color:"#999",textAlign:"center"}}>{dia>=70?"¡Vas muy bien hoy! 🌟":dia>=40?"Buen avance, sigue así 💪":"Registra tus hábitos para subir tu puntuación 📈"}</div>
+              </div>);
+            })()}
           </div>
 
           {/* Selector comida — grid 2x2 */}
