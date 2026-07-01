@@ -360,6 +360,8 @@ function PatientApp({onLogout,user,token}){
   const [showHF,setShowHF]=useState(false);
   const [tab,setTab]=useState(0);
   const [meal,setMeal]=useState(0);
+  const [step,setStep]=useState(0);
+  const [mealPrompt,setMealPrompt]=useState(null);
   const [selected,setSelected]=useState([]);
   const [catOpen,setCatOpen]=useState(null);
   const [saving,setSaving]=useState(false);
@@ -735,6 +737,7 @@ function PatientApp({onLogout,user,token}){
     run();
   };
   const stopVoice=()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}};
+  const irAComida=(m)=>{const idx=(typeof m==="number")?m:meal;setMeal(idx);setTab(0);setStep(1);setPhotoResult(null);setSavedMsg("");if(idx===1||idx===2)setMealPrompt(idx);};
 
   // ── ANÁLISIS SEMANAL INTEGRAL ──────────────────────────
   const analizarSemana=async()=>{
@@ -968,9 +971,25 @@ function PatientApp({onLogout,user,token}){
       </div>
 
       {/* ══ TAB 0: INICIO/REGISTRO ════════════════════════════════ */}
+      {mealPrompt!==null&&(
+        <div onClick={()=>setMealPrompt(null)} style={{position:"fixed",inset:0,zIndex:80,background:"rgba(40,30,80,.55)",display:"flex",alignItems:"flex-end",justifyContent:"center"}}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:"22px 22px 0 0",width:"100%",maxWidth:480,padding:"22px 20px 30px",boxShadow:"0 -8px 30px rgba(0,0,0,.25)"}}>
+            <div style={{width:44,height:5,borderRadius:3,background:"#E5E1F5",margin:"0 auto 16px"}}/>
+            <div style={{fontSize:34,textAlign:"center",marginBottom:6}}>{mealPrompt===1?"🍽️":"🌙"}</div>
+            <div style={{fontSize:19,fontWeight:900,color:"#4A3B9E",textAlign:"center",marginBottom:4}}>{mealPrompt===1?"¿Qué almorzaste?":"¿Qué comiste hoy?"}</div>
+            <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:20,lineHeight:1.5}}>Toca el micrófono y cuéntame; yo lo registro y lo analizo por ti.</div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
+              <button onClick={()=>{setMealPrompt(null);startVoice();}} style={{width:82,height:82,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:34,cursor:"pointer",boxShadow:"0 8px 24px #6D5BD055"}}>🎤</button>
+              <button onClick={()=>setMealPrompt(null)} style={{background:"transparent",border:"none",color:"#9990C8",fontSize:13,fontWeight:700,cursor:"pointer",textDecoration:"underline"}}>Prefiero escribirlo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab===0&&(
         <div style={{padding:"16px 14px"}}>
 
+          {step===0&&(<>
           {/* Accesos rápidos */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
             {[["💧","Agua",4,"#3DAEE6"],["😴","Sueño",5,"#6D5BD0"],["💪","Ejercicio",6,"#E76F51"]].map(([ic,lb,tb,cl])=>(
@@ -1028,6 +1047,37 @@ function PatientApp({onLogout,user,token}){
                 <div style={{fontSize:12,color:"#999",textAlign:"center"}}>{dia>=70?"¡Vas muy bien hoy! 🌟":dia>=40?"Buen avance, sigue así 💪":"Registra tus hábitos para subir tu puntuación 📈"}</div>
               </div>);
             })()}
+          </div>
+
+          <button onClick={()=>irAComida(meal)} style={{width:"100%",padding:16,marginTop:4,borderRadius:16,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer",boxShadow:"0 6px 20px #6D5BD044",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>➕ Registrar una comida</button>
+          </>)}
+
+          {step===1&&(<>
+          {/* Header wizard */}
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14}}>
+            <button onClick={()=>{setStep(0);setMealPrompt(null);}} style={{width:38,height:38,borderRadius:12,border:"none",background:"#F0EFF7",color:"#6D5BD0",fontSize:18,cursor:"pointer",flexShrink:0}}>‹</button>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontWeight:900,color:"#4A3B9E"}}>{MEALS[meal].emoji} {MEALS[meal].label}</div>
+              <div style={{fontSize:11,color:"#999"}}>Cuéntame o selecciona qué comiste</div>
+            </div>
+            <div style={{display:"flex",gap:5,alignItems:"center"}}>{[0,1].map(d=><span key={d} style={{width:d===0?18:7,height:7,borderRadius:4,background:d===0?"#6D5BD0":"#D8D3F0"}}/>)}</div>
+          </div>
+
+          {/* Micrófono protagonista */}
+          <div style={{background:"linear-gradient(135deg,#EFEDFC,#F6F4FE)",borderRadius:18,padding:"18px 16px",marginBottom:16,border:"1.5px solid #E1DBF7",textAlign:"center"}}>
+            <button onClick={listening?stopVoice:startVoice} style={{width:74,height:74,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:30,cursor:"pointer",boxShadow:listening?"0 0 0 8px rgba(193,18,31,.15)":"0 8px 22px #6D5BD055",animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
+            <div style={{fontSize:14,fontWeight:800,color:"#4A3B9E",marginTop:12}}>{listening?"Escuchando… habla tranquilo":"Graba lo que comiste"}</div>
+            <div style={{fontSize:11,color:"#8A82B8",marginTop:3}}>{listening?"Toca ⏹️ para guardar y analizar":"Ej: \"desayuné huevos con arepa y jugo de naranja\""}</div>
+            {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:12,fontStyle:"italic",lineHeight:1.4,background:"#fff",borderRadius:12,padding:"10px 12px"}}>"{voiceText}"</div>}
+            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:10}}>🤔 Guardando y analizando…</div>}
+            {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#6D5BD0",fontWeight:700,marginTop:10,background:"#fff",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
+            {voiceResult&&voiceResult.analisis&&(
+              <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#fff",textAlign:"left",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2E9E5B":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
+                <div style={{fontSize:12,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>{voiceResult.analisis.semaforo==="verde"?"🟢":voiceResult.analisis.semaforo==="rojo"?"🔴":"🟡"} Análisis de lo que comiste</div>
+                <div style={{fontSize:12,color:"#555",lineHeight:1.5}}>{voiceResult.analisis.recomendacion}</div>
+              </div>
+            )}
+            <div style={{fontSize:11,color:"#B0A9D6",marginTop:12}}>— o selecciona manualmente abajo —</div>
           </div>
 
           {/* Selector comida — grid 2x2 */}
@@ -1228,6 +1278,7 @@ function PatientApp({onLogout,user,token}){
             {saving?savedMsg||"Procesando...":"💾 Guardar en mi pestaña"}
           </button>
           {savedMsg&&!saving&&<div style={{marginTop:8,padding:12,borderRadius:14,textAlign:"center",fontSize:13,fontWeight:700,background:savedMsg.includes("✅")?"#EFEDFC":"#FFE5DE",color:savedMsg.includes("✅")?"#6D5BD0":"#E76F51"}}>{savedMsg}</div>}
+          </>)}
         </div>
       )}
 
@@ -1750,7 +1801,7 @@ function PatientApp({onLogout,user,token}){
         </div>
       )}
       <style>{`@keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(193,18,31,.55)}70%{box-shadow:0 0 0 22px rgba(193,18,31,0)}100%{box-shadow:0 0 0 0 rgba(193,18,31,0)}}`}</style>
-      <div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
+      {!(tab===0&&step===1)&&(<div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult)&&(
           <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#EFEDFC"}`,pointerEvents:"auto"}}>
             {listening&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#C1121F",fontWeight:800}}><span style={{width:10,height:10,borderRadius:"50%",background:"#C1121F",animation:"vtpulse 1.3s infinite"}}/>Escuchando… habla tranquilo</div>}
@@ -1768,7 +1819,7 @@ function PatientApp({onLogout,user,token}){
           </div>
         )}
         <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
-      </div>
+      </div>)}
 
       {tab===7&&(
         <div style={{padding:"16px 14px 90px"}}>
@@ -1841,10 +1892,10 @@ function PatientApp({onLogout,user,token}){
             </button>
           );
           return (<>
-            {navBtn("🏠","Inicio",tab===0||tab===4||tab===5||tab===6,()=>setTab(0))}
+            {navBtn("🏠","Inicio",tab===0||tab===4||tab===5||tab===6,()=>{setTab(0);setStep(0);})}
             {navBtn("📋","Plan",tab===7,()=>setTab(7))}
             <div style={{flex:1,display:"flex",justifyContent:"center"}}>
-              <button onClick={()=>setPrefsEditor(true)} style={{width:54,height:54,borderRadius:"50%",background:"#6D5BD0",border:"none",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-26,boxShadow:"0 6px 16px rgba(109,91,208,0.45)",cursor:"pointer"}}>
+              <button onClick={()=>irAComida(meal)} style={{width:54,height:54,borderRadius:"50%",background:"#6D5BD0",border:"none",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-26,boxShadow:"0 6px 16px rgba(109,91,208,0.45)",cursor:"pointer"}}>
                 <span style={{fontSize:30,color:"#fff",fontWeight:300,lineHeight:1,marginTop:-2}}>＋</span>
               </button>
             </div>
