@@ -90,6 +90,7 @@ const MEALS = [
   {label:"Merienda",emoji:"🍎",color:"#E76F51"},
 ];
 const WATER_GOAL = 8;
+const GLASS_ML = 250;
 
 function calcScores(sel) {
   const t={immunity:0,energy:0,focus:0,vitality:0};const found=new Set();let cats=0;
@@ -367,6 +368,8 @@ function PatientApp({onLogout,user,token}){
   const [saving,setSaving]=useState(false);
   const [savedMsg,setSavedMsg]=useState("");
   const [water,setWater]=useState(0);
+  const [waterLog,setWaterLog]=useState([]);
+  const [containerMl,setContainerMl]=useState(250);
   const [streak,setStreak]=useState(0);
   const [history,setHistory]=useState([]);
   const [loadingHist,setLoadingHist]=useState(false);
@@ -480,8 +483,13 @@ function PatientApp({onLogout,user,token}){
   useEffect(()=>{
     if(!perfil)return;
     const k=sk(perfil,"water"),d=sk(perfil,"water_date"),today=new Date().toLocaleDateString("es-CO");
-    if(localStorage.getItem(d)===today)setWater(parseInt(localStorage.getItem(k)||"0"));
-    else{setWater(0);localStorage.setItem(k,"0");localStorage.setItem(d,today);}
+    if(localStorage.getItem(d)===today){
+      const g=parseInt(localStorage.getItem(k)||"0");setWater(g);
+      let lg=[];try{lg=JSON.parse(localStorage.getItem(sk(perfil,"waterlog"))||"[]");}catch(_){}
+      if((!lg||!lg.length)&&g>0)lg=Array.from({length:g}).map((_,i)=>({t:Date.now()-i*300000,ml:GLASS_ML}));
+      setWaterLog(lg);
+    }
+    else{setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);}
     setStreak(parseInt(localStorage.getItem(sk(perfil,"streak"))||"0"));
     const b=localStorage.getItem(sk(perfil,"badges"));if(b)setBadges(JSON.parse(b));
     const slp=localStorage.getItem(sk(perfil,"sleep"));if(slp)setSleepLog(JSON.parse(slp));
@@ -514,6 +522,9 @@ function PatientApp({onLogout,user,token}){
   const today=new Date().toLocaleDateString("es-CO");
   const nivel=getNivel(streak,history.length);
   const waterPct=Math.min(100,(water/WATER_GOAL)*100);
+  const waterMl=waterLog.reduce((a,d)=>a+(d.ml||0),0);
+  const waterGoalMl=WATER_GOAL*GLASS_ML;
+  const waterMlPct=Math.min(100,(waterMl/waterGoalMl)*100);
   const scoreColor=v=>v>=70?"#6D5BD0":v>=40?"#E9C46A":"#E76F51";
   const scoreBg=v=>v>=70?"#EDEAFB":v>=40?"#FFF3CD":"#FFE5DE";
   const toggle=f=>setSelected(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
@@ -556,7 +567,11 @@ function PatientApp({onLogout,user,token}){
     setSaving(false);
   };
 
-  const changeWater=d=>{const nw=Math.max(0,Math.min(12,water+d));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);if(nw>=8)checkBadges({streak,water:nw,lastScore,lastCats},history);};
+  const persistWaterLog=(log)=>{try{localStorage.setItem(sk(perfil,"waterlog"),JSON.stringify(log));localStorage.setItem(sk(perfil,"water_date"),today);}catch(_){}};
+  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
+  const addWater=(ml)=>{if(!ml)return;const log=[{t:Date.now(),ml},...waterLog];setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
+  const removeWaterAt=(i)=>{const log=waterLog.filter((_,j)=>j!==i);setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
+  const changeWater=d=>{if(d>0){addWater(GLASS_ML*d);}else if(d<0){const log=waterLog.slice(Math.abs(d));setWaterLog(log);persistWaterLog(log);syncGlasses(log);}};
 
   // ── IDENTIDAD: cada acción es un voto a quien eliges ser ──
   const addVoto=(n=1)=>{setVotos(prev=>{const nv=prev+n;localStorage.setItem(sk(perfil,"votos"),nv);return nv;});};
@@ -1015,7 +1030,7 @@ function PatientApp({onLogout,user,token}){
               const R=46,C=2*Math.PI*R;
               const barras=[
                 ["Nutrición",pNutri,"#6D5BD0",lastScore?`${Math.round(lastScore)}/100`:"—"],
-                ["Hidratación",pAgua,"#3DAEE6",`${water}/${WATER_GOAL} vasos`],
+                ["Hidratación",pAgua,"#3DAEE6",`${waterMl}/${waterGoalMl} ml`],
                 ["Ejercicio",pEjer,"#E76F51",`${exHoy} min`],
                 ["Sueño",pSueno,"#5B49C0",suenoH?`${suenoH} h`:"—"],
               ];
@@ -1347,27 +1362,69 @@ function PatientApp({onLogout,user,token}){
       {tab===4&&(
         <div style={{padding:"16px 14px"}}>
           <div style={{fontSize:18,fontWeight:900,marginBottom:4}}>Hidratación</div>
-          <div style={{fontSize:13,color:"#888",marginBottom:16}}>Meta: {WATER_GOAL} vasos · Hoy: {water} · {Math.round(waterPct)}%</div>
+          <div style={{fontSize:13,color:"#888",marginBottom:16}}>Meta: {waterGoalMl} ml · Hoy: {waterMl} ml · {Math.round(waterMlPct)}%</div>
 
-          <div style={{background:"#fff",borderRadius:20,padding:20,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-              <span style={{fontSize:14,fontWeight:800}}>💧 Progreso del día</span>
-              <span style={{fontSize:14,fontWeight:900,color:waterPct>=100?"#6D5BD0":"#1A6FA8"}}>{water}/{WATER_GOAL}</span>
+          {/* Botella de hidratación */}
+          <div style={{background:"#fff",borderRadius:20,padding:"22px 20px",marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{textAlign:"center",marginBottom:2}}>
+              <span style={{fontSize:32,fontWeight:900,color:"#4A3B9E"}}>{waterMl}</span>
+              <span style={{fontSize:18,fontWeight:700,color:"#B0A9D6"}}> / {waterGoalMl}</span>
+              <span style={{fontSize:14,color:"#B0A9D6",fontWeight:700}}> ml</span>
             </div>
-            <div style={{background:"#EFEDFC",borderRadius:10,height:14,marginBottom:16,overflow:"hidden"}}>
-              <div style={{width:`${waterPct}%`,height:14,borderRadius:10,background:"linear-gradient(90deg,#1A6FA8,#8B7BE8)",transition:"width .5s"}}/>
+
+            <div style={{display:"flex",justifyContent:"center",margin:"4px 0"}}>
+              <svg width="118" height="168" viewBox="0 0 120 170">
+                <defs>
+                  <linearGradient id="vtwater" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0%" stopColor="#6D5BD0"/><stop offset="100%" stopColor="#9C8CF0"/>
+                  </linearGradient>
+                  <clipPath id="vtbottle"><path d="M42 34 h36 v10 q0 6 6 10 q14 8 14 30 v42 q0 20 -20 20 h-36 q-20 0 -20 -20 v-42 q0 -22 14 -30 q6 -4 6 -10 z"/></clipPath>
+                </defs>
+                <rect x="48" y="16" width="24" height="16" rx="4" fill="#C9C0F0"/>
+                <g clipPath="url(#vtbottle)">
+                  <rect x="16" y="34" width="88" height="122" fill="#F1EFFC"/>
+                  <rect x="16" y={156-(122*waterMlPct/100)} width="88" height={122*waterMlPct/100} fill="url(#vtwater)" style={{transition:"y .5s,height .5s"}}/>
+                </g>
+                <path d="M42 34 h36 v10 q0 6 6 10 q14 8 14 30 v42 q0 20 -20 20 h-36 q-20 0 -20 -20 v-42 q0 -22 14 -30 q6 -4 6 -10 z" fill="none" stroke="#D8D2F2" strokeWidth="3"/>
+                <text x="60" y="106" textAnchor="middle" fontSize="21" fontWeight="900" fill={waterMlPct>48?"#fff":"#6D5BD0"}>{Math.round(waterMlPct)}%</text>
+              </svg>
             </div>
-            <div style={{display:"flex",justifyContent:"center",flexWrap:"wrap",gap:8,marginBottom:16}}>
-              {Array.from({length:WATER_GOAL}).map((_,i)=>(
-                <div key={i} onClick={()=>changeWater(i<water?-(water-i):i-water+1)} style={{width:48,height:58,borderRadius:12,background:i<water?"linear-gradient(180deg,#1A6FA8,#0D47A1)":"#F0F0F0",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,cursor:"pointer",transition:"all .2s",transform:i<water?"scale(1.05)":"scale(1)",boxShadow:i<water?"0 4px 12px #1A6FA844":"none"}}>{i<water?"💧":"○"}</div>
+
+            {/* Selector de recipiente */}
+            <div style={{display:"flex",gap:7,justifyContent:"center",marginBottom:14,flexWrap:"wrap"}}>
+              {[{ml:250,l:"Vaso",e:"🥛"},{ml:500,l:"Botella",e:"🍶"},{ml:750,l:"Termo",e:"🧴"}].map(c=>(
+                <button key={c.ml} onClick={()=>setContainerMl(c.ml)} style={{padding:"8px 12px",borderRadius:14,border:`2px solid ${containerMl===c.ml?"#6D5BD0":"#EFEDFC"}`,background:containerMl===c.ml?"#EFEDFC":"#fff",color:containerMl===c.ml?"#4A3B9E":"#999",fontSize:12,fontWeight:800,cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:1,minWidth:62}}>
+                  <span style={{fontSize:17}}>{c.e}</span>{c.l}<span style={{fontSize:10,color:"#B0A9D6"}}>{c.ml} ml</span>
+                </button>
               ))}
             </div>
-            <div style={{display:"flex",gap:12,justifyContent:"center"}}>
-              <button onClick={()=>changeWater(-1)} style={{width:56,height:56,borderRadius:"50%",border:"2px solid #E8E8E8",background:"#F8F7FE",color:"#333",fontSize:24,cursor:"pointer",fontWeight:700}}>−</button>
-              <button onClick={()=>changeWater(1)} style={{width:56,height:56,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#1A6FA8,#8B7BE8)",color:"#fff",fontSize:24,cursor:"pointer",fontWeight:700,boxShadow:"0 4px 16px #1A6FA844"}}>+</button>
+
+            {/* − cantidad + */}
+            <div style={{display:"flex",gap:14,justifyContent:"center",alignItems:"center"}}>
+              <button onClick={()=>changeWater(-1)} disabled={!waterLog.length} style={{width:52,height:52,borderRadius:"50%",border:"2px solid #E8E4F5",background:"#F8F7FE",color:waterLog.length?"#6D5BD0":"#D8D2F2",fontSize:26,cursor:waterLog.length?"pointer":"not-allowed",fontWeight:700}}>−</button>
+              <div style={{textAlign:"center",minWidth:74}}>
+                <div style={{fontSize:22,fontWeight:900,color:"#6D5BD0"}}>{containerMl}</div>
+                <div style={{fontSize:11,color:"#B0A9D6",fontWeight:700}}>ml a agregar</div>
+              </div>
+              <button onClick={()=>addWater(containerMl)} style={{width:52,height:52,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:26,cursor:"pointer",fontWeight:700,boxShadow:"0 6px 18px #6D5BD055"}}>+</button>
             </div>
-            {water>=WATER_GOAL&&<div style={{marginTop:14,color:"#6D5BD0",fontSize:14,fontWeight:800,textAlign:"center",background:"#EFEDFC",padding:"10px",borderRadius:12}}>🎉 ¡Meta de agua cumplida hoy!</div>}
+
+            {waterMlPct>=100&&<div style={{marginTop:16,color:"#6D5BD0",fontSize:14,fontWeight:800,textAlign:"center",background:"#EFEDFC",padding:"10px",borderRadius:12}}>🎉 ¡Meta de hidratación cumplida hoy!</div>}
           </div>
+
+          {/* Registro de tomas de hoy */}
+          {waterLog.length>0&&(
+            <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+              <div style={{fontSize:13,fontWeight:900,color:"#4A3B9E",marginBottom:8}}>💧 Tomas de hoy ({waterLog.length})</div>
+              {waterLog.map((d,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 2px",borderBottom:i<waterLog.length-1?"1px solid #F2F0FB":"none"}}>
+                  <span style={{fontSize:13,color:"#999"}}>🕐 {new Date(d.t).toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"})}</span>
+                  <span style={{fontSize:14,fontWeight:800,color:"#6D5BD0"}}>{d.ml} ml</span>
+                  <button onClick={()=>removeWaterAt(i)} style={{border:"none",background:"transparent",color:"#CFC7EC",fontSize:16,cursor:"pointer",padding:"0 4px",lineHeight:1}}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #EFEDFC"}}>
             <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:6}}>💡 Habit Stacking</div>
