@@ -354,6 +354,37 @@ function HealthScreen({perfil,onComplete}){
   );
 }
 
+// ══ ÍCONOS DE HÁBITOS (resumen semanal) ═════════════════════════════
+function IconoHabito({tipo}){
+  const CFG={
+    nutricion:{bg:"#E5F5E9",fg:"#3DAE5A"},
+    hidratacion:{bg:"#DDF1FA",fg:"#3DAEE6"},
+    ejercicio:{bg:"#FCEEDB",fg:"#E9A23B"},
+    sueno:{bg:"#EDEAFB",fg:"#6D5BD0"},
+  };
+  const c=CFG[tipo];
+  return (
+    <div style={{width:34,height:34,borderRadius:"50%",background:c.bg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+      <svg width="18" height="18" viewBox="0 0 24 24">
+        {tipo==="nutricion"&&(<g transform="rotate(45 12 12)"><ellipse cx="12" cy="12" rx="9" ry="5" fill={c.fg}/><line x1="4" y1="12" x2="20" y2="12" stroke={c.bg} strokeWidth="1.4"/></g>)}
+        {tipo==="hidratacion"&&(<path d="M12 2C12 2 4 12.5 4 17a8 8 0 0 0 16 0C20 12.5 12 2 12 2Z" fill={c.fg}/>)}
+        {tipo==="ejercicio"&&(<>
+          <rect x="1" y="9" width="2.5" height="6" rx="1" fill={c.fg}/>
+          <rect x="20.5" y="9" width="2.5" height="6" rx="1" fill={c.fg}/>
+          <rect x="3" y="10" width="4" height="4" rx="1" fill={c.fg}/>
+          <rect x="17" y="10" width="4" height="4" rx="1" fill={c.fg}/>
+          <rect x="7" y="11" width="10" height="2" fill={c.fg}/>
+        </>)}
+        {tipo==="sueno"&&(<>
+          <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" fill={c.fg}/>
+          <circle cx="19" cy="5" r="1.1" fill={c.fg}/>
+          <circle cx="16" cy="3" r="0.7" fill={c.fg}/>
+        </>)}
+      </svg>
+    </div>
+  );
+}
+
 // ══ APP PRINCIPAL ═════════════════════════════════════════════════
 function PatientApp({onLogout,user,token}){
   const [perfil,setPerfil]=useState(()=>(user&&user.user_metadata&&user.user_metadata.nombre)||localStorage.getItem("vt_perfil_actual")||null);
@@ -369,6 +400,7 @@ function PatientApp({onLogout,user,token}){
   const [savedMsg,setSavedMsg]=useState("");
   const [water,setWater]=useState(0);
   const [waterLog,setWaterLog]=useState([]);
+  const [waterHist,setWaterHist]=useState({});
   const [containerMl,setContainerMl]=useState(250);
   const [streak,setStreak]=useState(0);
   const [history,setHistory]=useState([]);
@@ -483,13 +515,20 @@ function PatientApp({onLogout,user,token}){
   useEffect(()=>{
     if(!perfil)return;
     const k=sk(perfil,"water"),d=sk(perfil,"water_date"),today=new Date().toLocaleDateString("es-CO");
+    let wh={};try{wh=JSON.parse(localStorage.getItem(sk(perfil,"water_history"))||"{}");}catch(_){}
     if(localStorage.getItem(d)===today){
       const g=parseInt(localStorage.getItem(k)||"0");setWater(g);
       let lg=[];try{lg=JSON.parse(localStorage.getItem(sk(perfil,"waterlog"))||"[]");}catch(_){}
       if((!lg||!lg.length)&&g>0)lg=Array.from({length:g}).map((_,i)=>({t:Date.now()-i*300000,ml:GLASS_ML}));
       setWaterLog(lg);
     }
-    else{setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);}
+    else{
+      const prevDate=localStorage.getItem(d);
+      const prevG=parseInt(localStorage.getItem(k)||"0");
+      if(prevDate&&prevG>0){wh={...wh,[prevDate]:prevG};localStorage.setItem(sk(perfil,"water_history"),JSON.stringify(wh));}
+      setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);
+    }
+    setWaterHist(wh);
     setStreak(parseInt(localStorage.getItem(sk(perfil,"streak"))||"0"));
     const b=localStorage.getItem(sk(perfil,"badges"));if(b)setBadges(JSON.parse(b));
     const slp=localStorage.getItem(sk(perfil,"sleep"));if(slp)setSleepLog(JSON.parse(slp));
@@ -1016,51 +1055,84 @@ function PatientApp({onLogout,user,token}){
             ))}
           </div>
 
-          {/* Resumen del día */}
+          {/* Resumen semanal */}
           <div style={{background:"#fff",borderRadius:18,padding:"18px 16px",marginBottom:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0",marginBottom:14}}>Tu resumen de hoy</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontSize:16,fontWeight:900,color:"#6D5BD0"}}>Resumen semanal</div>
+              <div style={{fontSize:11,color:"#999"}}>últimos 7 días</div>
+            </div>
             {(()=>{
-              const exHoy=exLog.filter(w=>w.date===today).reduce((a,w)=>a+(w.min||0),0);
-              const suenoH=(sleepLog[0]&&sleepLog[0].date===today)?(sleepLog[0].hours||0):0;
-              const pNutri=Math.max(0,Math.min(100,Math.round(lastScore)));
-              const pAgua=Math.max(0,Math.min(100,Math.round(water/WATER_GOAL*100)));
-              const pEjer=Math.max(0,Math.min(100,Math.round(exHoy/30*100)));
-              const pSueno=Math.max(0,Math.min(100,Math.round(suenoH/8*100)));
-              const dia=Math.round((pNutri+pAgua+pEjer+pSueno)/4);
+              const pct=v=>Math.max(0,Math.min(100,Math.round(v)));
+              const fechaMatch=(f,ds)=>f===ds||(typeof f==="string"&&f.split("T")[0]===ds);
+              const DIAS=["D","L","M","M","J","V","S"];
+              const semana=Array.from({length:7}).map((_,i)=>{
+                const dt=new Date(Date.now()-(6-i)*864e5);
+                return {ds:dt.toLocaleDateString("es-CO"),lbl:DIAS[dt.getDay()]};
+              });
+              const nutriDias=semana.map(w=>{
+                const ms=history.filter(r=>fechaMatch(r.fecha,w.ds));
+                return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
+              });
+              const ejerDias=semana.map(w=>pct(exLog.filter(e=>e.date===w.ds).reduce((a,e)=>a+(e.min||0),0)/30*100));
+              const aguaDias=semana.map(w=>{
+                if(w.ds===today)return pct(water/WATER_GOAL*100);
+                if(waterHist[w.ds]!=null)return pct(waterHist[w.ds]/WATER_GOAL*100);
+                return null;
+              });
+              const suenoDias=semana.map(w=>{
+                const e=sleepLog.find(s=>s.date===w.ds);
+                return e?pct((e.hours||0)/8*100):null;
+              });
+              const avgOf=arr=>{const v=arr.filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;};
+              const pNutri=avgOf(nutriDias),pAgua=avgOf(aguaDias),pEjer=avgOf(ejerDias),pSueno=avgOf(suenoDias);
+              const semanaProm=Math.round((pNutri+pAgua+pEjer+pSueno)/4);
               const R=46,C=2*Math.PI*R;
-              const barras=[
-                ["Nutrición",pNutri,"#6D5BD0",lastScore?`${Math.round(lastScore)}/100`:"—"],
-                ["Hidratación",pAgua,"#3DAEE6",`${waterMl}/${waterGoalMl} ml`],
-                ["Ejercicio",pEjer,"#E76F51",`${exHoy} min`],
-                ["Sueño",pSueno,"#5B49C0",suenoH?`${suenoH} h`:"—"],
+              const filas=[
+                ["nutricion","Nutrición",pNutri,"#3DAE5A"],
+                ["hidratacion","Hidratación",pAgua,"#3DAEE6"],
+                ["ejercicio","Ejercicio",pEjer,"#E9A23B"],
+                ["sueno","Sueño",pSueno,"#6D5BD0"],
               ];
+              const diasConDato=semana.map((w,i)=>{
+                const vals=[nutriDias[i],aguaDias[i],ejerDias[i],suenoDias[i]].filter(v=>v!=null);
+                return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+              });
               return (<div>
-                <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:14}}>
+                <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
                   <div style={{position:"relative",width:112,height:112,flexShrink:0}}>
                     <svg width="112" height="112" viewBox="0 0 112 112">
                       <circle cx="56" cy="56" r="46" fill="none" stroke="#EDEAFB" strokeWidth="11"/>
-                      <circle cx="56" cy="56" r="46" fill="none" stroke="#6D5BD0" strokeWidth="11" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-dia/100)} transform="rotate(-90 56 56)" style={{transition:"stroke-dashoffset .6s"}}/>
+                      <circle cx="56" cy="56" r="46" fill="none" stroke="#6D5BD0" strokeWidth="11" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-semanaProm/100)} transform="rotate(-90 56 56)" style={{transition:"stroke-dashoffset .6s"}}/>
                     </svg>
                     <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                      <div style={{fontSize:26,fontWeight:900,color:"#6D5BD0",lineHeight:1}}>{dia}<span style={{fontSize:13}}>%</span></div>
-                      <div style={{fontSize:10,color:"#999",marginTop:2,fontWeight:700}}>del día</div>
+                      <div style={{fontSize:26,fontWeight:900,color:"#6D5BD0",lineHeight:1}}>{semanaProm}<span style={{fontSize:13}}>%</span></div>
+                      <div style={{fontSize:10,color:"#999",marginTop:2,fontWeight:700}}>promedio</div>
                     </div>
                   </div>
-                  <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:11}}>
-                    {barras.map(([lb,pct,cl,val])=>(
-                      <div key={lb}>
-                        <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                          <span style={{fontSize:12,fontWeight:700,color:"#555"}}>{lb}</span>
-                          <span style={{fontSize:11,fontWeight:700,color:cl}}>{val}</span>
-                        </div>
-                        <div style={{height:7,background:"#F0EFF7",borderRadius:6,overflow:"hidden"}}>
-                          <div style={{height:7,width:pct+"%",background:cl,borderRadius:6,transition:"width .6s"}}/>
+                  <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:12}}>
+                    {filas.map(([tipo,lb,pctV,cl])=>(
+                      <div key={tipo} style={{display:"flex",alignItems:"center",gap:8}}>
+                        <IconoHabito tipo={tipo}/>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                            <span style={{fontSize:12,fontWeight:700,color:"#555"}}>{lb}</span>
+                            <span style={{fontSize:11,fontWeight:700,color:cl}}>{pctV}%</span>
+                          </div>
+                          <div style={{height:7,background:"#F0EFF7",borderRadius:6,overflow:"hidden"}}>
+                            <div style={{height:7,width:pctV+"%",background:cl,borderRadius:6,transition:"width .6s"}}/>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div style={{fontSize:12,color:"#999",textAlign:"center"}}>{dia>=70?"¡Vas muy bien hoy! 🌟":dia>=40?"Buen avance, sigue así 💪":"Registra tus hábitos para subir tu puntuación 📈"}</div>
+                <div style={{display:"flex",gap:4,marginBottom:6}}>
+                  {semana.map((w,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:i===6?"#6D5BD0":"#999",fontWeight:i===6?800:500}}>{w.lbl}</div>))}
+                </div>
+                <div style={{display:"flex",gap:4,height:28,alignItems:"flex-end"}}>
+                  {diasConDato.map((v,i)=>(<div key={i} style={{flex:1,background:i===6?"#6D5BD0":"#D8D3F0",borderRadius:4,height:(v==null?4:Math.max(6,v*0.28))+"px"}}/>))}
+                </div>
+                <div style={{fontSize:12,color:"#999",textAlign:"center",marginTop:10}}>{semanaProm>=70?"¡Excelente semana! 🌟":semanaProm>=40?"Buena semana, sigue así 💪":"Registra tus hábitos para subir tu promedio 📈"}</div>
               </div>);
             })()}
           </div>
