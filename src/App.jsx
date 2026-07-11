@@ -2177,13 +2177,22 @@ function OnboardingPreferences({user,token,onDone}){
     };
     const expr=getExpression();
     return (
-      <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:100,height:"auto",display:"block",flexShrink:0,mixBlendMode:"multiply",animation:"vtfloat 2.2s ease-in-out infinite"}}/>
+      <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:150,height:"auto",display:"block",flexShrink:0,mixBlendMode:"multiply",animation:"vtfloat 1.9s ease-in-out infinite",transformOrigin:"bottom center"}}/>
     );
   };
 
   return (
     <div style={{minHeight:"100vh",background:VT.bg,fontFamily:"system-ui,-apple-system,sans-serif",display:"flex",flexDirection:"column"}}>
-      <style>{`@keyframes vtfloat{0%{transform:translateY(0px) rotate(0deg)}25%{transform:translateY(-13px) rotate(-3deg)}50%{transform:translateY(0px) rotate(0deg)}75%{transform:translateY(-6px) rotate(3deg)}100%{transform:translateY(0px) rotate(0deg)}}`}</style>
+      <style>{`@keyframes vtfloat{
+        0%{transform:translateY(0px) rotate(0deg) scale(1,1)}
+        15%{transform:translateY(-4px) rotate(-6deg) scale(0.98,1.02)}
+        30%{transform:translateY(-14px) rotate(-9deg) scale(1,1)}
+        45%{transform:translateY(-4px) rotate(-2deg) scale(1.02,0.98)}
+        60%{transform:translateY(0px) rotate(4deg) scale(1,1)}
+        75%{transform:translateY(-8px) rotate(9deg) scale(0.98,1.02)}
+        90%{transform:translateY(-2px) rotate(2deg) scale(1,1)}
+        100%{transform:translateY(0px) rotate(0deg) scale(1,1)}
+      }`}</style>
       <div style={{background:VT.violeta,padding:"16px 18px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,maxWidth:420,marginLeft:"auto",marginRight:"auto"}}>
           <span style={{color:"#fff",fontSize:14,fontWeight:800}}>Tus preferencias</span>
