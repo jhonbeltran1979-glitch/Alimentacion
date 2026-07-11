@@ -2161,76 +2161,25 @@ function OnboardingPreferences({user,token,onDone}){
     </div>);
   };
 
+  const OTTER_IMG={
+    feliz1:`${import.meta.env.BASE_URL}otter/otter-feliz-1.png`,
+    feliz2:`${import.meta.env.BASE_URL}otter/otter-feliz-2.png`,
+    pensando:`${import.meta.env.BASE_URL}otter/otter-pensando.png`,
+    preocupada:`${import.meta.env.BASE_URL}otter/otter-preocupada.png`,
+  };
   const OtterMascot=({step})=>{
+    // Una expresión distinta según qué tan sensible/decisiva es la pregunta
     const getExpression=()=>{
-      if(step<2)return "thinking";
-      if(step<4)return "wondering";
-      if(step<6)return "happy";
-      return "celebrating";
+      if(step===6)return "preocupada";   // alergias: tema de seguridad
+      if(step===2||step===5||step===7)return "pensando"; // decisiones (dieta, objetivo, presupuesto/tiempo)
+      if(step===1||step===4)return "feliz2"; // variedad visual
+      return "feliz1";
     };
     const expr=getExpression();
     return (
-      <svg width="120" height="120" viewBox="0 0 120 120" style={{margin:"0 auto 16px",display:"block"}}>
-        {/* Cuerpo */}
-        <ellipse cx="60" cy="75" rx="35" ry="40" fill="#8B6F47"/>
-        {/* Brazos */}
-        <circle cx="32" cy="65" r="14" fill="#8B6F47"/>
-        <circle cx="88" cy="65" r="14" fill="#8B6F47"/>
-        {/* Cabeza */}
-        <circle cx="60" cy="45" r="30" fill="#C9B5A0"/>
-        {/* Orejas */}
-        <circle cx="42" cy="22" r="12" fill="#8B6F47"/>
-        <circle cx="78" cy="22" r="12" fill="#8B6F47"/>
-        <circle cx="42" cy="24" r="7" fill="#C9B5A0"/>
-        <circle cx="78" cy="24" r="7" fill="#C9B5A0"/>
-        {/* Nariz */}
-        <ellipse cx="60" cy="46" rx="6" ry="8" fill="#333"/>
-        {/* Expresiones */}
-        {expr==="thinking"&&(<>
-          {/* Ojos dudosos */}
-          <circle cx="50" cy="38" r="5" fill="#333"/>
-          <circle cx="70" cy="38" r="5" fill="#333"/>
-          <circle cx="51" cy="36" r="2.5" fill="#fff"/>
-          <circle cx="71" cy="36" r="2.5" fill="#fff"/>
-          {/* Boca pequeña */}
-          <path d="M55 54 Q60 56 65 54" stroke="#333" strokeWidth="2" fill="none" strokeLinecap="round"/>
-        </>)}
-        {expr==="wondering"&&(<>
-          {/* Ojos pensativos */}
-          <circle cx="50" cy="38" r="5" fill="#333"/>
-          <circle cx="70" cy="38" r="5" fill="#333"/>
-          <circle cx="51" cy="36" r="2.5" fill="#fff"/>
-          <circle cx="71" cy="36" r="2.5" fill="#fff"/>
-          {/* Boca o cerrada */}
-          <line x1="55" y1="56" x2="65" y2="56" stroke="#333" strokeWidth="2" strokeLinecap="round"/>
-        </>)}
-        {expr==="happy"&&(<>
-          {/* Ojos felices */}
-          <path d="M46 36 Q50 42 54 36" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          <path d="M66 36 Q70 42 74 36" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          {/* Boca sonrisa grande */}
-          <path d="M52 54 Q60 62 68 54" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-        </>)}
-        {expr==="celebrating"&&(<>
-          {/* Ojos muy felices con líneas */}
-          <path d="M46 35 Q50 43 54 35" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          <path d="M66 35 Q70 43 74 35" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          <line x1="48" y1="32" x2="52" y2="28" stroke="#6D5BD0" strokeWidth="2" strokeLinecap="round"/>
-          <line x1="68" y1="32" x2="72" y2="28" stroke="#6D5BD0" strokeWidth="2" strokeLinecap="round"/>
-          {/* Boca sonrisa gigante */}
-          <path d="M50 56 Q60 66 70 56" stroke="#333" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-          {/* Confeti */}
-          <circle cx="30" cy="20" r="3" fill="#6D5BD0" opacity="0.7" style={{animation:"vtpulse 1s ease-in-out infinite"}}/>
-          <circle cx="90" cy="25" r="3" fill="#E9A23B" opacity="0.7" style={{animation:"vtpulse 1s ease-in-out infinite 0.2s"}}/>
-          <rect x="35" y="15" width="4" height="4" fill="#2E9E5B" opacity="0.7" style={{animation:"vtpulse 1s ease-in-out infinite 0.4s"}}/>
-        </>)}
-        {/* Camisa VitalTrack violeta */}
-        <g opacity="0.6" style={{pointerEvents:"none"}}>
-          <path d="M50 60 L40 75 L80 75 L70 60 Z" fill="#6D5BD0" opacity="0.4"/>
-          <circle cx="45" cy="65" r="4" fill="#8B7BE8" opacity="0.5"/>
-          <circle cx="75" cy="65" r="4" fill="#8B7BE8" opacity="0.5"/>
-        </g>
-      </svg>
+      <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+        <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:110,height:"auto",display:"block"}}/>
+      </div>
     );
   };
 
