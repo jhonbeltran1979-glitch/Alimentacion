@@ -2177,14 +2177,13 @@ function OnboardingPreferences({user,token,onDone}){
     };
     const expr=getExpression();
     return (
-      <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-        <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:110,height:"auto",display:"block"}}/>
-      </div>
+      <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:84,height:"auto",display:"block",flexShrink:0,mixBlendMode:"multiply",animation:"vtfloat 2.6s ease-in-out infinite"}}/>
     );
   };
 
   return (
     <div style={{minHeight:"100vh",background:VT.bg,fontFamily:"system-ui,-apple-system,sans-serif",display:"flex",flexDirection:"column"}}>
+      <style>{`@keyframes vtfloat{0%{transform:translateY(0px)}50%{transform:translateY(-7px)}100%{transform:translateY(0px)}}`}</style>
       <div style={{background:VT.violeta,padding:"16px 18px"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10,maxWidth:420,marginLeft:"auto",marginRight:"auto"}}>
           <span style={{color:"#fff",fontSize:14,fontWeight:800}}>Tus preferencias</span>
@@ -2195,9 +2194,13 @@ function OnboardingPreferences({user,token,onDone}){
         </div>
       </div>
       <div style={{flex:1,padding:"22px 18px",maxWidth:420,marginLeft:"auto",marginRight:"auto",width:"100%",boxSizing:"border-box",display:"flex",flexDirection:"column"}}>
-        <OtterMascot step={paso}/>
-        <h2 style={{fontSize:20,color:VT.txt,margin:"0 0 4px"}}>{TITULOS[paso][0]}</h2>
-        <p style={{fontSize:13,color:VT.gris,margin:"0 0 18px"}}>{TITULOS[paso][1]}</p>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+          <OtterMascot step={paso}/>
+          <div>
+            <h2 style={{fontSize:20,color:VT.txt,margin:"0 0 4px"}}>{TITULOS[paso][0]}</h2>
+            <p style={{fontSize:13,color:VT.gris,margin:0}}>{TITULOS[paso][1]}</p>
+          </div>
+        </div>
         {cuerpo()}
         {err&&<div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginTop:14}}>{err}</div>}
       </div>
