@@ -1834,7 +1834,7 @@ function PatientApp({onLogout,user,token}){
             {voiceResult&&<div style={{textAlign:"right",marginTop:8}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
           </div>
         )}
-        <button onClick={listening?stopVoice:startVoice} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
+        <button onClick={listening?stopVoice:()=>{setMeal(mealByHour());startVoice();}} title="Dictar por voz" style={{pointerEvents:"auto",width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:listening?22:26,cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
       </div>)}
 
       {tab===7&&(
@@ -1910,11 +1910,6 @@ function PatientApp({onLogout,user,token}){
           return (<>
             {navBtn("🏠","Inicio",tab===0||tab===4||tab===5||tab===6,()=>{setTab(0);setStep(0);})}
             {navBtn("📋","Plan",tab===7,()=>setTab(7))}
-            <div style={{flex:1,display:"flex",justifyContent:"center"}}>
-              <button onClick={()=>irAComida()} style={{width:54,height:54,borderRadius:"50%",background:"#6D5BD0",border:"none",display:"flex",alignItems:"center",justifyContent:"center",marginTop:-26,boxShadow:"0 6px 16px rgba(109,91,208,0.45)",cursor:"pointer"}}>
-                <span style={{fontSize:30,color:"#fff",fontWeight:300,lineHeight:1,marginTop:-2}}>＋</span>
-              </button>
-            </div>
             {navBtn("📈","Progreso",tab===1||tab===2||tab===3,()=>setTab(1))}
             {navBtn("👤","Perfil",tab===9,()=>setTab(9))}
           </>);
