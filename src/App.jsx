@@ -1050,9 +1050,9 @@ function PatientApp({onLogout,user,token}){
 
           {step===0&&(<>
           {/* Accesos rápidos */}
-          <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:16}}>
-            {[["💧","Agua",4,"#3DAEE6"],["😴","Sueño",5,"#6D5BD0"],["💪","Ejercicio",6,"#E76F51"]].map(([ic,lb,tb,cl])=>(
-              <button key={lb} onClick={()=>setTab(tb)} style={{background:"#fff",border:"none",borderRadius:16,padding:"16px 8px",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
+            {[["🥗","Nutrición",()=>irAComida(),"#3DAE5A"],["💧","Hidratación",()=>setTab(4),"#3DAEE6"],["💪","Ejercicio",()=>setTab(6),"#E76F51"],["😴","Sueño",()=>setTab(5),"#6D5BD0"]].map(([ic,lb,onClick,cl])=>(
+              <button key={lb} onClick={onClick} style={{background:"#fff",border:"none",borderRadius:16,padding:"16px 8px",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                 <span style={{fontSize:26}}>{ic}</span>
                 <span style={{fontSize:12,fontWeight:800,color:cl}}>{lb}</span>
               </button>
@@ -1141,7 +1141,6 @@ function PatientApp({onLogout,user,token}){
             })()}
           </div>
 
-          <button onClick={()=>irAComida()} style={{width:"100%",padding:16,marginTop:4,borderRadius:16,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer",boxShadow:"0 6px 20px #6D5BD044",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>➕ Registrar una comida</button>
           </>)}
 
           {step===1&&(<>
