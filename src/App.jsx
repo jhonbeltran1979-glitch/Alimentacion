@@ -1034,7 +1034,11 @@ function PatientApp({onLogout,user,token}){
             <div style={{fontSize:19,fontWeight:900,color:"#4A3B9E",textAlign:"center",marginBottom:4}}>{mealPrompt===0?"¿Qué desayunaste?":mealPrompt===1?"¿Qué almorzaste?":mealPrompt===2?"¿Qué cenaste?":"¿Qué merendaste?"}</div>
             <div style={{fontSize:13,color:"#888",textAlign:"center",marginBottom:20,lineHeight:1.5}}>Toca el micrófono y cuéntame; yo lo registro y lo analizo por ti.</div>
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:14}}>
-              <button onClick={()=>{setMealPrompt(null);startVoice();}} style={{width:82,height:82,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:34,cursor:"pointer",boxShadow:"0 8px 24px #6D5BD055"}}>🎤</button>
+              <button onClick={()=>{setMealPrompt(null);startVoice();}} style={{width:82,height:82,borderRadius:"50%",border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 8px 24px #6D5BD055"}}>
+                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>
+                </svg>
+              </button>
               <button onClick={()=>setMealPrompt(null)} style={{background:"transparent",border:"none",color:"#9990C8",fontSize:13,fontWeight:700,cursor:"pointer",textDecoration:"underline"}}>Prefiero escribirlo</button>
             </div>
           </div>
@@ -1153,7 +1157,15 @@ function PatientApp({onLogout,user,token}){
 
           {/* Micrófono protagonista */}
           <div style={{background:"linear-gradient(135deg,#EFEDFC,#F6F4FE)",borderRadius:18,padding:"18px 16px",marginBottom:16,border:"1.5px solid #E1DBF7",textAlign:"center"}}>
-            <button onClick={listening?stopVoice:startVoice} style={{width:74,height:74,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:30,cursor:"pointer",boxShadow:listening?"0 0 0 8px rgba(193,18,31,.15)":"0 8px 22px #6D5BD055",animation:listening?"vtpulse 1.3s infinite":"none"}}>{listening?"⏹️":"🎤"}</button>
+            <button onClick={listening?stopVoice:startVoice} style={{width:74,height:74,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:listening?"0 0 0 8px rgba(193,18,31,.15)":"0 8px 22px #6D5BD055",animation:listening?"vtpulse 1.3s infinite":"none"}}>
+              {listening?(
+                <svg width="26" height="26" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="#fff"/></svg>
+              ):(
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="8" y1="21" x2="16" y2="21"/>
+                </svg>
+              )}
+            </button>
             <div style={{fontSize:14,fontWeight:800,color:"#4A3B9E",marginTop:12}}>{listening?"Escuchando… habla tranquilo":"Graba lo que comiste"}</div>
             <div style={{fontSize:11,color:"#8A82B8",marginTop:3}}>{listening?"Toca ⏹️ para guardar y analizar":"Ej: \"desayuné huevos con arepa y jugo de naranja\""}</div>
             {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:12,fontStyle:"italic",lineHeight:1.4,background:"#fff",borderRadius:12,padding:"10px 12px"}}>"{voiceText}"</div>}
