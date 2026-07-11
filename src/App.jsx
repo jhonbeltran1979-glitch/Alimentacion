@@ -2177,7 +2177,7 @@ function OnboardingPreferences({user,token,onDone}){
     };
     const expr=getExpression();
     return (
-      <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:150,height:"auto",display:"block",flexShrink:0,mixBlendMode:"multiply",animation:"vtfloat 2.2s ease-in-out infinite"}}/>
+      <img src={OTTER_IMG[expr]} alt="Nutria de VitalTrack" style={{width:100,height:"auto",display:"block",flexShrink:0,mixBlendMode:"multiply",animation:"vtfloat 2.2s ease-in-out infinite"}}/>
     );
   };
 
@@ -2194,14 +2194,12 @@ function OnboardingPreferences({user,token,onDone}){
         </div>
       </div>
       <div style={{flex:1,padding:"22px 18px",maxWidth:420,marginLeft:"auto",marginRight:"auto",width:"100%",boxSizing:"border-box",display:"flex",flexDirection:"column"}}>
-        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+        <h2 style={{fontSize:20,color:VT.txt,margin:"0 0 4px"}}>{TITULOS[paso][0]}</h2>
+        <p style={{fontSize:13,color:VT.gris,margin:"0 0 16px"}}>{TITULOS[paso][1]}</p>
+        <div style={{display:"flex",alignItems:"flex-start",gap:14}}>
           <OtterMascot step={paso}/>
-          <div>
-            <h2 style={{fontSize:20,color:VT.txt,margin:"0 0 4px"}}>{TITULOS[paso][0]}</h2>
-            <p style={{fontSize:13,color:VT.gris,margin:0}}>{TITULOS[paso][1]}</p>
-          </div>
+          <div style={{flex:1,minWidth:0}}>{cuerpo()}</div>
         </div>
-        {cuerpo()}
         {err&&<div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginTop:14}}>{err}</div>}
       </div>
       <div style={{padding:"14px 18px calc(18px + env(safe-area-inset-bottom,0px))",display:"flex",gap:10,maxWidth:420,marginLeft:"auto",marginRight:"auto",width:"100%",boxSizing:"border-box"}}>
