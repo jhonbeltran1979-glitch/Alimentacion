@@ -214,6 +214,21 @@ Responde SOLO JSON sin backticks:
 {"resumen":"2-3 oraciones sobre su energía y vitalidad esta semana","energia":75,"habitos":[{"area":"Nutrición|Sueño|Ejercicio|Hidratación","cambio":"sugerencia concreta y accionable"}],"mensaje":"frase corta motivadora"}`);
 }
 
+async function analisisDia(datos,hp){
+  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  return iaText(`Eres un nutricionista y coach de salud cálido, cercano y directo. ${ctxP}
+Esto es lo que el usuario registró el ${datos.dia}:
+- Comidas: ${datos.comida}
+- Hidratación: ${datos.agua}
+- Ejercicio: ${datos.ejercicio}
+- Sueño: ${datos.sueno}
+
+Analiza qué le faltó ese día (ej: verduras, proteína, agua, actividad física) y da sugerencias concretas y accionables para hoy. Tono cercano tipo "Ayer notamos que...", motivador, sin diagnósticos médicos ni alarmismo.
+
+Responde SOLO JSON sin backticks:
+{"resumen":"1-2 oraciones sobre cómo estuvo ese día en general","faltantes":["cosas concretas que faltaron ese día, máx 4"],"sugerencias":["2-3 sugerencias accionables y concretas para hoy"]}`);
+}
+
 async function corregirFoto(detectados,correccion){
   return iaText(`Detecté estos alimentos en una foto: ${detectados.join(", ")||"ninguno"}.
 El usuario corrige por voz: "${correccion}".
@@ -402,6 +417,10 @@ function PatientApp({onLogout,user,token}){
   const [waterLog,setWaterLog]=useState([]);
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
+  const [dayAI,setDayAI]=useState({});
+  const [planDiaAbierto,setPlanDiaAbierto]=useState(null);
+  const [dayAiLoadingId,setDayAiLoadingId]=useState(null);
+  const dayAiBusyRef=useRef(false);
   const [micPos,setMicPos]=useState(()=>{try{return JSON.parse(localStorage.getItem("vt_mic_pos")||"null")||{x:0,y:0};}catch(_){return {x:0,y:0};}});
   const micDrag=useRef({dragging:false,startX:0,startY:0,origX:0,origY:0,moved:false});
   const [containerMl,setContainerMl]=useState(250);
@@ -532,6 +551,8 @@ function PatientApp({onLogout,user,token}){
       setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);
     }
     setWaterHist(wh);
+    let dai={};try{dai=JSON.parse(localStorage.getItem(sk(perfil,"day_ai"))||"{}");}catch(_){}
+    setDayAI(dai);
     setStreak(parseInt(localStorage.getItem(sk(perfil,"streak"))||"0"));
     const b=localStorage.getItem(sk(perfil,"badges"));if(b)setBadges(JSON.parse(b));
     const slp=localStorage.getItem(sk(perfil,"sleep"));if(slp)setSleepLog(JSON.parse(slp));
@@ -600,6 +621,36 @@ function PatientApp({onLogout,user,token}){
     });
     return {semana,nutriDias,ejerDias,aguaDias,suenoDias,pNutri,pAgua,pEjer,pSueno,semanaProm,diasConDato};
   })();
+  const datosDelDia=(ds)=>{
+    const fechaMatch=f=>f===ds||(typeof f==="string"&&f.split("T")[0]===ds);
+    const comidas=history.filter(r=>fechaMatch(r.fecha));
+    const comidaTxt=comidas.length?comidas.map(r=>{let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}return `${r.comida}: ${(Array.isArray(f)?f:[]).map(x=>typeof x==="object"?x.name:x).join(", ")}`;}).join(" | "):"sin registros de comida";
+    const aguaVal=ds===today?water:(waterHist[ds]!=null?waterHist[ds]:null);
+    const aguaTxt=aguaVal!=null?`${aguaVal} de ${WATER_GOAL} vasos`:"sin registro de hidratación";
+    const ejerMin=exLog.filter(e=>e.date===ds).reduce((a,e)=>a+(e.min||0),0);
+    const ejercicioTxt=ejerMin>0?`${ejerMin} min de actividad`:"sin actividad física registrada";
+    const sleepE=sleepLog.find(s=>s.date===ds);
+    const suenoTxt=sleepE?`${sleepE.hours} horas`:"sin registro de sueño";
+    return {comidas,comidaTxt,aguaTxt,ejercicioTxt,suenoTxt};
+  };
+  const generarAnalisisDia=async(ds,label)=>{
+    if(dayAiBusyRef.current||dayAI[ds])return;
+    dayAiBusyRef.current=true;setDayAiLoadingId(ds);
+    try{
+      const dd=datosDelDia(ds);
+      const r=await analisisDia({dia:label||ds,comida:dd.comidaTxt,agua:dd.aguaTxt,ejercicio:dd.ejercicioTxt,sueno:dd.suenoTxt},hp);
+      setDayAI(prev=>{const n={...prev,[ds]:r};try{localStorage.setItem(sk(perfil,"day_ai"),JSON.stringify(n));}catch(_){}return n;});
+    }catch(_){/* si falla, se reintenta la próxima vez que abra la app */}
+    dayAiBusyRef.current=false;setDayAiLoadingId(null);
+  };
+  useEffect(()=>{
+    if(!perfil||!history.length)return;
+    const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
+    const tieneRegistros=history.some(r=>r.fecha===ayerDs||(typeof r.fecha==="string"&&r.fecha.split("T")[0]===ayerDs));
+    if(tieneRegistros&&!dayAI[ayerDs])generarAnalisisDia(ayerDs,"día de ayer");
+  // eslint-disable-next-line
+  },[perfil,history.length]);
+
   const recomendacionDia=(tipo,v)=>{
     if(v==null)return "Sin datos registrados este día.";
     const M={
@@ -1962,6 +2013,89 @@ function PatientApp({onLogout,user,token}){
               <button onClick={genMiPlan} style={{background:"#6D5BD0",color:"#fff",border:"none",borderRadius:12,padding:"13px 24px",fontWeight:800,fontSize:15,cursor:"pointer"}}>Generar mi plan</button>
             </div>
           ))}
+
+          {/* ══ REGISTRO DÍA A DÍA + ANÁLISIS IA ══ */}
+          <div style={{marginTop:22}}>
+            <div style={{fontSize:16,fontWeight:900,color:"#1A1A1A",marginBottom:4}}>Tu registro día a día</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Lo que registraste por voz, con recomendaciones de la IA</div>
+            {(()=>{
+              const dateKeyToTs=ds=>{
+                if(typeof ds!=="string")return 0;
+                const p=ds.split("/");
+                if(p.length===3){const [d,m,y]=p.map(Number);return new Date(y,m-1,d).getTime();}
+                const t=Date.parse(ds);return isNaN(t)?0:t;
+              };
+              const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
+              const map={};
+              history.forEach(r=>{
+                const k=(typeof r.fecha==="string"&&r.fecha.includes("T"))?r.fecha.split("T")[0]:r.fecha;
+                if(!map[k])map[k]=[];
+                map[k].push(r);
+              });
+              const dias=Object.keys(map).sort((a,b)=>dateKeyToTs(b)-dateKeyToTs(a)).slice(0,14);
+              if(!dias.length)return (
+                <div style={{textAlign:"center",padding:"30px 20px",background:"#fff",borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,0.05)"}}>
+                  <div style={{fontSize:36,marginBottom:8}}>🎙️</div>
+                  <div style={{color:"#888",fontSize:13}}>Registra tu primera comida por voz para empezar tu historial.</div>
+                </div>
+              );
+              return dias.map(ds=>{
+                const items=map[ds];
+                const scores=items.map(r=>r.score_total).filter(v=>typeof v==="number");
+                const scoreProm=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+                const label=ds===today?"Hoy":ds===ayerDs?"Ayer":ds;
+                const abierto=planDiaAbierto===ds;
+                const ai=dayAI[ds];
+                return (
+                  <div key={ds} style={{background:"#fff",borderRadius:16,marginBottom:10,boxShadow:"0 2px 10px rgba(0,0,0,0.05)",overflow:"hidden"}}>
+                    <button onClick={()=>setPlanDiaAbierto(abierto?null:ds)} style={{width:"100%",background:"none",border:"none",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
+                      <div style={{textAlign:"left"}}>
+                        <div style={{fontSize:14,fontWeight:800,color:"#1A1A1A"}}>{label}</div>
+                        <div style={{fontSize:11,color:"#999",marginTop:1}}>{items.length} comida{items.length!==1?"s":""} registrada{items.length!==1?"s":""}</div>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        {scoreProm!=null&&<span style={{fontSize:11,fontWeight:800,color:scoreColor(scoreProm),background:scoreBg(scoreProm),padding:"3px 9px",borderRadius:10}}>{scoreProm}%</span>}
+                        <span style={{fontSize:12,color:"#bbb",transform:abierto?"rotate(90deg)":"none",transition:"transform .2s"}}>›</span>
+                      </div>
+                    </button>
+                    {abierto&&(
+                      <div style={{padding:"0 16px 16px"}}>
+                        {items.map((r,i)=>{
+                          let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}
+                          return (
+                            <div key={i} style={{background:"#F8F7FE",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
+                              <div style={{fontSize:12,fontWeight:800,color:"#6D5BD0",marginBottom:5}}>{r.comida||"Comida"}</div>
+                              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>{(Array.isArray(f)?f:[]).slice(0,8).map((x,j)=><span key={j} style={{fontSize:10,padding:"3px 8px",borderRadius:20,background:"#fff",color:"#666",fontWeight:500}}>{typeof x==="object"?x.name:x}</span>)}</div>
+                              {r.notas&&<div style={{fontSize:11,color:"#6D5BD0",marginTop:6,lineHeight:1.4}}>💡 {r.notas}</div>}
+                            </div>
+                          );
+                        })}
+                        <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #F2F2F2"}}>
+                          {ds===today?(
+                            <div style={{fontSize:12,color:"#999",fontStyle:"italic"}}>El análisis de IA de este día se genera mañana, cuando el día quede completo.</div>
+                          ):ai?(
+                            <div>
+                              <div style={{fontSize:12,color:"#444",lineHeight:1.5,marginBottom:8}}>🤖 {ai.resumen}</div>
+                              {ai.faltantes&&ai.faltantes.length>0&&(
+                                <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+                                  {ai.faltantes.map((x,i)=><span key={i} style={{fontSize:10,padding:"3px 9px",borderRadius:20,background:"#FEECEC",color:"#C0392B",fontWeight:600}}>Te faltó: {x}</span>)}
+                                </div>
+                              )}
+                              {ai.sugerencias&&ai.sugerencias.map((s,i)=>(
+                                <div key={i} style={{fontSize:12,color:"#5B49C0",background:"#EFEDFC",borderRadius:10,padding:"8px 10px",marginBottom:6,lineHeight:1.4}}>✓ {s}</div>
+                              ))}
+                            </div>
+                          ):(
+                            <button onClick={()=>generarAnalisisDia(ds,label)} disabled={dayAiLoadingId===ds} style={{width:"100%",padding:"10px",borderRadius:10,border:"1.5px solid #6D5BD0",background:"#fff",color:"#6D5BD0",fontWeight:800,fontSize:12,cursor:dayAiLoadingId===ds?"default":"pointer"}}>{dayAiLoadingId===ds?"🤖 Analizando…":"✨ Analizar este día con IA"}</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+          </div>
         </div>
       )}
 
