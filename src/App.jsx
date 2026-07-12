@@ -1557,18 +1557,6 @@ function PatientApp({onLogout,user,token}){
               </div>
             );
           })()}
-
-          {hp&&(
-            <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",border:"2px solid #EFEDFC"}}>
-              <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:.5}}>Tu perfil activo</div>
-              {[{icon:"🎂",l:"Edad",v:`${hp.edad} años`},{icon:"🏃",l:"Actividad",v:hp.ejercicio},{icon:"💊",l:"Condición",v:hp.enfermedad}].map(({icon,l,v})=>(
-                <div key={l} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"#F8F7FE",borderRadius:12,marginBottom:6}}>
-                  <span style={{fontSize:18}}>{icon}</span>
-                  <div style={{flex:1}}><div style={{fontSize:10,color:"#aaa"}}>{l}</div><div style={{fontSize:13,fontWeight:700}}>{v}</div></div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -2164,7 +2152,7 @@ function PatientApp({onLogout,user,token}){
                     <button onClick={()=>setPlanDiaAbierto(abierto?null:ds)} style={{width:"100%",background:"none",border:"none",padding:"14px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer"}}>
                       <div style={{textAlign:"left"}}>
                         <div style={{fontSize:14,fontWeight:800,color:"#1A1A1A"}}>{label}</div>
-                        <div style={{fontSize:11,color:"#999",marginTop:1}}>{items.length} comida{items.length!==1?"s":""} registrada{items.length!==1?"s":""}</div>
+                        <div style={{fontSize:11,color:"#999",marginTop:1}}>{items.length} comida{items.length!==1?"s":""} · hidratación · ejercicio</div>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         {scoreProm!=null&&<span style={{fontSize:11,fontWeight:800,color:scoreColor(scoreProm),background:scoreBg(scoreProm),padding:"3px 9px",borderRadius:10}}>{scoreProm}%</span>}
@@ -2183,6 +2171,26 @@ function PatientApp({onLogout,user,token}){
                             </div>
                           );
                         })}
+                        {(()=>{
+                          const aguaVal=ds===today?water:(waterHist[ds]!=null?waterHist[ds]:null);
+                          const ejerDia=exLog.filter(e=>e.date===ds);
+                          return (<>
+                            <div style={{background:"#EAF6FC",borderRadius:12,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"center",gap:10}}>
+                              <IconoHabito tipo="hidratacion"/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:800,color:"#0C7CB0"}}>Hidratación</div>
+                                <div style={{fontSize:11,color:"#0C7CB0",marginTop:1}}>{aguaVal!=null?`${aguaVal} de ${WATER_GOAL} vasos`:"Sin registro"}</div>
+                              </div>
+                            </div>
+                            <div style={{background:"#FCF3E3",borderRadius:12,padding:"10px 12px",marginBottom:8,display:"flex",alignItems:"flex-start",gap:10}}>
+                              <IconoHabito tipo="ejercicio"/>
+                              <div style={{flex:1}}>
+                                <div style={{fontSize:12,fontWeight:800,color:"#9A6A0C",marginBottom:ejerDia.length?4:0}}>Ejercicio</div>
+                                {ejerDia.length?ejerDia.map((e,i)=>(<div key={i} style={{fontSize:11,color:"#9A6A0C"}}>{e.tipo} · {e.min} min</div>)):<div style={{fontSize:11,color:"#9A6A0C"}}>Sin registro</div>}
+                              </div>
+                            </div>
+                          </>);
+                        })()}
                         <div style={{marginTop:4,paddingTop:12,borderTop:"1px solid #F2F2F2"}}>
                           {ds===today?(
                             <div style={{fontSize:12,color:"#999",fontStyle:"italic"}}>El análisis de IA de este día se genera mañana, cuando el día quede completo.</div>
@@ -2244,7 +2252,7 @@ function PatientApp({onLogout,user,token}){
           );
           return (<>
             {navBtn("🏠","Inicio",tab===0||tab===4||tab===5||tab===6,()=>{setTab(0);setStep(0);})}
-            {navBtn("📋","Plan",tab===7,()=>setTab(7))}
+            {navBtn("📋","Registros",tab===7,()=>setTab(7))}
             {navBtn("📈","Progreso",tab===1||tab===2||tab===3,()=>setTab(1))}
             {navBtn("👤","Perfil",tab===9,()=>setTab(9))}
           </>);
