@@ -229,6 +229,23 @@ Responde SOLO JSON sin backticks:
 {"resumen":"1-2 oraciones sobre cómo estuvo ese día en general","faltantes":["cosas concretas que faltaron ese día, máx 4"],"sugerencias":["2-3 sugerencias accionables y concretas para hoy"]}`);
 }
 
+async function analisisMes(datos,hp){
+  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  return iaText(`Eres un nutricionista y coach de salud cálido y directo, hablando con el usuario al iniciar un nuevo mes. ${ctxP}
+Esto es lo que el usuario registró durante ${datos.mes}:
+- Nutrición: ${datos.nutricion}
+- Hidratación: ${datos.hidratacion}
+- Ejercicio: ${datos.ejercicio}
+- Sueño: ${datos.sueno}
+${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
+
+Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay mejora respecto al mes anterior, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
+
+Responde SOLO JSON sin backticks:
+{"resumen":"2-3 oraciones sobre cómo estuvo el mes en general","faltantes":["cosas concretas que faltaron ese mes, máx 4"],"metas":["2-3 metas concretas y alcanzables para el próximo mes"]}`);
+}
+
+
 async function corregirFoto(detectados,correccion){
   return iaText(`Detecté estos alimentos en una foto: ${detectados.join(", ")||"ninguno"}.
 El usuario corrige por voz: "${correccion}".
@@ -421,6 +438,8 @@ function PatientApp({onLogout,user,token}){
   const [planDiaAbierto,setPlanDiaAbierto]=useState(null);
   const [dayAiLoadingId,setDayAiLoadingId]=useState(null);
   const dayAiBusyRef=useRef(false);
+  const [monthAI,setMonthAI]=useState({});
+  const monthAiBusyRef=useRef(false);
   const [micPos,setMicPos]=useState(()=>{try{return JSON.parse(localStorage.getItem("vt_mic_pos")||"null")||{x:0,y:0};}catch(_){return {x:0,y:0};}});
   const micDrag=useRef({dragging:false,startX:0,startY:0,origX:0,origY:0,moved:false});
   const [containerMl,setContainerMl]=useState(250);
@@ -553,6 +572,8 @@ function PatientApp({onLogout,user,token}){
     setWaterHist(wh);
     let dai={};try{dai=JSON.parse(localStorage.getItem(sk(perfil,"day_ai"))||"{}");}catch(_){}
     setDayAI(dai);
+    let mai={};try{mai=JSON.parse(localStorage.getItem(sk(perfil,"month_ai"))||"{}");}catch(_){}
+    setMonthAI(mai);
     setStreak(parseInt(localStorage.getItem(sk(perfil,"streak"))||"0"));
     const b=localStorage.getItem(sk(perfil,"badges"));if(b)setBadges(JSON.parse(b));
     const slp=localStorage.getItem(sk(perfil,"sleep"));if(slp)setSleepLog(JSON.parse(slp));
@@ -648,6 +669,89 @@ function PatientApp({onLogout,user,token}){
     const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
     const tieneRegistros=history.some(r=>r.fecha===ayerDs||(typeof r.fecha==="string"&&r.fecha.split("T")[0]===ayerDs));
     if(tieneRegistros&&!dayAI[ayerDs])generarAnalisisDia(ayerDs,"día de ayer");
+  // eslint-disable-next-line
+  },[perfil,history.length]);
+
+  const MESES_CORTO=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const MESES_LARGO=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  const mesData=(()=>{
+    const pct=v=>Math.max(0,Math.min(100,Math.round(v)));
+    const parseDs=ds=>{
+      if(typeof ds!=="string")return null;
+      const p=ds.split("/");
+      if(p.length===3){const [d,m,y]=p.map(Number);return {d,m:m-1,y};}
+      const t=new Date(ds);return isNaN(t)?null:{d:t.getDate(),m:t.getMonth(),y:t.getFullYear()};
+    };
+    const now=new Date();
+    const meses=Array.from({length:6}).map((_,i)=>{
+      const dt=new Date(now.getFullYear(),now.getMonth()-(5-i),1);
+      return {y:dt.getFullYear(),m:dt.getMonth(),key:`${dt.getFullYear()}-${dt.getMonth()}`,lbl:MESES_CORTO[dt.getMonth()]};
+    });
+    const enMes=(ds,mes)=>{const p=parseDs(ds);return p&&p.y===mes.y&&p.m===mes.m;};
+    const nutriMes=meses.map(mes=>{
+      const ms=history.filter(r=>enMes(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha,mes));
+      return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
+    });
+    const aguaMes=meses.map(mes=>{
+      const dias=Object.keys(waterHist).filter(ds=>enMes(ds,mes)).map(ds=>waterHist[ds]);
+      if(today){const p=parseDs(today);if(p&&p.y===mes.y&&p.m===mes.m)dias.push(water);}
+      return dias.length?pct(dias.reduce((a,v)=>a+v,0)/dias.length/WATER_GOAL*100):null;
+    });
+    const ejerMes=meses.map(mes=>{
+      const dt=new Date(mes.y,mes.m+1,0);
+      const diasEnMes=(mes.y===now.getFullYear()&&mes.m===now.getMonth())?now.getDate():dt.getDate();
+      const mins=exLog.filter(e=>enMes(e.date,mes)).reduce((a,e)=>a+(e.min||0),0);
+      return pct(mins/(30*diasEnMes)*100);
+    });
+    const suenoMes=meses.map(mes=>{
+      const ns=sleepLog.filter(s=>enMes(s.date,mes));
+      return ns.length?pct(ns.reduce((a,s)=>a+((s.hours||0)/8*100),0)/ns.length):null;
+    });
+    const avgOf=arr=>{const v=arr.filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;};
+    return {meses,nutriMes,aguaMes,ejerMes,suenoMes,
+      actualIdx:5,
+      promActual:Math.round((avgOf([nutriMes[5]])+avgOf([aguaMes[5]])+ejerMes[5]+avgOf([suenoMes[5]]))/4)};
+  })();
+  const datosDelMes=(mes)=>{
+    const parseDs=ds=>{
+      if(typeof ds!=="string")return null;
+      const p=ds.split("/");
+      if(p.length===3){const [d,m,y]=p.map(Number);return {d,m:m-1,y};}
+      const t=new Date(ds);return isNaN(t)?null:{d:t.getDate(),m:t.getMonth(),y:t.getFullYear()};
+    };
+    const enMes=ds=>{const p=parseDs(ds);return p&&p.y===mes.y&&p.m===mes.m;};
+    const comidas=history.filter(r=>enMes(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha));
+    const nutricion=comidas.length?`${comidas.length} comidas registradas, score promedio ${Math.round(comidas.reduce((a,r)=>a+(r.score_total||0),0)/comidas.length)}%`:"sin registros de comida";
+    const diasAgua=Object.keys(waterHist).filter(enMes);
+    const hidratacion=diasAgua.length?`meta cumplida ${diasAgua.filter(d=>waterHist[d]>=WATER_GOAL).length} de ${diasAgua.length} días registrados`:"sin registros de hidratación";
+    const minsEj=exLog.filter(e=>enMes(e.date)).reduce((a,e)=>a+(e.min||0),0);
+    const ejercicio=minsEj>0?`${minsEj} min totales en el mes`:"sin actividad física registrada";
+    const nochesS=sleepLog.filter(s=>enMes(s.date));
+    const sueno=nochesS.length?`promedio ${Math.round(nochesS.reduce((a,s)=>a+(s.hours||0),0)/nochesS.length*10)/10}h en ${nochesS.length} noches registradas`:"sin registros de sueño";
+    return {nutricion,hidratacion,ejercicio,sueno};
+  };
+  const generarAnalisisMes=async(key,mes,mesAnteriorTxt)=>{
+    if(monthAiBusyRef.current||monthAI[key])return;
+    monthAiBusyRef.current=true;
+    try{
+      const dd=datosDelMes(mes);
+      const r=await analisisMes({mes:MESES_LARGO[mes.m],...dd,mesAnterior:mesAnteriorTxt},hp);
+      setMonthAI(prev=>{const n={...prev,[key]:r};try{localStorage.setItem(sk(perfil,"month_ai"),JSON.stringify(n));}catch(_){}return n;});
+    }catch(_){}
+    monthAiBusyRef.current=false;
+  };
+  useEffect(()=>{
+    if(!perfil||!history.length)return;
+    const now=new Date();
+    const mesAnt=new Date(now.getFullYear(),now.getMonth()-1,1);
+    const key=`${mesAnt.getFullYear()}-${mesAnt.getMonth()}`;
+    const mes={y:mesAnt.getFullYear(),m:mesAnt.getMonth()};
+    const tieneRegistros=history.some(r=>{
+      const f=typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha;
+      const p=typeof f==="string"?f.split("/"):null;
+      return p&&p.length===3&&Number(p[2])===mes.y&&Number(p[1])-1===mes.m;
+    });
+    if(tieneRegistros&&!monthAI[key])generarAnalisisMes(key,mes,null);
   // eslint-disable-next-line
   },[perfil,history.length]);
 
@@ -1398,49 +1502,58 @@ function PatientApp({onLogout,user,token}){
               </div>
             )}
           </div>
-          <div style={{textAlign:"center",marginBottom:20}}>
-            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:8,textTransform:"uppercase",letterSpacing:.5}}>{eatScore?`Qué tan bien te alimentas · ${eatScore.n} comida${eatScore.n!==1?"s":""}`:"Selecciona alimentos para ver tu score"}</div>
-            <div style={{position:"relative",width:150,height:150,margin:"0 auto 14px"}}>
-              <svg width="150" height="150" style={{transform:"rotate(-90deg)"}}>
-                <circle cx="75" cy="75" r="64" fill="none" stroke="#EFEDFC" strokeWidth="14"/>
-                <circle cx="75" cy="75" r="64" fill="none" stroke={scoreColor(scoreView.total)} strokeWidth="14"
-                  strokeDasharray={`${2*Math.PI*64}`} strokeDashoffset={`${2*Math.PI*64*(1-scoreView.total/100)}`}
-                  strokeLinecap="round" style={{transition:"stroke-dashoffset 1s ease"}}/>
-              </svg>
-              <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",textAlign:"center"}}>
-                <div style={{fontSize:36,fontWeight:900,color:scoreColor(scoreView.total)}}>{scoreView.total}</div>
-                <div style={{fontSize:10,color:"#aaa",letterSpacing:1,textTransform:"uppercase"}}>Score</div>
+          <div style={{marginBottom:16}}>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:12,textTransform:"uppercase",letterSpacing:.5}}>Progreso mensual · últimos 6 meses</div>
+            {[["nutricion","Nutrición",mesData.nutriMes,"#3DAE5A"],["hidratacion","Hidratación",mesData.aguaMes,"#3DAEE6"],["ejercicio","Ejercicio",mesData.ejerMes,"#E9A23B"],["sueno","Sueño",mesData.suenoMes,"#6D5BD0"]].map(([tipo,lb,serie,cl])=>(
+              <div key={tipo} style={{background:"#fff",borderRadius:16,padding:"14px 16px",marginBottom:10,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                  <IconoHabito tipo={tipo}/>
+                  <span style={{flex:1,fontSize:13,fontWeight:800,color:"#333"}}>{lb}</span>
+                  <span style={{fontSize:13,fontWeight:900,color:cl}}>{serie[5]==null?"—":serie[5]+"%"}</span>
+                </div>
+                <div style={{display:"flex",gap:6,alignItems:"flex-end",height:44}}>
+                  {serie.map((v,i)=>(
+                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
+                      <div style={{width:"100%",background:i===5?cl:cl+"33",borderRadius:4,height:(v==null?3:Math.max(4,v*0.4))+"px",transition:"height .5s"}}/>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"flex",gap:6,marginTop:4}}>
+                  {mesData.meses.map((m,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:i===5?cl:"#bbb",fontWeight:i===5?800:500}}>{m.lbl}</div>))}
+                </div>
               </div>
-            </div>
-            <div style={{color:"#555",fontSize:14,fontWeight:600}}>{scoreView.total>=70?"🌟 ¡Excelente alimentación!":scoreView.total>=40?"💪 Puedes mejorar":"🥺 Necesitas más variedad"}</div>
+            ))}
           </div>
 
-          {[{label:"🛡️ Inmunidad",key:"immunity"},{label:"⚡ Energía",key:"energy"},{label:"🧠 Concentración",key:"focus"},{label:"✨ Vitalidad",key:"vitality"}].map(({label,key})=>(
-            <div key={key} style={{background:"#fff",borderRadius:16,padding:"14px 16px",marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                <span style={{fontSize:14,fontWeight:700}}>{label}</span>
-                <span style={{fontSize:15,fontWeight:900,color:scoreColor(scoreView[key]),background:scoreBg(scoreView[key]),padding:"2px 10px",borderRadius:10}}>{scoreView[key]}%</span>
-              </div>
-              <div style={{background:"#F0F0F0",borderRadius:8,height:10,overflow:"hidden"}}>
-                <div style={{width:`${scoreView[key]}%`,height:10,borderRadius:8,background:scoreColor(scoreView[key]),transition:"width 1s ease"}}/>
-              </div>
-            </div>
-          ))}
-
-          {eatScore&&(()=>{
-            const dims=[["immunity","🛡️ Inmunidad"],["energy","⚡ Energía"],["focus","🧠 Concentración"],["vitality","✨ Vitalidad"]];
-            const TIPS={immunity:"Suma frutas y verduras de colores (cítricos, brócoli, zanahoria, espinaca).",energy:"Prefiere granos integrales y baja el azúcar y los fritos para energía estable.",focus:"Incluye proteína, pescado o frutos secos y mantente hidratado.",vitality:"Varía más el plato con verduras de hoja y menos ultraprocesados."};
-            const weak=dims.slice().sort((a,b)=>eatScore[a[0]]-eatScore[b[0]]).slice(0,2);
-            return(
-              <div style={{background:"#fff",borderRadius:16,padding:16,marginTop:8,marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",borderLeft:"5px solid #E9A23B"}}>
-                <div style={{fontSize:13,fontWeight:800,color:"#B26A00",marginBottom:10}}>📈 Para mejorar tu alimentación</div>
-                {weak.map(([k,label])=>(
-                  <div key={k} style={{background:"#FFF8EC",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
-                    <div style={{fontSize:12,fontWeight:800,color:"#856404",marginBottom:3}}>{label} · {eatScore[k]}%</div>
-                    <div style={{fontSize:13,color:"#6b5a2e",lineHeight:1.5}}>{TIPS[k]}</div>
+          {(()=>{
+            const now=new Date();
+            const mesAnt=new Date(now.getFullYear(),now.getMonth()-1,1);
+            const key=`${mesAnt.getFullYear()}-${mesAnt.getMonth()}`;
+            const mes={y:mesAnt.getFullYear(),m:mesAnt.getMonth()};
+            const ai=monthAI[key];
+            const nombreMes=MESES_LARGO[mesAnt.getMonth()];
+            return (
+              <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",borderLeft:"5px solid #6D5BD0"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:10,textTransform:"capitalize"}}>📅 Cómo te fue en {nombreMes}</div>
+                {ai?(
+                  <div>
+                    <div style={{fontSize:13,color:"#444",lineHeight:1.5,marginBottom:10}}>{ai.resumen}</div>
+                    {ai.faltantes&&ai.faltantes.length>0&&(
+                      <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:10}}>
+                        {ai.faltantes.map((x,i)=><span key={i} style={{fontSize:10,padding:"3px 9px",borderRadius:20,background:"#FEECEC",color:"#C0392B",fontWeight:600}}>Te faltó: {x}</span>)}
+                      </div>
+                    )}
+                    <div style={{fontSize:11,fontWeight:800,color:"#5B49C0",marginBottom:6,textTransform:"uppercase",letterSpacing:.5}}>Metas para este mes</div>
+                    {(ai.metas||[]).map((s,i)=>(
+                      <div key={i} style={{fontSize:12,color:"#5B49C0",background:"#EFEDFC",borderRadius:10,padding:"8px 10px",marginBottom:6,lineHeight:1.4}}>🎯 {s}</div>
+                    ))}
                   </div>
-                ))}
-                <div style={{fontSize:11,color:"#aaa",marginTop:2}}>Para un plan completo, usa "✨ Mi semana" arriba.</div>
+                ):(
+                  <div>
+                    <p style={{fontSize:12,color:"#888",marginBottom:10}}>Aún no se ha generado el análisis de {nombreMes}.</p>
+                    <button onClick={()=>generarAnalisisMes(key,mes,null)} style={{width:"100%",padding:"10px",borderRadius:10,border:"1.5px solid #6D5BD0",background:"#fff",color:"#6D5BD0",fontWeight:800,fontSize:12,cursor:"pointer"}}>✨ Analizar {nombreMes} con IA</button>
+                  </div>
+                )}
               </div>
             );
           })()}
