@@ -401,6 +401,7 @@ function PatientApp({onLogout,user,token}){
   const [water,setWater]=useState(0);
   const [waterLog,setWaterLog]=useState([]);
   const [waterHist,setWaterHist]=useState({});
+  const [diaSel,setDiaSel]=useState(6);
   const [containerMl,setContainerMl]=useState(250);
   const [streak,setStreak]=useState(0);
   const [history,setHistory]=useState([]);
@@ -564,6 +565,49 @@ function PatientApp({onLogout,user,token}){
   const waterMl=waterLog.reduce((a,d)=>a+(d.ml||0),0);
   const waterGoalMl=WATER_GOAL*GLASS_ML;
   const waterMlPct=Math.min(100,(waterMl/waterGoalMl)*100);
+
+  const semanaData=(()=>{
+    const pct=v=>Math.max(0,Math.min(100,Math.round(v)));
+    const fechaMatch=(f,ds)=>f===ds||(typeof f==="string"&&f.split("T")[0]===ds);
+    const DIAS=["D","L","M","M","J","V","S"];
+    const DIAS_FULL=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+    const semana=Array.from({length:7}).map((_,i)=>{
+      const dt=new Date(Date.now()-(6-i)*864e5);
+      return {ds:dt.toLocaleDateString("es-CO"),lbl:DIAS[dt.getDay()],full:DIAS_FULL[dt.getDay()]};
+    });
+    const nutriDias=semana.map(w=>{
+      const ms=history.filter(r=>fechaMatch(r.fecha,w.ds));
+      return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
+    });
+    const ejerDias=semana.map(w=>pct(exLog.filter(e=>e.date===w.ds).reduce((a,e)=>a+(e.min||0),0)/30*100));
+    const aguaDias=semana.map(w=>{
+      if(w.ds===today)return pct(water/WATER_GOAL*100);
+      if(waterHist[w.ds]!=null)return pct(waterHist[w.ds]/WATER_GOAL*100);
+      return null;
+    });
+    const suenoDias=semana.map(w=>{
+      const e=sleepLog.find(s=>s.date===w.ds);
+      return e?pct((e.hours||0)/8*100):null;
+    });
+    const avgOf=arr=>{const v=arr.filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;};
+    const pNutri=avgOf(nutriDias),pAgua=avgOf(aguaDias),pEjer=avgOf(ejerDias),pSueno=avgOf(suenoDias);
+    const semanaProm=Math.round((pNutri+pAgua+pEjer+pSueno)/4);
+    const diasConDato=semana.map((w,i)=>{
+      const vals=[nutriDias[i],aguaDias[i],ejerDias[i],suenoDias[i]].filter(v=>v!=null);
+      return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
+    });
+    return {semana,nutriDias,ejerDias,aguaDias,suenoDias,pNutri,pAgua,pEjer,pSueno,semanaProm,diasConDato};
+  })();
+  const recomendacionDia=(tipo,v)=>{
+    if(v==null)return "Sin datos registrados este día.";
+    const M={
+      nutricion:[v>=70?"¡Excelente alimentación! 🌟":v>=40?"Buena base, suma más variedad de alimentos.":"Registra tus comidas para mejorar tu nutrición."],
+      hidratacion:[v>=70?"Cumpliste tu meta de hidratación 💧":v>=40?"Vas bien, toma un poco más de agua.":"Te faltó tomar agua este día."],
+      ejercicio:[v>=70?"¡Buen nivel de actividad! 💪":v>=40?"Un poco más de movimiento te vendría bien.":"No se registró actividad física."],
+      sueno:[v>=70?"Dormiste muy bien 😴":v>=40?"Podrías dormir un poco más.":"Te faltó descanso este día."],
+    };
+    return M[tipo][0];
+  };
   const scoreColor=v=>v>=70?"#6D5BD0":v>=40?"#E9C46A":"#E76F51";
   const scoreBg=v=>v>=70?"#EDEAFB":v>=40?"#FFF3CD":"#FFE5DE";
   const toggle=f=>setSelected(p=>p.includes(f)?p.filter(x=>x!==f):[...p,f]);
@@ -1051,8 +1095,9 @@ function PatientApp({onLogout,user,token}){
           {step===0&&(<>
           {/* Accesos rápidos */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:16}}>
-            {[["🥗","Nutrición",()=>irAComida(),"#3DAE5A"],["💧","Hidratación",()=>setTab(4),"#3DAEE6"],["💪","Ejercicio",()=>setTab(6),"#E76F51"],["😴","Sueño",()=>setTab(5),"#6D5BD0"]].map(([ic,lb,onClick,cl])=>(
-              <button key={lb} onClick={onClick} style={{background:"#fff",border:"none",borderRadius:16,padding:"16px 8px",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
+            {[["nutricion","🥗","Nutrición",()=>irAComida(),"#3DAE5A",semanaData.nutriDias[diaSel]],["hidratacion","💧","Hidratación",()=>setTab(4),"#3DAEE6",semanaData.aguaDias[diaSel]],["ejercicio","💪","Ejercicio",()=>setTab(6),"#E76F51",semanaData.ejerDias[diaSel]],["sueno","😴","Sueño",()=>setTab(5),"#6D5BD0",semanaData.suenoDias[diaSel]]].map(([tipo,ic,lb,onClick,cl,val])=>(
+              <button key={lb} onClick={onClick} style={{background:"#fff",border:"none",borderRadius:16,padding:"16px 8px",boxShadow:"0 2px 10px rgba(0,0,0,0.05)",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6,position:"relative"}}>
+                <span style={{position:"absolute",top:8,right:8,fontSize:10,fontWeight:800,color:cl,background:cl+"18",padding:"2px 7px",borderRadius:10}}>{val==null?"—":val+"%"}</span>
                 <span style={{fontSize:26}}>{ic}</span>
                 <span style={{fontSize:12,fontWeight:800,color:cl}}>{lb}</span>
               </button>
@@ -1066,50 +1111,29 @@ function PatientApp({onLogout,user,token}){
               <div style={{fontSize:11,color:"#999"}}>últimos 7 días</div>
             </div>
             {(()=>{
-              const pct=v=>Math.max(0,Math.min(100,Math.round(v)));
-              const fechaMatch=(f,ds)=>f===ds||(typeof f==="string"&&f.split("T")[0]===ds);
-              const DIAS=["D","L","M","M","J","V","S"];
-              const semana=Array.from({length:7}).map((_,i)=>{
-                const dt=new Date(Date.now()-(6-i)*864e5);
-                return {ds:dt.toLocaleDateString("es-CO"),lbl:DIAS[dt.getDay()]};
-              });
-              const nutriDias=semana.map(w=>{
-                const ms=history.filter(r=>fechaMatch(r.fecha,w.ds));
-                return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
-              });
-              const ejerDias=semana.map(w=>pct(exLog.filter(e=>e.date===w.ds).reduce((a,e)=>a+(e.min||0),0)/30*100));
-              const aguaDias=semana.map(w=>{
-                if(w.ds===today)return pct(water/WATER_GOAL*100);
-                if(waterHist[w.ds]!=null)return pct(waterHist[w.ds]/WATER_GOAL*100);
-                return null;
-              });
-              const suenoDias=semana.map(w=>{
-                const e=sleepLog.find(s=>s.date===w.ds);
-                return e?pct((e.hours||0)/8*100):null;
-              });
-              const avgOf=arr=>{const v=arr.filter(x=>x!=null);return v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;};
-              const pNutri=avgOf(nutriDias),pAgua=avgOf(aguaDias),pEjer=avgOf(ejerDias),pSueno=avgOf(suenoDias);
-              const semanaProm=Math.round((pNutri+pAgua+pEjer+pSueno)/4);
+              const d=semanaData;
               const R=46,C=2*Math.PI*R;
               const filas=[
-                ["nutricion","Nutrición",pNutri,"#3DAE5A"],
-                ["hidratacion","Hidratación",pAgua,"#3DAEE6"],
-                ["ejercicio","Ejercicio",pEjer,"#E9A23B"],
-                ["sueno","Sueño",pSueno,"#6D5BD0"],
+                ["nutricion","Nutrición",d.pNutri,"#3DAE5A"],
+                ["hidratacion","Hidratación",d.pAgua,"#3DAEE6"],
+                ["ejercicio","Ejercicio",d.pEjer,"#E9A23B"],
+                ["sueno","Sueño",d.pSueno,"#6D5BD0"],
               ];
-              const diasConDato=semana.map((w,i)=>{
-                const vals=[nutriDias[i],aguaDias[i],ejerDias[i],suenoDias[i]].filter(v=>v!=null);
-                return vals.length?Math.round(vals.reduce((a,b)=>a+b,0)/vals.length):null;
-              });
+              const filasDia=[
+                ["nutricion","Nutrición",d.nutriDias[diaSel],"#3DAE5A"],
+                ["hidratacion","Hidratación",d.aguaDias[diaSel],"#3DAEE6"],
+                ["ejercicio","Ejercicio",d.ejerDias[diaSel],"#E9A23B"],
+                ["sueno","Sueño",d.suenoDias[diaSel],"#6D5BD0"],
+              ];
               return (<div>
                 <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:16}}>
                   <div style={{position:"relative",width:112,height:112,flexShrink:0}}>
                     <svg width="112" height="112" viewBox="0 0 112 112">
                       <circle cx="56" cy="56" r="46" fill="none" stroke="#EDEAFB" strokeWidth="11"/>
-                      <circle cx="56" cy="56" r="46" fill="none" stroke="#6D5BD0" strokeWidth="11" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-semanaProm/100)} transform="rotate(-90 56 56)" style={{transition:"stroke-dashoffset .6s"}}/>
+                      <circle cx="56" cy="56" r="46" fill="none" stroke="#6D5BD0" strokeWidth="11" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C*(1-d.semanaProm/100)} transform="rotate(-90 56 56)" style={{transition:"stroke-dashoffset .6s"}}/>
                     </svg>
                     <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-                      <div style={{fontSize:26,fontWeight:900,color:"#6D5BD0",lineHeight:1}}>{semanaProm}<span style={{fontSize:13}}>%</span></div>
+                      <div style={{fontSize:26,fontWeight:900,color:"#6D5BD0",lineHeight:1}}>{d.semanaProm}<span style={{fontSize:13}}>%</span></div>
                       <div style={{fontSize:10,color:"#999",marginTop:2,fontWeight:700}}>promedio</div>
                     </div>
                   </div>
@@ -1130,13 +1154,32 @@ function PatientApp({onLogout,user,token}){
                     ))}
                   </div>
                 </div>
-                <div style={{display:"flex",gap:4,marginBottom:6}}>
-                  {semana.map((w,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:i===6?"#6D5BD0":"#999",fontWeight:i===6?800:500}}>{w.lbl}</div>))}
+                <div style={{fontSize:10,color:"#bbb",textAlign:"center",marginBottom:6}}>Toca un día para ver su detalle</div>
+                <div style={{display:"flex",gap:4}}>
+                  {d.semana.map((w,i)=>(
+                    <button key={i} onClick={()=>setDiaSel(i)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"2px 0"}}>
+                      <span style={{fontSize:9,color:diaSel===i?"#6D5BD0":"#999",fontWeight:diaSel===i?800:500}}>{w.lbl}</span>
+                      <div style={{width:"100%",height:28,display:"flex",alignItems:"flex-end"}}>
+                        <div style={{width:"100%",background:diaSel===i?"#6D5BD0":"#D8D3F0",borderRadius:4,height:(d.diasConDato[i]==null?4:Math.max(6,d.diasConDato[i]*0.28))+"px",transition:"background .2s"}}/>
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div style={{display:"flex",gap:4,height:28,alignItems:"flex-end"}}>
-                  {diasConDato.map((v,i)=>(<div key={i} style={{flex:1,background:i===6?"#6D5BD0":"#D8D3F0",borderRadius:4,height:(v==null?4:Math.max(6,v*0.28))+"px"}}/>))}
+                <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #F0EFF7"}}>
+                  <div style={{fontSize:12,fontWeight:800,color:"#6D5BD0",marginBottom:10}}>{d.semana[diaSel].ds===today?"Hoy":d.semana[diaSel].full} · cómo vas en cada pilar</div>
+                  {filasDia.map(([tipo,lb,v,cl])=>(
+                    <div key={tipo} style={{display:"flex",gap:8,alignItems:"flex-start",marginBottom:10}}>
+                      <IconoHabito tipo={tipo}/>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:"flex",justifyContent:"space-between"}}>
+                          <span style={{fontSize:12,fontWeight:700,color:"#555"}}>{lb}</span>
+                          <span style={{fontSize:11,fontWeight:700,color:cl}}>{v==null?"sin datos":v+"%"}</span>
+                        </div>
+                        <div style={{fontSize:11,color:"#888",marginTop:2,lineHeight:1.4}}>{recomendacionDia(tipo,v)}</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div style={{fontSize:12,color:"#999",textAlign:"center",marginTop:10}}>{semanaProm>=70?"¡Excelente semana! 🌟":semanaProm>=40?"Buena semana, sigue así 💪":"Registra tus hábitos para subir tu promedio 📈"}</div>
               </div>);
             })()}
           </div>
