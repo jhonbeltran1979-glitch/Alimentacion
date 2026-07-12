@@ -2137,9 +2137,8 @@ function PatientApp({onLogout,user,token}){
               });
               const dias=Object.keys(map).sort((a,b)=>dateKeyToTs(b)-dateKeyToTs(a)).slice(0,14);
               if(!dias.length)return (
-                <div style={{textAlign:"center",padding:"30px 20px",background:"#fff",borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,0.05)"}}>
-                  <div style={{fontSize:36,marginBottom:8}}>🎙️</div>
-                  <div style={{color:"#888",fontSize:13}}>Registra tu primera comida por voz para empezar tu historial.</div>
+                <div style={{textAlign:"center",padding:"24px 20px",background:"#fff",borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,0.05)"}}>
+                  <div style={{color:"#888",fontSize:13}}>Aún no tienes comidas registradas. Toca el micrófono flotante y cuéntame qué desayunaste, almorzaste o cenaste para empezar tu historial.</div>
                 </div>
               );
               return dias.map(ds=>{
