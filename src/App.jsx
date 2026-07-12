@@ -323,18 +323,19 @@ function ProfileScreen({onEnter}){
 
 // ══ ONBOARDING SALUD ═════════════════════════════════════════════
 function HealthScreen({perfil,onComplete}){
-  const [edad,setEdad]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
   const EJERCICIOS=[{e:"🛋️ Sedentario",d:"Poca o ninguna actividad"},{e:"🚶 Caminata",d:"Menos de 3 veces/semana"},{e:"🏃 Activo",d:"3-4 veces por semana"},{e:"💪 Intenso",d:"Diario o competitivo"}];
   const ENFERMEDADES=["Ninguna","Diabetes","Hipertensión","Colesterol alto","Hipotiroidismo","Gastritis","Otra"];
   const save=async()=>{
     if(!edad||+edad<1||+edad>110){setErr("Ingresa una edad válida");return;}
+    if(!peso||+peso<20||+peso>300){setErr("Ingresa un peso válido (kg)");return;}
     if(!ejercicio){setErr("Selecciona tu nivel de actividad");return;}
     if(!enf){setErr("Selecciona una opción");return;}
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
-    try{await apiGet({action:"guardar_perfil",perfil,edad,ejercicio:encodeURIComponent(ejercicio),enfermedad:encodeURIComponent(e2)});}catch(_){}
-    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,ejercicio,enfermedad:e2}));
-    setLoading(false);onComplete({edad,ejercicio,enfermedad:e2});
+    try{await apiGet({action:"guardar_perfil",perfil,edad,peso,ejercicio:encodeURIComponent(ejercicio),enfermedad:encodeURIComponent(e2)});}catch(_){}
+    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,ejercicio,enfermedad:e2}));
+    setLoading(false);onComplete({edad,peso,ejercicio,enfermedad:e2});
   };
   return(
     <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
@@ -344,11 +345,18 @@ function HealthScreen({perfil,onComplete}){
         <div style={{color:"rgba(255,255,255,.75)",fontSize:13,marginTop:4}}>Hola <b>{perfil}</b> — personalizamos tus recomendaciones</div>
       </div>
       <div style={{padding:"0 16px 24px",marginTop:-20}}>
-        {/* Edad */}
-        <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Edad</div>
-          <input type="number" value={edad} onChange={e=>{setEdad(e.target.value);setErr("");}} placeholder="Ej: 32"
-            style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+        {/* Edad y peso */}
+        <div style={{display:"flex",gap:12,marginBottom:12}}>
+          <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+            <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Edad</div>
+            <input type="number" value={edad} onChange={e=>{setEdad(e.target.value);setErr("");}} placeholder="Ej: 32"
+              style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+          </div>
+          <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+            <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Peso (kg)</div>
+            <input type="number" value={peso} onChange={e=>{setPeso(e.target.value);setErr("");}} placeholder="Ej: 70"
+              style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+          </div>
         </div>
         {/* Ejercicio */}
         <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
@@ -505,6 +513,19 @@ function PatientApp({onLogout,user,token}){
   const [exType,setExType]=useState("Caminar");
   const [exLogMin,setExLogMin]=useState(30);
   const [exInt,setExInt]=useState("media");
+  const [caminataActiva,setCaminataActiva]=useState(false);
+  const [caminataTiempo,setCaminataTiempo]=useState(0);
+  const [caminataDist,setCaminataDist]=useState(0);
+  const [caminataErr,setCaminataErr]=useState("");
+  const [caminataResumen,setCaminataResumen]=useState(null);
+  const caminataWatchId=useRef(null);
+  const caminataTimerRef=useRef(null);
+  const caminataMapaRef=useRef(null);
+  const caminataMapaDivRef=useRef(null);
+  const caminataLineaRef=useRef(null);
+  const caminataMarcadorRef=useRef(null);
+  const caminataPuntosRef=useRef([]);
+  const caminataLeafletListo=useRef(false);
   const [exAnalyzing,setExAnalyzing]=useState(false);
   const [exMsg,setExMsg]=useState("");
   const [listening,setListening]=useState(false);
@@ -546,7 +567,7 @@ function PatientApp({onLogout,user,token}){
       setPerfil(saved);
       const h=localStorage.getItem(sk(saved,"perfil_salud"));
       if(h)setHp(JSON.parse(h));
-      else{apiGet({action:"obtener_perfil",perfil:saved}).then(r=>{if(r.ok&&r.encontrado){const h2={edad:r.edad,ejercicio:r.ejercicio,enfermedad:r.enfermedad};setHp(h2);localStorage.setItem(sk(saved,"perfil_salud"),JSON.stringify(h2));}else setShowHF(true);}).catch(()=>setShowHF(true));}
+      else{apiGet({action:"obtener_perfil",perfil:saved}).then(r=>{if(r.ok&&r.encontrado){const h2={edad:r.edad,peso:r.peso,ejercicio:r.ejercicio,enfermedad:r.enfermedad};setHp(h2);localStorage.setItem(sk(saved,"perfil_salud"),JSON.stringify(h2));}else setShowHF(true);}).catch(()=>setShowHF(true));}
       const qf=localStorage.getItem(sk(saved,"quick_foods"));if(qf)setQuickFoods(JSON.parse(qf));
     }
     const cached=localStorage.getItem("vt_api_key_cache");if(cached)CLAUDE_API_KEY=cached;
@@ -941,6 +962,77 @@ function PatientApp({onLogout,user,token}){
     const rec={date:today,ts:Date.now(),tipo:exType,min:exLogMin,intensidad:exInt};
     const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
     setExMsg("✓ Entrenamiento registrado");setTimeout(()=>setExMsg(""),2500);
+  };
+
+  const cargarLeaflet=()=>new Promise((resolve,reject)=>{
+    if(window.L){caminataLeafletListo.current=true;resolve();return;}
+    if(!document.getElementById("vt-leaflet-css")){
+      const link=document.createElement("link");link.id="vt-leaflet-css";link.rel="stylesheet";link.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";document.head.appendChild(link);
+    }
+    const existente=document.getElementById("vt-leaflet-js");
+    if(existente){existente.addEventListener("load",()=>{caminataLeafletListo.current=true;resolve();});return;}
+    const script=document.createElement("script");script.id="vt-leaflet-js";script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload=()=>{caminataLeafletListo.current=true;resolve();};
+    script.onerror=()=>reject(new Error("No se pudo cargar el mapa"));
+    document.body.appendChild(script);
+  });
+
+  const haversineKm=(a,b)=>{
+    const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
+    const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));
+  };
+
+  const iniciarCaminata=async()=>{
+    setCaminataErr("");setCaminataResumen(null);
+    if(!navigator.geolocation){setCaminataErr("Tu navegador no soporta GPS.");return;}
+    try{await cargarLeaflet();}catch(e){setCaminataErr(e.message);return;}
+    caminataPuntosRef.current=[];setCaminataDist(0);setCaminataTiempo(0);
+    setCaminataActiva(true);
+    setTimeout(()=>{
+      const L=window.L;
+      if(caminataMapaDivRef.current&&!caminataMapaRef.current){
+        const mapa=L.map(caminataMapaDivRef.current).setView([4.6,-74.08],16);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(mapa);
+        caminataMapaRef.current=mapa;
+        caminataLineaRef.current=L.polyline([],{color:"#6D5BD0",weight:5}).addTo(mapa);
+      }
+    },50);
+    const inicioTs=Date.now();
+    caminataTimerRef.current=setInterval(()=>setCaminataTiempo(Math.floor((Date.now()-inicioTs)/1000)),1000);
+    caminataWatchId.current=navigator.geolocation.watchPosition(
+      pos=>{
+        const p={lat:pos.coords.latitude,lng:pos.coords.longitude};
+        const pts=caminataPuntosRef.current;
+        if(pts.length>0)setCaminataDist(d=>d+haversineKm(pts[pts.length-1],p));
+        pts.push(p);
+        const L=window.L,mapa=caminataMapaRef.current;
+        if(L&&mapa){
+          caminataLineaRef.current.addLatLng(p);
+          mapa.setView(p,mapa.getZoom()<16?16:mapa.getZoom());
+          if(caminataMarcadorRef.current)caminataMarcadorRef.current.setLatLng(p);
+          else caminataMarcadorRef.current=L.circleMarker(p,{radius:7,color:"#6D5BD0",fillColor:"#6D5BD0",fillOpacity:1}).addTo(mapa);
+        }
+      },
+      err=>setCaminataErr(err.code===1?"Necesito permiso de ubicación para trazar tu ruta.":"No se pudo obtener tu ubicación."),
+      {enableHighAccuracy:true,maximumAge:2000,timeout:15000}
+    );
+  };
+
+  const detenerCaminata=()=>{
+    if(caminataWatchId.current!=null){navigator.geolocation.clearWatch(caminataWatchId.current);caminataWatchId.current=null;}
+    if(caminataTimerRef.current){clearInterval(caminataTimerRef.current);caminataTimerRef.current=null;}
+    const minutos=Math.max(1,Math.round(caminataTiempo/60));
+    const km=Math.round(caminataDist*100)/100;
+    const pesoKg=hp&&hp.peso?Number(hp.peso):70;
+    const MET=3.8;
+    const calorias=Math.round((MET*3.5*pesoKg/200)*minutos);
+    const intensidad=km/((caminataTiempo||1)/3600)>=5?"alta":km/((caminataTiempo||1)/3600)>=3.5?"media":"baja";
+    const rec={date:today,ts:Date.now(),tipo:"Caminata GPS",min:minutos,intensidad,km,calorias};
+    const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
+    setCaminataResumen({min:minutos,km,calorias});
+    setCaminataActiva(false);
+    if(caminataMapaRef.current){caminataMapaRef.current.remove();caminataMapaRef.current=null;caminataLineaRef.current=null;caminataMarcadorRef.current=null;}
   };
 
   // ── VOZ ────────────────────────────────────────────────
@@ -1951,6 +2043,48 @@ function PatientApp({onLogout,user,token}){
               <div style={{width:`${wpct}%`,height:14,borderRadius:10,background:"#fff",transition:"width .5s"}}/>
             </div>
             <div style={{fontSize:12,opacity:.9}}>{wd} día{wd!==1?"s":""} activo{wd!==1?"s":""} · {wpct>=100?"¡Meta cumplida! 🎉":`Te faltan ${Math.max(0,WHO-wm)} min`}</div>
+          </div>
+
+          <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:14,fontWeight:900,marginBottom:4,color:"#C1492B"}}>🗺️ Caminata con GPS</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Traza tu ruta en el mapa y calcula distancia y calorías reales.</div>
+            {!caminataActiva&&!caminataResumen&&(
+              <button onClick={iniciarCaminata} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #6D5BD044"}}>🚶 Iniciar caminata</button>
+            )}
+            {caminataErr&&<div style={{marginTop:10,background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:12}}>{caminataErr}</div>}
+            {caminataActiva&&(
+              <div>
+                <div ref={caminataMapaDivRef} style={{width:"100%",height:220,borderRadius:14,overflow:"hidden",marginBottom:12,background:"#EFEDFC"}}/>
+                <div style={{display:"flex",gap:8,marginBottom:12}}>
+                  <div style={{flex:1,background:"#F8F7FE",borderRadius:12,padding:"10px 6px",textAlign:"center"}}>
+                    <div style={{fontSize:17,fontWeight:900,color:"#6D5BD0"}}>{String(Math.floor(caminataTiempo/60)).padStart(2,"0")}:{String(caminataTiempo%60).padStart(2,"0")}</div>
+                    <div style={{fontSize:10,color:"#999"}}>tiempo</div>
+                  </div>
+                  <div style={{flex:1,background:"#F8F7FE",borderRadius:12,padding:"10px 6px",textAlign:"center"}}>
+                    <div style={{fontSize:17,fontWeight:900,color:"#6D5BD0"}}>{caminataDist.toFixed(2)}</div>
+                    <div style={{fontSize:10,color:"#999"}}>km</div>
+                  </div>
+                  <div style={{flex:1,background:"#F8F7FE",borderRadius:12,padding:"10px 6px",textAlign:"center"}}>
+                    <div style={{fontSize:17,fontWeight:900,color:"#6D5BD0"}}>{Math.round((3.8*3.5*(hp&&hp.peso?Number(hp.peso):70)/200)*(caminataTiempo/60))}</div>
+                    <div style={{fontSize:10,color:"#999"}}>kcal</div>
+                  </div>
+                </div>
+                <button onClick={detenerCaminata} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"#C1121F",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>⏹️ Detener y guardar</button>
+              </div>
+            )}
+            {caminataResumen&&!caminataActiva&&(
+              <div>
+                <div style={{background:"#EFEDFC",borderRadius:14,padding:14,marginBottom:12,textAlign:"center"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#5B49C0",marginBottom:8}}>✓ Caminata guardada</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.min}</div><div style={{fontSize:10,color:"#999"}}>min</div></div>
+                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.km}</div><div style={{fontSize:10,color:"#999"}}>km</div></div>
+                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.calorias}</div><div style={{fontSize:10,color:"#999"}}>kcal</div></div>
+                  </div>
+                </div>
+                <button onClick={()=>setCaminataResumen(null)} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #6D5BD0",background:"#fff",color:"#6D5BD0",fontWeight:800,fontSize:13,cursor:"pointer"}}>🚶 Nueva caminata</button>
+              </div>
+            )}
           </div>
 
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
