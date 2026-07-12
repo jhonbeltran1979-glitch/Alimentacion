@@ -402,6 +402,8 @@ function PatientApp({onLogout,user,token}){
   const [waterLog,setWaterLog]=useState([]);
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
+  const [micPos,setMicPos]=useState(()=>{try{return JSON.parse(localStorage.getItem("vt_mic_pos")||"null")||{x:0,y:0};}catch(_){return {x:0,y:0};}});
+  const micDrag=useRef({dragging:false,startX:0,startY:0,origX:0,origY:0,moved:false});
   const [containerMl,setContainerMl]=useState(250);
   const [streak,setStreak]=useState(0);
   const [history,setHistory]=useState([]);
@@ -1890,8 +1892,24 @@ function PatientApp({onLogout,user,token}){
             {voiceResult&&<div style={{textAlign:"right",marginTop:8}}><button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"transparent",border:"none",color:"#aaa",fontSize:11,cursor:"pointer"}}>cerrar</button></div>}
           </div>
         )}
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,pointerEvents:"auto"}}>
-          <button onClick={listening?stopVoice:()=>{setMeal(mealByHour());startVoice();}} title="Dictar por voz" style={{width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>
+        <div
+          onPointerDown={(e)=>{
+            try{e.currentTarget.setPointerCapture(e.pointerId);}catch(_){}
+            micDrag.current={dragging:true,startX:e.clientX,startY:e.clientY,origX:micPos.x,origY:micPos.y,moved:false};
+          }}
+          onPointerMove={(e)=>{
+            if(!micDrag.current.dragging)return;
+            const dx=e.clientX-micDrag.current.startX,dy=e.clientY-micDrag.current.startY;
+            if(Math.abs(dx)>6||Math.abs(dy)>6)micDrag.current.moved=true;
+            setMicPos({x:micDrag.current.origX+dx,y:micDrag.current.origY+dy});
+          }}
+          onPointerUp={()=>{
+            if(!micDrag.current.dragging)return;
+            micDrag.current.dragging=false;
+            setMicPos(p=>{try{localStorage.setItem("vt_mic_pos",JSON.stringify(p));}catch(_){}return p;});
+          }}
+          style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,pointerEvents:"auto",touchAction:"none",transform:`translate(${micPos.x}px,${micPos.y}px)`,cursor:"grab"}}>
+          <button onClick={()=>{if(micDrag.current.moved){micDrag.current.moved=false;return;}if(listening){stopVoice();}else{setMeal(mealByHour());startVoice();}}} title="Dictar por voz · mantén y arrastra para mover" style={{width:64,height:64,borderRadius:"50%",border:"none",background:listening?"#C1121F":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",boxShadow:"0 6px 20px rgba(45,106,79,.45)",flexShrink:0,animation:listening?"vtpulse 1.3s infinite":"none"}}>
             {listening?(
               <svg width="22" height="22" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2" fill="#fff"/></svg>
             ):(
