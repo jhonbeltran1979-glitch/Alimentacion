@@ -2126,6 +2126,8 @@ function PatientApp({onLogout,user,token}){
                 if(p.length===3){const [d,m,y]=p.map(Number);return new Date(y,m-1,d).getTime();}
                 const t=Date.parse(ds);return isNaN(t)?0:t;
               };
+              const DIA_SEMANA=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+              const nombreDia=ds=>{const ts=dateKeyToTs(ds);if(!ts)return ds;const dt=new Date(ts);return `${DIA_SEMANA[dt.getDay()]} ${dt.getDate()}/${dt.getMonth()+1}`;};
               const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
               const map={};
               history.forEach(r=>{
@@ -2144,7 +2146,7 @@ function PatientApp({onLogout,user,token}){
                 const items=map[ds];
                 const scores=items.map(r=>r.score_total).filter(v=>typeof v==="number");
                 const scoreProm=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
-                const label=ds===today?"Hoy":ds===ayerDs?"Ayer":ds;
+                const label=ds===today?"Hoy":ds===ayerDs?"Ayer":nombreDia(ds);
                 const abierto=planDiaAbierto===ds;
                 const ai=dayAI[ds];
                 return (
