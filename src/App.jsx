@@ -1157,7 +1157,7 @@ function PatientApp({onLogout,user,token}){
                 <div style={{fontSize:10,color:"#bbb",textAlign:"center",marginBottom:6}}>Toca un día para ver su detalle</div>
                 <div style={{display:"flex",gap:4}}>
                   {d.semana.map((w,i)=>(
-                    <button key={i} onClick={()=>setDiaSel(i)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"2px 0"}}>
+                    <button key={i} onClick={()=>setDiaSel(diaSel===i?null:i)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,background:"none",border:"none",cursor:"pointer",padding:"2px 0"}}>
                       <span style={{fontSize:9,color:diaSel===i?"#6D5BD0":"#999",fontWeight:diaSel===i?800:500}}>{w.lbl}</span>
                       <div style={{width:"100%",height:28,display:"flex",alignItems:"flex-end"}}>
                         <div style={{width:"100%",background:diaSel===i?"#6D5BD0":"#D8D3F0",borderRadius:4,height:(d.diasConDato[i]==null?4:Math.max(6,d.diasConDato[i]*0.28))+"px",transition:"background .2s"}}/>
@@ -1165,6 +1165,7 @@ function PatientApp({onLogout,user,token}){
                     </button>
                   ))}
                 </div>
+                {diaSel!=null&&(
                 <div style={{marginTop:14,paddingTop:14,borderTop:"1px solid #F0EFF7"}}>
                   <div style={{fontSize:12,fontWeight:800,color:"#6D5BD0",marginBottom:10}}>{d.semana[diaSel].ds===today?"Hoy":d.semana[diaSel].full} · cómo vas en cada pilar</div>
                   {filasDia.map(([tipo,lb,v,cl])=>(
@@ -1180,6 +1181,7 @@ function PatientApp({onLogout,user,token}){
                     </div>
                   ))}
                 </div>
+                )}
               </div>);
             })()}
           </div>
