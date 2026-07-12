@@ -1027,10 +1027,13 @@ function PatientApp({onLogout,user,token}){
     const pesoKg=hp&&hp.peso?Number(hp.peso):70;
     const MET=3.8;
     const calorias=Math.round((MET*3.5*pesoKg/200)*minutos);
-    const intensidad=km/((caminataTiempo||1)/3600)>=5?"alta":km/((caminataTiempo||1)/3600)>=3.5?"media":"baja";
-    const rec={date:today,ts:Date.now(),tipo:"Caminata GPS",min:minutos,intensidad,km,calorias};
+    const kmh=km/((caminataTiempo||1)/3600);
+    const intensidad=kmh>=5?"alta":kmh>=3.5?"media":"baja";
+    const ritmoMinKm=km>0?minutos/km:null;
+    const ritmoTxt=ritmoMinKm?`${Math.floor(ritmoMinKm)}:${String(Math.round((ritmoMinKm%1)*60)).padStart(2,"0")} /km`:"—";
+    const rec={date:today,ts:Date.now(),tipo:"Caminata GPS",min:minutos,intensidad,km,calorias,ritmoTxt};
     const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
-    setCaminataResumen({min:minutos,km,calorias});
+    setCaminataResumen({min:minutos,km,calorias,ritmoTxt});
     setCaminataActiva(false);
     if(caminataMapaRef.current){caminataMapaRef.current.remove();caminataMapaRef.current=null;caminataLineaRef.current=null;caminataMarcadorRef.current=null;}
   };
@@ -2074,13 +2077,15 @@ function PatientApp({onLogout,user,token}){
             )}
             {caminataResumen&&!caminataActiva&&(
               <div>
-                <div style={{background:"#EFEDFC",borderRadius:14,padding:14,marginBottom:12,textAlign:"center"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#5B49C0",marginBottom:8}}>✓ Caminata guardada</div>
-                  <div style={{display:"flex",gap:8}}>
-                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.min}</div><div style={{fontSize:10,color:"#999"}}>min</div></div>
-                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.km}</div><div style={{fontSize:10,color:"#999"}}>km</div></div>
-                    <div style={{flex:1}}><div style={{fontSize:18,fontWeight:900,color:"#6D5BD0"}}>{caminataResumen.calorias}</div><div style={{fontSize:10,color:"#999"}}>kcal</div></div>
-                  </div>
+                <div style={{background:"#EFEDFC",borderRadius:14,padding:16,marginBottom:12}}>
+                  <div style={{fontSize:14,fontWeight:800,color:"#5B49C0",marginBottom:12,textAlign:"center"}}>💚 ¡Bien hecho!</div>
+                  {[["⏱️","Tiempo de actividad",`${caminataResumen.min} min`],["📍","Distancia",`${caminataResumen.km} km`],["🔥","Energía gastada",`${caminataResumen.calorias} cal`],["🚶","Ritmo promedio",caminataResumen.ritmoTxt]].map(([ic,lb,v])=>(
+                    <div key={lb} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 0",borderBottom:"1px solid #E1DBF7"}}>
+                      <span style={{fontSize:16,width:22,textAlign:"center"}}>{ic}</span>
+                      <span style={{flex:1,fontSize:13,color:"#5B49C0"}}>{lb}</span>
+                      <span style={{fontSize:14,fontWeight:800,color:"#4A3B9E"}}>{v}</span>
+                    </div>
+                  ))}
                 </div>
                 <button onClick={()=>setCaminataResumen(null)} style={{width:"100%",padding:"12px",borderRadius:12,border:"1.5px solid #6D5BD0",background:"#fff",color:"#6D5BD0",fontWeight:800,fontSize:13,cursor:"pointer"}}>🚶 Nueva caminata</button>
               </div>
