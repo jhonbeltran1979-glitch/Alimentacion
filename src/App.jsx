@@ -2079,45 +2079,10 @@ function PatientApp({onLogout,user,token}){
 
       {tab===7&&(
         <div style={{padding:"16px 14px 90px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-            <h2 style={{fontSize:20,fontWeight:900,color:"#1A1A1A",margin:0}}>Tu plan 📋</h2>
-            <button onClick={genMiPlan} disabled={planBusy} style={{background:"#6D5BD0",color:"#fff",border:"none",borderRadius:10,padding:"8px 12px",fontWeight:800,fontSize:12,cursor:planBusy?"default":"pointer",opacity:planBusy?.6:1}}>{planBusy?"Generando…":"🔄 Regenerar"}</button>
-          </div>
-          {planErr&&<div style={{background:"#FEECEC",color:"#C0392B",padding:"10px 12px",borderRadius:10,fontSize:13,marginBottom:12}}>{planErr}</div>}
-          {planBusy&&!plan&&<div style={{textAlign:"center",color:"#6D5BD0",padding:"40px 20px",fontWeight:700}}>🤖 Generando tu plan con IA…<div style={{fontSize:12,color:"#999",fontWeight:500,marginTop:6}}>Esto toma unos segundos</div></div>}
-          {plan?(
-            <div>
-              {plan.resumen&&<div style={{background:"#EDEAFB",borderRadius:14,padding:14,color:"#5B49C0",fontSize:14,fontWeight:700,marginBottom:14}}>{plan.resumen}</div>}
-              {[["🌅 Desayuno",plan.desayuno],["☀️ Almuerzo",plan.almuerzo],["🌙 Cena",plan.cena]].map(([t,txt])=>(
-                <div key={t} style={{background:"#fff",borderRadius:14,padding:14,marginBottom:10,boxShadow:"0 2px 10px rgba(0,0,0,.05)"}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#6D5BD0",marginBottom:4}}>{t}</div>
-                  <div style={{fontSize:13,color:"#444",lineHeight:1.5}}>{txt||"—"}</div>
-                </div>
-              ))}
-              {plan.evitar&&plan.evitar.length>0&&(
-                <div style={{background:"#FEECEC",borderRadius:14,padding:14,marginBottom:10}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#C0392B",marginBottom:8}}>🚫 Alimentos a evitar</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>{plan.evitar.map((x,i)=>(<span key={i} style={{fontSize:12,background:"#fff",color:"#C0392B",padding:"5px 10px",borderRadius:14,border:"1px solid #F0C0C0"}}>{x}</span>))}</div>
-                </div>
-              )}
-              {plan.ejercicio&&(
-                <div style={{background:"#fff",borderRadius:14,padding:14,boxShadow:"0 2px 10px rgba(0,0,0,.05)"}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#6D5BD0",marginBottom:4}}>💪 Ejercicio recomendado</div>
-                  <div style={{fontSize:13,color:"#444",lineHeight:1.5}}>{plan.ejercicio}</div>
-                </div>
-              )}
-            </div>
-          ):(!planBusy&&(
-            <div style={{textAlign:"center",padding:"40px 20px"}}>
-              <div style={{fontSize:42,marginBottom:10}}>📋</div>
-              <p style={{color:"#888",fontSize:14,marginBottom:18}}>Aún no tienes un plan generado.</p>
-              <button onClick={genMiPlan} style={{background:"#6D5BD0",color:"#fff",border:"none",borderRadius:12,padding:"13px 24px",fontWeight:800,fontSize:15,cursor:"pointer"}}>Generar mi plan</button>
-            </div>
-          ))}
-
           {/* ══ REGISTRO DÍA A DÍA + ANÁLISIS IA ══ */}
-          <div style={{marginTop:22}}>
-            <div style={{fontSize:16,fontWeight:900,color:"#1A1A1A",marginBottom:4}}>Tu registro día a día</div>
+          <div>
+            <h2 style={{fontSize:20,fontWeight:900,color:"#1A1A1A",margin:"0 0 4px"}}>Tus registros 📋</h2>
+            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Lo que registraste por voz, con recomendaciones de la IA</div>
             <div style={{fontSize:12,color:"#888",marginBottom:12}}>Lo que registraste por voz, con recomendaciones de la IA</div>
             {(()=>{
               const dateKeyToTs=ds=>{
