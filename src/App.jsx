@@ -174,13 +174,15 @@ Responde SOLO JSON sin backticks:
 {"titulo":"frase corta, ej 'Buena noche' o 'Noche inquieta'","resena":"reseña de UNA sola línea (máx 8 palabras), ej 'Descanso estable, despierta con energía'","resumen":"2-3 oraciones de cómo fue la noche","semaforo":"verde|amarillo|rojo","recomendacion":"1-2 consejos para esta noche","comida_sueno":"observación que conecta su dieta con su descanso, o null","ver_medico":true,"motivo_medico":"si ver_medico es true: motivo breve y calmado; si es false: null"}`);
 }
 
-async function planSemana(prefs,hp,contexto){
+async function planSemana(prefs,hp,contexto,historial){
   const ctxP=hp?`Perfil: ${hp.edad} años, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
-  return iaText(`Eres un entrenador personal certificado y prudente. ${ctxP}
+  return iaText(`Eres un entrenador personal certificado y prudente, como un coach de IA que ajusta el plan según el desempeño real del usuario. ${ctxP}
 Objetivo: ${prefs.goal}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
 ${contexto||""}
+${historial?`HISTORIAL DE LA SEMANA ANTERIOR (usa esto para reajustar la dificultad): ${historial}`:""}
 
-Diseña un plan SEMANAL (7 días, de lunes a domingo) realista y progresivo. Pon días de descanso o movilidad ligera en los días que no entrena (respetando los ${prefs.dias} días activos). Si el equipo es "Ninguno", usa peso corporal y elementos del hogar. Adapta a Colombia (caminar, escaleras, parque, ciclovía).
+Diseña un plan SEMANAL (7 días, de lunes a domingo) realista y progresivo, con EJERCICIOS CONCRETOS (nombre, series, repeticiones o duración, descanso entre series) — no actividades genéricas en texto libre. Pon días de descanso o movilidad ligera en los días que no entrena (respetando los ${prefs.dias} días activos). Si el equipo es "Ninguno", usa peso corporal y elementos del hogar. Adapta a Colombia (caminar, escaleras, parque, ciclovía).
+${historial?"Si el usuario cumplió casi todos los días la semana pasada, sube un poco el volumen o la dificultad. Si falló varios días, baja el volumen, acorta sesiones o simplifica — prioriza que pueda cumplir antes que exigir de más.":""}
 
 SEGURIDAD (importante): respeta la condición de salud.
 - Hipertensión: evita esfuerzos máximos y aguantar la respiración (Valsalva); prioriza aeróbico moderado.
@@ -189,7 +191,7 @@ SEGURIDAD (importante): respeta la condición de salud.
 No prometas resultados médicos ni de pérdida de peso garantizada.
 
 Responde SOLO JSON sin backticks:
-{"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","actividades":["actividad concreta 1","actividad concreta 2"],"duracion":"X min","intensidad":"baja|media|alta"}]}`);
+{"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","ajuste":"si hay historial, 1 frase explicando qué cambiaste vs la semana pasada y por qué (si no hay historial, deja string vacío)","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","duracion":"X min","intensidad":"baja|media|alta","ejercicios":[{"nombre":"nombre concreto del ejercicio","series":3,"reps":"10-12 o 30s","descanso":"45s"}]}]}`);
 }
 
 async function interpretarVoz(texto){
@@ -952,7 +954,13 @@ function PatientApp({onLogout,user,token}){
     setExAnalyzing(true);
     localStorage.setItem(sk(perfil,"fit_prefs"),JSON.stringify({goal:exGoal,equip:exEquip,dias:exDias,min:exMin}));
     let contexto="";const ss=sleepStats();if(ss)contexto=`Contexto del usuario: duerme en promedio ${ss.avg}h con constancia ${ss.consLabel}. Ajusta la carga si duerme poco.`;
-    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin},hp,contexto);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
+    let historial="";
+    if(exPlan&&exPlan.dias&&exPlan.dias.length){
+      const activos=exPlan.dias.filter(d=>!/descanso/i.test(d.foco||""));
+      const cumplidos=activos.filter((d,i)=>exDone.includes(exPlan.dias.indexOf(d))).length;
+      historial=`De ${activos.length} días activos planeados la semana pasada, el usuario cumplió ${cumplidos}.`;
+    }
+    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin},hp,contexto,historial);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
     catch(e){setExMsg("Error: "+e.message);setTimeout(()=>setExMsg(""),3000);}
     setExAnalyzing(false);
   };
@@ -2111,6 +2119,9 @@ function PatientApp({onLogout,user,token}){
               <div style={{background:"#FFF4EF",borderRadius:14,padding:"12px 14px",marginBottom:10,borderLeft:"4px solid #E76F51"}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#C1492B",marginBottom:4}}>🎯 {exPlan.meta_semanal}</div>
                 <div style={{fontSize:12,color:"#7A4A3A",lineHeight:1.5}}>💡 {exPlan.consejo}</div>
+                {exPlan.ajuste&&(
+                  <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #F5D9CC",fontSize:12,color:"#5B49C0",fontWeight:700,lineHeight:1.5}}>🔄 {exPlan.ajuste}</div>
+                )}
               </div>
               {(exPlan.dias||[]).map((d,i)=>{
                 const done=exDone.includes(i),rest=/descanso/i.test(d.foco||"");
@@ -2120,7 +2131,14 @@ function PatientApp({onLogout,user,token}){
                       <div style={{fontSize:14,fontWeight:900,color:"#333"}}>{d.dia} · <span style={{color:"#E76F51"}}>{d.foco}</span></div>
                       {!rest&&<button onClick={()=>toggleDone(i)} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#6D5BD0":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
                     </div>
-                    {(d.actividades||[]).map((a,j)=><div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>)}
+                    {(d.ejercicios||d.actividades||[]).map((a,j)=>typeof a==="object"?(
+                      <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 4px",borderBottom:j<(d.ejercicios.length-1)?"1px solid #F5F5F5":"none"}}>
+                        <span style={{fontSize:13,color:"#444",fontWeight:600}}>{a.nombre}</span>
+                        <span style={{fontSize:12,color:"#E76F51",fontWeight:800,whiteSpace:"nowrap",marginLeft:8}}>{a.series}×{a.reps}{a.descanso?` · ${a.descanso}`:""}</span>
+                      </div>
+                    ):(
+                      <div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>
+                    ))}
                     {!rest&&<div style={{fontSize:11,color:"#999",marginTop:6}}>⏱️ {d.duracion} · intensidad {d.intensidad}</div>}
                   </div>
                 );
