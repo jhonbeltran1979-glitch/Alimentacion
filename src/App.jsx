@@ -515,6 +515,8 @@ function PatientApp({onLogout,user,token}){
   const [exResultados,setExResultados]=useState([]);
   const [exDificultad,setExDificultad]=useState(3);
   const [exSeccion,setExSeccion]=useState("plan");
+  const [exFormAbierto,setExFormAbierto]=useState(false);
+  const [exDiaAbierto,setExDiaAbierto]=useState(null);
   const [exPlan,setExPlan]=useState(null);
   const [exDone,setExDone]=useState([]);
   const [exLog,setExLog]=useState([]);
@@ -966,7 +968,7 @@ function PatientApp({onLogout,user,token}){
       const cumplidos=activos.filter((d,i)=>exDone.includes(exPlan.dias.indexOf(d))).length;
       historial=`De ${activos.length} días activos planeados la semana pasada, el usuario cumplió ${cumplidos}.`;
     }
-    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin,objetivo:exObjetivo,resultados:exResultados,dificultad:exDificultad},hp,contexto,historial);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
+    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin,objetivo:exObjetivo,resultados:exResultados,dificultad:exDificultad},hp,contexto,historial);setExPlan(r);setExDone([]);setExFormAbierto(false);setExDiaAbierto(null);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
     catch(e){setExMsg("Error: "+e.message);setTimeout(()=>setExMsg(""),3000);}
     setExAnalyzing(false);
   };
@@ -2118,7 +2120,22 @@ function PatientApp({onLogout,user,token}){
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>🎯 Tu plan a la medida</div>
 
-            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8}}>¿Cuál es tu objetivo principal?</div>
+            {exPlan&&!exFormAbierto&&(
+              <div style={{display:"flex",alignItems:"center",gap:10,background:"#FFF4EF",borderRadius:14,padding:"12px 14px",marginBottom:4}}>
+                <span style={{fontSize:20}}>🎯</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#C1492B",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{exObjetivo}</div>
+                  <div style={{fontSize:11,color:"#996"}}>Dificultad {exDificultad}/5 · {exDias} días/sem · {exMin} min/sesión · {exEquip}</div>
+                </div>
+                <button onClick={()=>setExFormAbierto(true)} style={{padding:"7px 12px",borderRadius:10,border:"1.5px solid #E76F51",background:"#fff",color:"#E76F51",fontWeight:800,fontSize:11,cursor:"pointer",flexShrink:0}}>✏️ Editar</button>
+              </div>
+            )}
+            {exPlan&&!exFormAbierto&&(
+              <button onClick={genPlan} disabled={exAnalyzing} style={{width:"100%",padding:"11px",borderRadius:12,border:"none",background:exAnalyzing?"#ccc":"#F0EDFB",color:"#6D5BD0",fontSize:13,fontWeight:800,cursor:"pointer",marginTop:8}}>{exAnalyzing?"🔍 Creando tu plan…":"🔄 Regenerar plan de la semana"}</button>
+            )}
+
+            {(!exPlan||exFormAbierto)&&(<>
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8,marginTop:exPlan?14:0}}>¿Cuál es tu objetivo principal?</div>
             <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:16}}>
               {[["💪","Ganar masa muscular"],["🔥","Perder peso y quemar grasa"],["🏋️","Aumentar la fuerza"],["⚖️","Tonificar: ganar músculo y perder grasa"],["❤️","Estar en forma y sentirte saludable"],["🎯","Preparación física / táctica"]].map(([ic,l])=>(
                 <div key={l} onClick={()=>setExObjetivo(l)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`2px solid ${exObjetivo===l?"#E76F51":"#F5F0ED"}`,background:exObjetivo===l?"#FFF4EF":"#FAFAFA",cursor:"pointer",transition:"all .15s"}}>
@@ -2162,6 +2179,7 @@ function PatientApp({onLogout,user,token}){
               <div style={{flex:1}}><div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Min/sesión</div><div style={{display:"flex",alignItems:"center",gap:10}}><button onClick={()=>setExMin(Math.max(15,exMin-5))} style={{width:32,height:32,borderRadius:"50%",border:"2px solid #eee",background:"#F8F8F8",fontSize:16,cursor:"pointer"}}>−</button><span style={{fontSize:16,fontWeight:900,minWidth:24,textAlign:"center"}}>{exMin}</span><button onClick={()=>setExMin(Math.min(90,exMin+5))} style={{width:32,height:32,borderRadius:"50%",border:"none",background:"#E76F51",color:"#fff",fontSize:16,cursor:"pointer"}}>+</button></div></div>
             </div>
             <button onClick={genPlan} disabled={exAnalyzing} style={{width:"100%",padding:"14px",borderRadius:14,border:"none",background:exAnalyzing?"#ccc":"linear-gradient(135deg,#E76F51,#C1492B)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #E76F5144"}}>{exAnalyzing?"🔍 Creando tu plan…":exPlan?"🔄 Regenerar plan de la semana":"✨ Generar plan de la semana con IA"}</button>
+            </>)}
             {exMsg&&<div style={{marginTop:10,textAlign:"center",fontSize:12,fontWeight:700,color:"#C1492B"}}>{exMsg}</div>}
           </div>
 
@@ -2174,26 +2192,43 @@ function PatientApp({onLogout,user,token}){
                   <div style={{marginTop:8,paddingTop:8,borderTop:"1px solid #F5D9CC",fontSize:12,color:"#5B49C0",fontWeight:700,lineHeight:1.5}}>🔄 {exPlan.ajuste}</div>
                 )}
               </div>
-              {(exPlan.dias||[]).map((d,i)=>{
-                const done=exDone.includes(i),rest=/descanso/i.test(d.foco||"");
-                return(
-                  <div key={i} style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:8,boxShadow:"0 2px 10px rgba(0,0,0,0.05)",opacity:done?.6:1,borderLeft:`4px solid ${rest?"#bbb":intColor(d.intensidad)}`}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                      <div style={{fontSize:14,fontWeight:900,color:"#333"}}>{d.dia} · <span style={{color:"#E76F51"}}>{d.foco}</span></div>
-                      {!rest&&<button onClick={()=>toggleDone(i)} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#6D5BD0":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
-                    </div>
-                    {(d.ejercicios||d.actividades||[]).map((a,j)=>typeof a==="object"?(
-                      <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 4px",borderBottom:j<(d.ejercicios.length-1)?"1px solid #F5F5F5":"none"}}>
-                        <span style={{fontSize:13,color:"#444",fontWeight:600}}>{a.nombre}</span>
-                        <span style={{fontSize:12,color:"#E76F51",fontWeight:800,whiteSpace:"nowrap",marginLeft:8}}>{a.series}×{a.reps}{a.descanso?` · ${a.descanso}`:""}</span>
+              {(()=>{
+                const NOMBRES=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+                const norm=s=>(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+                const hoyNombre=norm(NOMBRES[new Date().getDay()]);
+                return (exPlan.dias||[]).map((d,i)=>{
+                  const done=exDone.includes(i),rest=/descanso/i.test(d.foco||"");
+                  const esHoy=norm(d.dia).includes(hoyNombre);
+                  const abierto=exDiaAbierto==null?esHoy:exDiaAbierto===i;
+                  return(
+                    <div key={i} style={{background:"#fff",borderRadius:14,marginBottom:8,boxShadow:"0 2px 10px rgba(0,0,0,0.05)",opacity:done?.6:1,borderLeft:`4px solid ${rest?"#bbb":intColor(d.intensidad)}`,overflow:"hidden"}}>
+                      <div onClick={()=>setExDiaAbierto(abierto?-1:i)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",cursor:"pointer"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8,minWidth:0}}>
+                          <div style={{fontSize:14,fontWeight:900,color:"#333",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{d.dia} · <span style={{color:"#E76F51"}}>{d.foco}</span></div>
+                          {esHoy&&<span style={{fontSize:9,fontWeight:800,color:"#fff",background:"#6D5BD0",padding:"2px 7px",borderRadius:8,flexShrink:0}}>HOY</span>}
+                        </div>
+                        <div style={{display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
+                          {!rest&&<button onClick={e=>{e.stopPropagation();toggleDone(i);}} style={{padding:"4px 10px",borderRadius:10,border:"none",cursor:"pointer",fontSize:11,fontWeight:800,background:done?"#6D5BD0":"#F0F0F0",color:done?"#fff":"#888"}}>{done?"✓ Hecho":"Marcar"}</button>}
+                          <span style={{fontSize:12,color:"#bbb",transform:abierto?"rotate(90deg)":"none",transition:"transform .2s"}}>›</span>
+                        </div>
                       </div>
-                    ):(
-                      <div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>
-                    ))}
-                    {!rest&&<div style={{fontSize:11,color:"#999",marginTop:6}}>⏱️ {d.duracion} · intensidad {d.intensidad}</div>}
-                  </div>
-                );
-              })}
+                      {abierto&&(
+                        <div style={{padding:"0 14px 12px"}}>
+                          {(d.ejercicios||d.actividades||[]).map((a,j)=>typeof a==="object"?(
+                            <div key={j} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 4px",borderBottom:j<(d.ejercicios.length-1)?"1px solid #F5F5F5":"none"}}>
+                              <span style={{fontSize:13,color:"#444",fontWeight:600}}>{a.nombre}</span>
+                              <span style={{fontSize:12,color:"#E76F51",fontWeight:800,whiteSpace:"nowrap",marginLeft:8}}>{a.series}×{a.reps}{a.descanso?` · ${a.descanso}`:""}</span>
+                            </div>
+                          ):(
+                            <div key={j} style={{fontSize:13,color:"#555",lineHeight:1.5,paddingLeft:4}}>• {a}</div>
+                          ))}
+                          {!rest&&<div style={{fontSize:11,color:"#999",marginTop:6}}>⏱️ {d.duracion} · intensidad {d.intensidad}</div>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
           </>)}
