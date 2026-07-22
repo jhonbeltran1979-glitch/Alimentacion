@@ -738,7 +738,7 @@ function PatientApp({onLogout,user,token}){
     });
     const nutriDias=semana.map(w=>{
       const ms=history.filter(r=>fechaMatch(r.fecha,w.ds));
-      return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
+      return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/3):null;
     });
     const ejerDias=semana.map(w=>pct(exLog.filter(e=>e.date===w.ds).reduce((a,e)=>a+(e.min||0),0)/30*100));
     const aguaDias=semana.map(w=>{
@@ -812,7 +812,10 @@ function PatientApp({onLogout,user,token}){
     const enMes=(ds,mes)=>{const p=parseDs(ds);return p&&p.y===mes.y&&p.m===mes.m;};
     const nutriMes=meses.map(mes=>{
       const ms=history.filter(r=>enMes(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha,mes));
-      return ms.length?pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/ms.length):null;
+      if(!ms.length)return null;
+      const dt2=new Date(mes.y,mes.m+1,0);
+      const diasEnMes2=(mes.y===now.getFullYear()&&mes.m===now.getMonth())?now.getDate():dt2.getDate();
+      return pct(ms.reduce((a,r)=>a+(r.score_total||0),0)/(3*diasEnMes2));
     });
     const aguaMes=meses.map(mes=>{
       const dias=Object.keys(waterHist).filter(ds=>enMes(ds,mes)).map(ds=>waterHist[ds]);
