@@ -329,7 +329,7 @@ function ProfileScreen({onEnter}){
 }
 
 // ══ ONBOARDING SALUD ═════════════════════════════════════════════
-function HealthScreen({perfil,onComplete}){
+function HealthScreen({perfil,user,token,onComplete}){
   const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
   const EJERCICIOS=[{e:"🛋️ Sedentario",d:"Poca o ninguna actividad"},{e:"🚶 Caminata",d:"Menos de 3 veces/semana"},{e:"🏃 Activo",d:"3-4 veces por semana"},{e:"💪 Intenso",d:"Diario o competitivo"}];
   const ENFERMEDADES=["Ninguna","Diabetes","Hipertensión","Colesterol alto","Hipotiroidismo","Gastritis","Otra"];
@@ -341,6 +341,9 @@ function HealthScreen({perfil,onComplete}){
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
     try{await apiGet({action:"guardar_perfil",perfil,edad,peso,ejercicio:encodeURIComponent(ejercicio),enfermedad:encodeURIComponent(e2)});}catch(_){}
+    if(user&&token){
+      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),condicion:e2,actividad:ejercicio})});}catch(_){}
+    }
     localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,ejercicio,enfermedad:e2}));
     setLoading(false);onComplete({edad,peso,ejercicio,enfermedad:e2});
   };
@@ -587,10 +590,24 @@ function PatientApp({onLogout,user,token}){
     apiGet({action:"getKey"}).then(r=>{if(r.ok&&r.k){CLAUDE_API_KEY=r.k;localStorage.setItem("vt_api_key_cache",r.k);}}).catch(()=>{});
   },[]);
 
-  const syncDailyLog=async(fechaISO,campos)=>{
+  const syncWaterLog=async(fechaISO,vasos)=>{
     if(!user||!token)return;
     try{
-      await fetch(`${SB_URL}/rest/v1/daily_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:fechaISO,...campos})});
+      await fetch(`${SB_URL}/rest/v1/water_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:fechaISO,vasos})});
+    }catch(_){}
+  };
+  const syncSleepLog=async(rec)=>{
+    if(!user||!token)return;
+    try{
+      const fechaISO=isoFromEsCO(rec.date);
+      await fetch(`${SB_URL}/rest/v1/sleep_logs?patient_id=eq.${user.id}&fecha=eq.${fechaISO}`,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+      await fetch(`${SB_URL}/rest/v1/sleep_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:fechaISO,bed:rec.bed||null,wake:rec.wake||null,hours:rec.hours,quality:rec.quality||null,awakenings:rec.awakenings!=null?rec.awakenings:null,measured:!!rec.measured,note:rec.note||null})});
+    }catch(_){}
+  };
+  const syncMealLog=async(rec)=>{
+    if(!user||!token)return;
+    try{
+      await fetch(`${SB_URL}/rest/v1/meals`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoFromEsCO(rec.fecha),momento:rec.comida,alimentos:rec.alimentos,score_total:rec.score_total,score_inmunidad:rec.score_inmunidad,score_energia:rec.score_energia,score_concentracion:rec.score_concentracion,score_vitalidad:rec.score_vitalidad,semaforo:rec.semaforo||null,calorias_aprox:rec.calorias_aprox||null,recomendacion:rec.notas||null})});
     }catch(_){}
   };
   const syncExerciseLog=async(rec)=>{
@@ -603,17 +620,23 @@ function PatientApp({onLogout,user,token}){
     if(!user||!token)return;
     (async()=>{
       try{
-        const rDL=await fetch(`${SB_URL}/rest/v1/daily_logs?patient_id=eq.${user.id}&select=fecha,water_glasses,sleep_hours&order=fecha.desc&limit=400`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
-        const dl=await rDL.json();
-        if(Array.isArray(dl)&&dl.length){
+        const rWL=await fetch(`${SB_URL}/rest/v1/water_logs?patient_id=eq.${user.id}&select=fecha,vasos&order=fecha.desc&limit=400`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const wl=await rWL.json();
+        if(Array.isArray(wl)&&wl.length){
           const hoyISO=isoHoy();
           const wh={};
-          dl.forEach(row=>{const ds=esCOfromISO(row.fecha);if(row.fecha!==hoyISO&&row.water_glasses!=null)wh[ds]=row.water_glasses;});
+          wl.forEach(row=>{const ds=esCOfromISO(row.fecha);if(row.fecha!==hoyISO&&row.vasos!=null)wh[ds]=row.vasos;});
           setWaterHist(wh);
-          const hoyRow=dl.find(row=>row.fecha===hoyISO);
-          if(hoyRow&&hoyRow.water_glasses!=null)setWater(hoyRow.water_glasses);
-          const slp=dl.filter(row=>row.sleep_hours!=null).map(row=>({date:esCOfromISO(row.fecha),hours:row.sleep_hours})).sort((a,b)=>isoFromEsCO(b.date).localeCompare(isoFromEsCO(a.date)));
-          if(slp.length)setSleepLog(slp);
+          const hoyRow=wl.find(row=>row.fecha===hoyISO);
+          if(hoyRow&&hoyRow.vasos!=null)setWater(hoyRow.vasos);
+        }
+      }catch(_){}
+      try{
+        const rSL=await fetch(`${SB_URL}/rest/v1/sleep_logs?patient_id=eq.${user.id}&select=*&order=fecha.desc&limit=60`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const sl=await rSL.json();
+        if(Array.isArray(sl)&&sl.length){
+          const n=sl.map(row=>({date:esCOfromISO(row.fecha),bed:row.bed,wake:row.wake,hours:row.hours,quality:row.quality,awakenings:row.awakenings,measured:row.measured,note:row.note}));
+          setSleepLog(n);
         }
       }catch(_){}
       try{
@@ -622,6 +645,16 @@ function PatientApp({onLogout,user,token}){
         if(Array.isArray(el)&&el.length){
           const n=el.map(row=>({date:esCOfromISO(row.fecha),ts:new Date(row.created_at).getTime(),tipo:row.tipo,min:row.min,intensidad:row.intensidad,km:row.km||undefined,calorias:row.calorias||undefined,ritmoTxt:row.ritmo||undefined}));
           setExLog(n);
+        }
+      }catch(_){}
+      try{
+        const rHP=await fetch(`${SB_URL}/rest/v1/health_profiles?patient_id=eq.${user.id}&select=*`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const hpRows=await rHP.json();
+        if(Array.isArray(hpRows)&&hpRows.length){
+          const row=hpRows[0];
+          const h2={edad:row.edad,peso:row.peso_kg,ejercicio:row.actividad,enfermedad:row.condicion};
+          setHp(h2);setShowHF(false);
+          if(perfil)localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify(h2));
         }
       }catch(_){}
     })();
@@ -640,7 +673,7 @@ function PatientApp({onLogout,user,token}){
     else{
       const prevDate=localStorage.getItem(d);
       const prevG=parseInt(localStorage.getItem(k)||"0");
-      if(prevDate&&prevG>0){wh={...wh,[prevDate]:prevG};localStorage.setItem(sk(perfil,"water_history"),JSON.stringify(wh));syncDailyLog(isoFromEsCO(prevDate),{water_glasses:prevG});}
+      if(prevDate&&prevG>0){wh={...wh,[prevDate]:prevG};localStorage.setItem(sk(perfil,"water_history"),JSON.stringify(wh));syncWaterLog(isoFromEsCO(prevDate),prevG);}
       setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);
     }
     setWaterHist(wh);
@@ -663,13 +696,23 @@ function PatientApp({onLogout,user,token}){
   useEffect(()=>{smartAlarmRef.current={on:smartAlarm,time:alarmTime};},[smartAlarm,alarmTime]);
 
   useEffect(()=>{
-    if(!perfil||tab!==2)return;
+    if(!user||!token)return;
     setLoadingHist(true);
-    apiGet({action:"historial",perfil}).then(d=>{if(d.ok)setHistory(d.registros||[]);}).catch(()=>{}).finally(()=>setLoadingHist(false));
-  },[perfil,tab]);
+    (async()=>{
+      try{
+        const r=await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&select=*&order=created_at.desc&limit=300`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const rows=await r.json();
+        if(Array.isArray(rows)&&rows.length){
+          const mapped=rows.map(row=>({fecha:esCOfromISO(row.fecha),comida:row.momento,alimentos:row.alimentos,score_total:row.score_total,score_inmunidad:row.score_inmunidad,score_energia:row.score_energia,score_concentracion:row.score_concentracion,score_vitalidad:row.score_vitalidad,notas:row.recomendacion}));
+          setHistory(mapped);setLoadingHist(false);return;
+        }
+      }catch(_){}
+      apiGet({action:"historial",perfil}).then(d=>{if(d.ok)setHistory(d.registros||[]);}).catch(()=>{}).finally(()=>setLoadingHist(false));
+    })();
+  },[user,token]);
 
   if(!perfil)return <ProfileScreen onEnter={p=>{setPerfil(p);setShowHF(true);}}/>;
-  if(showHF&&!hp)return <HealthScreen perfil={perfil} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
+  if(showHF&&!hp)return <HealthScreen perfil={perfil} user={user} token={token} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
   if(prefsEditor) return <OnboardingPreferences user={user} token={token} onDone={()=>{setPrefsEditor(false);setTab(0);}}/>;
 
   const scores=calcScores(selected);
@@ -864,6 +907,7 @@ function PatientApp({onLogout,user,token}){
     if(!analisis){try{const r=await analizarTexto(all,hp);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
     try{
       const res=await apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(MEALS[meal].label),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,agua_vasos:water,racha_dias:streak,notas:encodeURIComponent(analisis?.recomendacion||"")});
+      syncMealLog({fecha:today,comida:MEALS[meal].label,alimentos:all,score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,semaforo:analisis?.semaforo,calorias_aprox:analisis?.calorias_aprox,notas:analisis?.recomendacion||""});
       if(res.ok){
         const lastDate=localStorage.getItem(sk(perfil,"streak_date"));
         const yStr=new Date(Date.now()-86400000).toLocaleDateString("es-CO");
@@ -882,7 +926,7 @@ function PatientApp({onLogout,user,token}){
   };
 
   const persistWaterLog=(log)=>{try{localStorage.setItem(sk(perfil,"waterlog"),JSON.stringify(log));localStorage.setItem(sk(perfil,"water_date"),today);}catch(_){}};
-  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);syncDailyLog(isoHoy(),{water_glasses:g});if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
+  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);syncWaterLog(isoHoy(),g);if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
   const addWater=(ml)=>{if(!ml)return;const log=[{t:Date.now(),ml},...waterLog];setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const removeWaterAt=(i)=>{const log=waterLog.filter((_,j)=>j!==i);setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const changeWater=d=>{if(d>0){addWater(GLASS_ML*d);}else if(d<0){const log=waterLog.slice(Math.abs(d));setWaterLog(log);persistWaterLog(log);syncGlasses(log);}};
@@ -975,6 +1019,7 @@ function PatientApp({onLogout,user,token}){
     if(!measuredData&&!hours){setSleepMsg("Pon hora de dormir y de despertar");setTimeout(()=>setSleepMsg(""),2500);return;}
     const rec={date:today,bed:bedtime,wake:waketime,hours,quality:sleepQuality,awakenings,note:sleepNote.trim()};
     if(measuredData)Object.assign(rec,{measured:true},measuredData);
+    syncSleepLog(rec);
     const next=[rec,...sleepLog.filter(n=>n.date!==today)].slice(0,60);
     setSleepLog(next);localStorage.setItem(sk(perfil,"sleep"),JSON.stringify(next));
     setSleepNote("");setSleepAI(null);setNightAI(null);setMeasuredData(null);setSleepMsg("✓ Noche guardada — generando resumen…");setTimeout(()=>setSleepMsg(""),2500);
@@ -1106,7 +1151,7 @@ function PatientApp({onLogout,user,token}){
       syncExerciseLog(rec);
       setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});
     }
-    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);syncDailyLog(isoHoy(),{water_glasses:nw});}
+    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);syncWaterLog(isoHoy(),nw);}
     if(Array.isArray(p.comidas)&&p.comidas.length){
       const nuevos=[];
       p.comidas.forEach(c=>{
@@ -1115,6 +1160,7 @@ function PatientApp({onLogout,user,token}){
         const sc=calcScores(matched);
         nuevos.push({fecha:today,comida:c.momento||"Comida",alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true});
         apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(c.momento||"Comida"),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,agua_vasos:water,racha_dias:streak,notas:""}).catch(()=>{});
+        syncMealLog({fecha:today,comida:c.momento||"Comida",alimentos:all,score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,notas:""});
       });
       setHistory(prev=>[...nuevos,...prev]);
     }
