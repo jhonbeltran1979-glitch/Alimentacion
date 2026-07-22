@@ -340,7 +340,6 @@ function HealthScreen({perfil,user,token,onComplete}){
     if(!enf){setErr("Selecciona una opción");return;}
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
-    try{await apiGet({action:"guardar_perfil",perfil,edad,peso,ejercicio:encodeURIComponent(ejercicio),enfermedad:encodeURIComponent(e2)});}catch(_){}
     if(user&&token){
       try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),condicion:e2,actividad:ejercicio})});}catch(_){}
     }
@@ -583,7 +582,7 @@ function PatientApp({onLogout,user,token}){
       setPerfil(saved);
       const h=localStorage.getItem(sk(saved,"perfil_salud"));
       if(h)setHp(JSON.parse(h));
-      else{apiGet({action:"obtener_perfil",perfil:saved}).then(r=>{if(r.ok&&r.encontrado){const h2={edad:r.edad,peso:r.peso,ejercicio:r.ejercicio,enfermedad:r.enfermedad};setHp(h2);localStorage.setItem(sk(saved,"perfil_salud"),JSON.stringify(h2));}else setShowHF(true);}).catch(()=>setShowHF(true));}
+      else setShowHF(true);
       const qf=localStorage.getItem(sk(saved,"quick_foods"));if(qf)setQuickFoods(JSON.parse(qf));
     }
     const cached=localStorage.getItem("vt_api_key_cache");if(cached)CLAUDE_API_KEY=cached;
@@ -605,10 +604,11 @@ function PatientApp({onLogout,user,token}){
     }catch(_){}
   };
   const syncMealLog=async(rec)=>{
-    if(!user||!token)return;
+    if(!user||!token)return false;
     try{
-      await fetch(`${SB_URL}/rest/v1/meals`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoFromEsCO(rec.fecha),momento:rec.comida,alimentos:rec.alimentos,score_total:rec.score_total,score_inmunidad:rec.score_inmunidad,score_energia:rec.score_energia,score_concentracion:rec.score_concentracion,score_vitalidad:rec.score_vitalidad,semaforo:rec.semaforo||null,calorias_aprox:rec.calorias_aprox||null,recomendacion:rec.notas||null})});
-    }catch(_){}
+      const r=await fetch(`${SB_URL}/rest/v1/meals`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoFromEsCO(rec.fecha),momento:rec.comida,alimentos:rec.alimentos,score_total:rec.score_total,score_inmunidad:rec.score_inmunidad,score_energia:rec.score_energia,score_concentracion:rec.score_concentracion,score_vitalidad:rec.score_vitalidad,semaforo:rec.semaforo||null,calorias_aprox:rec.calorias_aprox||null,recomendacion:rec.notas||null})});
+      return r.ok;
+    }catch(_){return false;}
   };
   const syncExerciseLog=async(rec)=>{
     if(!user||!token)return;
@@ -702,12 +702,10 @@ function PatientApp({onLogout,user,token}){
       try{
         const r=await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&select=*&order=created_at.desc&limit=300`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const rows=await r.json();
-        if(Array.isArray(rows)&&rows.length){
-          const mapped=rows.map(row=>({fecha:esCOfromISO(row.fecha),comida:row.momento,alimentos:row.alimentos,score_total:row.score_total,score_inmunidad:row.score_inmunidad,score_energia:row.score_energia,score_concentracion:row.score_concentracion,score_vitalidad:row.score_vitalidad,notas:row.recomendacion}));
-          setHistory(mapped);setLoadingHist(false);return;
-        }
+        const mapped=Array.isArray(rows)?rows.map(row=>({fecha:esCOfromISO(row.fecha),comida:row.momento,alimentos:row.alimentos,score_total:row.score_total,score_inmunidad:row.score_inmunidad,score_energia:row.score_energia,score_concentracion:row.score_concentracion,score_vitalidad:row.score_vitalidad,notas:row.recomendacion})):[];
+        setHistory(mapped);
       }catch(_){}
-      apiGet({action:"historial",perfil}).then(d=>{if(d.ok)setHistory(d.registros||[]);}).catch(()=>{}).finally(()=>setLoadingHist(false));
+      setLoadingHist(false);
     })();
   },[user,token]);
 
@@ -906,9 +904,8 @@ function PatientApp({onLogout,user,token}){
     let analisis=photoResult;
     if(!analisis){try{const r=await analizarTexto(all,hp);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
     try{
-      const res=await apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(MEALS[meal].label),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,agua_vasos:water,racha_dias:streak,notas:encodeURIComponent(analisis?.recomendacion||"")});
-      syncMealLog({fecha:today,comida:MEALS[meal].label,alimentos:all,score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,semaforo:analisis?.semaforo,calorias_aprox:analisis?.calorias_aprox,notas:analisis?.recomendacion||""});
-      if(res.ok){
+      const ok=await syncMealLog({fecha:today,comida:MEALS[meal].label,alimentos:all,score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,semaforo:analisis?.semaforo,calorias_aprox:analisis?.calorias_aprox,notas:analisis?.recomendacion||""});
+      if(ok){
         const lastDate=localStorage.getItem(sk(perfil,"streak_date"));
         const yStr=new Date(Date.now()-86400000).toLocaleDateString("es-CO");
         const ns=lastDate===yStr?streak+1:1;
@@ -1159,7 +1156,6 @@ function PatientApp({onLogout,user,token}){
         const matched=FOOD_CATEGORIES.flatMap(cat=>cat.items).filter(f=>all.some(a=>f.toLowerCase().includes(String(a).toLowerCase())||String(a).toLowerCase().includes(f.toLowerCase())));
         const sc=calcScores(matched);
         nuevos.push({fecha:today,comida:c.momento||"Comida",alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true});
-        apiGet({action:"guardar",perfil,fecha:today,comida:encodeURIComponent(c.momento||"Comida"),alimentos:encodeURIComponent(JSON.stringify(all)),score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,agua_vasos:water,racha_dias:streak,notas:""}).catch(()=>{});
         syncMealLog({fecha:today,comida:c.momento||"Comida",alimentos:all,score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,notas:""});
       });
       setHistory(prev=>[...nuevos,...prev]);
