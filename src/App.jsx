@@ -590,20 +590,20 @@ function PatientApp({onLogout,user,token}){
   const syncDailyLog=async(fechaISO,campos)=>{
     if(!user||!token)return;
     try{
-      await fetch(`${SB_URL}/rest/v1/daily_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({user_id:user.id,fecha:fechaISO,...campos})});
+      await fetch(`${SB_URL}/rest/v1/daily_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:fechaISO,...campos})});
     }catch(_){}
   };
   const syncExerciseLog=async(rec)=>{
     if(!user||!token)return;
     try{
-      await fetch(`${SB_URL}/rest/v1/exercise_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({user_id:user.id,fecha:isoFromEsCO(rec.date),tipo:rec.tipo,minutos:rec.min,intensidad:rec.intensidad,km:rec.km||null,calorias:rec.calorias||null,ritmo:rec.ritmoTxt||null})});
+      await fetch(`${SB_URL}/rest/v1/exercise_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoFromEsCO(rec.date),tipo:rec.tipo,min:rec.min,intensidad:rec.intensidad,km:rec.km||null,calorias:rec.calorias||null,ritmo:rec.ritmoTxt||null})});
     }catch(_){}
   };
   useEffect(()=>{
     if(!user||!token)return;
     (async()=>{
       try{
-        const rDL=await fetch(`${SB_URL}/rest/v1/daily_logs?user_id=eq.${user.id}&select=fecha,water_glasses,sleep_hours&order=fecha.desc&limit=400`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const rDL=await fetch(`${SB_URL}/rest/v1/daily_logs?patient_id=eq.${user.id}&select=fecha,water_glasses,sleep_hours&order=fecha.desc&limit=400`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const dl=await rDL.json();
         if(Array.isArray(dl)&&dl.length){
           const hoyISO=isoHoy();
@@ -617,10 +617,10 @@ function PatientApp({onLogout,user,token}){
         }
       }catch(_){}
       try{
-        const rEL=await fetch(`${SB_URL}/rest/v1/exercise_logs?user_id=eq.${user.id}&select=*&order=created_at.desc&limit=200`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const rEL=await fetch(`${SB_URL}/rest/v1/exercise_logs?patient_id=eq.${user.id}&select=*&order=created_at.desc&limit=200`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const el=await rEL.json();
         if(Array.isArray(el)&&el.length){
-          const n=el.map(row=>({date:esCOfromISO(row.fecha),ts:new Date(row.created_at).getTime(),tipo:row.tipo,min:row.minutos,intensidad:row.intensidad,km:row.km||undefined,calorias:row.calorias||undefined,ritmoTxt:row.ritmo||undefined}));
+          const n=el.map(row=>({date:esCOfromISO(row.fecha),ts:new Date(row.created_at).getTime(),tipo:row.tipo,min:row.min,intensidad:row.intensidad,km:row.km||undefined,calorias:row.calorias||undefined,ritmoTxt:row.ritmo||undefined}));
           setExLog(n);
         }
       }catch(_){}
