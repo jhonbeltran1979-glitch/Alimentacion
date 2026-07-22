@@ -176,12 +176,14 @@ Responde SOLO JSON sin backticks:
 
 async function planSemana(prefs,hp,contexto,historial){
   const ctxP=hp?`Perfil: ${hp.edad} años, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
+  const DIF=["muy fácil","fácil","moderado","duro","intenso"];
+  const difTxt=DIF[Math.max(0,Math.min(4,(prefs.dificultad||3)-1))];
   return iaText(`Eres un entrenador personal certificado y prudente, como un coach de IA que ajusta el plan según el desempeño real del usuario. ${ctxP}
-Objetivo: ${prefs.goal}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
+Objetivo principal: ${prefs.objetivo||prefs.goal}. Resultados que busca conseguir: ${(prefs.resultados&&prefs.resultados.length)?prefs.resultados.join(", "):"bienestar general"}. Nivel de dificultad deseado: ${difTxt}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
 ${contexto||""}
 ${historial?`HISTORIAL DE LA SEMANA ANTERIOR (usa esto para reajustar la dificultad): ${historial}`:""}
 
-Diseña un plan SEMANAL (7 días, de lunes a domingo) realista y progresivo, con EJERCICIOS CONCRETOS (nombre, series, repeticiones o duración, descanso entre series) — no actividades genéricas en texto libre. Pon días de descanso o movilidad ligera en los días que no entrena (respetando los ${prefs.dias} días activos). Si el equipo es "Ninguno", usa peso corporal y elementos del hogar. Adapta a Colombia (caminar, escaleras, parque, ciclovía).
+Diseña un plan SEMANAL (7 días, de lunes a domingo) realista y progresivo, con EJERCICIOS CONCRETOS (nombre, series, repeticiones o duración, descanso entre series) — no actividades genéricas en texto libre. El plan debe reflejar el objetivo principal y los resultados que busca (ej: si busca "Aliviar el estrés" o "Mejorar la calidad del sueño", incluye movilidad/respiración/cardio suave; si busca "Aumentar la fuerza", prioriza series pesadas con buen descanso). Ajusta el volumen e intensidad general al nivel de dificultad indicado (${difTxt}). Pon días de descanso o movilidad ligera en los días que no entrena (respetando los ${prefs.dias} días activos). Si el equipo es "Ninguno", usa peso corporal y elementos del hogar. Adapta a Colombia (caminar, escaleras, parque, ciclovía).
 ${historial?"Si el usuario cumplió casi todos los días la semana pasada, sube un poco el volumen o la dificultad. Si falló varios días, baja el volumen, acorta sesiones o simplifica — prioriza que pueda cumplir antes que exigir de más.":""}
 
 SEGURIDAD (importante): respeta la condición de salud.
@@ -509,6 +511,9 @@ function PatientApp({onLogout,user,token}){
   const [exEquip,setExEquip]=useState("Ninguno");
   const [exDias,setExDias]=useState(4);
   const [exMin,setExMin]=useState(30);
+  const [exObjetivo,setExObjetivo]=useState("Estar en forma y sentirte saludable");
+  const [exResultados,setExResultados]=useState([]);
+  const [exDificultad,setExDificultad]=useState(3);
   const [exPlan,setExPlan]=useState(null);
   const [exDone,setExDone]=useState([]);
   const [exLog,setExLog]=useState([]);
@@ -960,7 +965,7 @@ function PatientApp({onLogout,user,token}){
       const cumplidos=activos.filter((d,i)=>exDone.includes(exPlan.dias.indexOf(d))).length;
       historial=`De ${activos.length} días activos planeados la semana pasada, el usuario cumplió ${cumplidos}.`;
     }
-    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin},hp,contexto,historial);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
+    try{const r=await planSemana({goal:exGoal,equip:exEquip,dias:exDias,min:exMin,objetivo:exObjetivo,resultados:exResultados,dificultad:exDificultad},hp,contexto,historial);setExPlan(r);setExDone([]);localStorage.setItem(sk(perfil,"fit_plan"),JSON.stringify(r));localStorage.setItem(sk(perfil,"fit_done"),"[]");}
     catch(e){setExMsg("Error: "+e.message);setTimeout(()=>setExMsg(""),3000);}
     setExAnalyzing(false);
   };
@@ -2102,8 +2107,44 @@ function PatientApp({onLogout,user,token}){
 
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>🎯 Tu plan a la medida</div>
-            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Objetivo</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Bajar peso","Fuerza","Resistencia","Bienestar general"].map(g=><button key={g} onClick={()=>setExGoal(g)} style={chip(g,exGoal)}>{g}</button>)}</div>
+
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8}}>¿Cuál es tu objetivo principal?</div>
+            <div style={{display:"flex",flexDirection:"column",gap:7,marginBottom:16}}>
+              {[["💪","Ganar masa muscular"],["🔥","Perder peso y quemar grasa"],["🏋️","Aumentar la fuerza"],["⚖️","Tonificar: ganar músculo y perder grasa"],["❤️","Estar en forma y sentirte saludable"],["🎯","Preparación física / táctica"]].map(([ic,l])=>(
+                <div key={l} onClick={()=>setExObjetivo(l)} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:12,border:`2px solid ${exObjetivo===l?"#E76F51":"#F5F0ED"}`,background:exObjetivo===l?"#FFF4EF":"#FAFAFA",cursor:"pointer",transition:"all .15s"}}>
+                  <span style={{fontSize:18,width:24,textAlign:"center"}}>{ic}</span>
+                  <span style={{flex:1,fontSize:13,fontWeight:exObjetivo===l?800:500,color:exObjetivo===l?"#C1492B":"#555"}}>{l}</span>
+                  <div style={{width:20,height:20,borderRadius:"50%",border:`2px solid ${exObjetivo===l?"#E76F51":"#ddd"}`,background:exObjetivo===l?"#E76F51":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{exObjetivo===l&&<span style={{color:"#fff",fontSize:11}}>✓</span>}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8}}>¿Qué resultados quieres conseguir? <span style={{fontWeight:400,color:"#bbb"}}>(elige los que quieras)</span></div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
+              {["Aliviar el estrés","Mejorar el sueño","Aumentar la energía","Envejecimiento activo","Mejorar la nutrición","Hábitos alimentarios saludables","Aumentar el VO2 máx","Aumentar la confianza","Mejorar el equilibrio","Aumentar la agilidad"].map(r=>{
+                const sel=exResultados.includes(r);
+                return <button key={r} onClick={()=>setExResultados(sel?exResultados.filter(x=>x!==r):[...exResultados,r])} style={{padding:"7px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:sel?"#6D5BD0":"#F0F0F0",color:sel?"#fff":"#666"}}>{sel?"✓ ":""}{r}</button>;
+              })}
+            </div>
+
+            <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:8}}>¿Qué tan duro te gustaría entrenar?</div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}>
+              {[1,2,3,4,5].map(n=>{
+                const tonos=["#FBD9C4","#F6BFA0","#F1A47C","#EA7C48","#C1492B"];
+                return (
+                  <div key={n} onClick={()=>setExDificultad(n)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:5,cursor:"pointer"}}>
+                    <div style={{width:42,height:42,borderRadius:"50%",background:tonos[n-1],display:"flex",alignItems:"center",justifyContent:"center",border:exDificultad===n?"3px solid #6D5BD0":"3px solid transparent",boxSizing:"border-box"}}>
+                      <span style={{fontSize:15,fontWeight:900,color:"#fff"}}>{n}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
+              <span style={{fontSize:10,color:"#999",fontWeight:700}}>Fácil</span>
+              <span style={{fontSize:10,color:"#999",fontWeight:700}}>Intenso</span>
+            </div>
+
             <div style={{fontSize:11,color:"#888",fontWeight:700,marginBottom:6}}>Equipo</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Ninguno","Casa","Gimnasio"].map(g=><button key={g} onClick={()=>setExEquip(g)} style={chip(g,exEquip)}>{g}</button>)}</div>
             <div style={{display:"flex",gap:14,marginBottom:14}}>
