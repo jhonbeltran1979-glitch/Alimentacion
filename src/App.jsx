@@ -299,7 +299,6 @@ function ProfileScreen({onEnter}){
   const go=async()=>{
     const t=name.trim();if(!t||t.length<2){setErr("Mínimo 2 caracteres");return;}
     setLoading(true);localStorage.setItem("vt_perfil_actual",t);
-    try{await apiGet({action:"historial",perfil:t});}catch(_){}
     setLoading(false);onEnter(t);
   };
   return(
@@ -585,8 +584,6 @@ function PatientApp({onLogout,user,token}){
       else setShowHF(true);
       const qf=localStorage.getItem(sk(saved,"quick_foods"));if(qf)setQuickFoods(JSON.parse(qf));
     }
-    const cached=localStorage.getItem("vt_api_key_cache");if(cached)CLAUDE_API_KEY=cached;
-    apiGet({action:"getKey"}).then(r=>{if(r.ok&&r.k){CLAUDE_API_KEY=r.k;localStorage.setItem("vt_api_key_cache",r.k);}}).catch(()=>{});
   },[]);
 
   const syncWaterLog=async(fechaISO,vasos)=>{
