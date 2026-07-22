@@ -514,6 +514,7 @@ function PatientApp({onLogout,user,token}){
   const [exObjetivo,setExObjetivo]=useState("Estar en forma y sentirte saludable");
   const [exResultados,setExResultados]=useState([]);
   const [exDificultad,setExDificultad]=useState(3);
+  const [exSeccion,setExSeccion]=useState("plan");
   const [exPlan,setExPlan]=useState(null);
   const [exDone,setExDone]=useState([]);
   const [exLog,setExLog]=useState([]);
@@ -2061,6 +2062,13 @@ function PatientApp({onLogout,user,token}){
             <div style={{fontSize:12,opacity:.9}}>{wd} día{wd!==1?"s":""} activo{wd!==1?"s":""} · {wpct>=100?"¡Meta cumplida! 🎉":`Te faltan ${Math.max(0,WHO-wm)} min`}</div>
           </div>
 
+          <div style={{display:"flex",gap:8,marginBottom:14}}>
+            {[["📋","Plan","plan"],["📝","Registrar","registrar"],["📜","Historial","historial"]].map(([ic,lb,sc])=>(
+              <button key={sc} onClick={()=>setExSeccion(sc)} style={{flex:1,padding:"10px 4px",borderRadius:12,border:"none",background:exSeccion===sc?"#E76F51":"#fff",color:exSeccion===sc?"#fff":"#888",fontWeight:800,fontSize:12,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>{ic} {lb}</button>
+            ))}
+          </div>
+
+          {exSeccion==="registrar"&&(<>
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{fontSize:14,fontWeight:900,marginBottom:4,color:"#C1492B"}}>🗺️ Caminata con GPS</div>
             <div style={{fontSize:12,color:"#888",marginBottom:12}}>Traza tu ruta en el mapa y calcula distancia y calorías reales.</div>
@@ -2104,7 +2112,9 @@ function PatientApp({onLogout,user,token}){
               </div>
             )}
           </div>
+          </>)}
 
+          {exSeccion==="plan"&&(<>
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>🎯 Tu plan a la medida</div>
 
@@ -2186,7 +2196,9 @@ function PatientApp({onLogout,user,token}){
               })}
             </div>
           )}
+          </>)}
 
+          {exSeccion==="registrar"&&(<>
           <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
             <div style={{fontSize:14,fontWeight:900,marginBottom:12,color:"#C1492B"}}>📝 Registrar entrenamiento</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>{["Caminar","Correr","Fuerza","Cardio","Yoga","Ciclismo","Deporte"].map(t=><button key={t} onClick={()=>setExType(t)} style={chip(t,exType)}>{t}</button>)}</div>
@@ -2197,7 +2209,9 @@ function PatientApp({onLogout,user,token}){
             <div style={{display:"flex",gap:6,marginBottom:14}}>{["baja","media","alta"].map(v=><button key={v} onClick={()=>setExInt(v)} style={{flex:1,padding:"9px 0",borderRadius:10,border:"none",cursor:"pointer",fontSize:12,fontWeight:700,background:v===exInt?intColor(v):"#F0F0F0",color:v===exInt?"#fff":"#666"}}>{v}</button>)}</div>
             <button onClick={logWorkout} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#E76F51,#F4A261)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>Registrar {exLogMin} min de {exType}</button>
           </div>
+          </>)}
 
+          {exSeccion==="historial"&&(<>
           {exLog.length>0&&(
             <div style={{background:"#fff",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
               <div style={{fontSize:12,fontWeight:800,color:"#C1492B",marginBottom:10}}>Entrenamientos recientes</div>
@@ -2209,6 +2223,12 @@ function PatientApp({onLogout,user,token}){
               ))}
             </div>
           )}
+          {exLog.length===0&&(
+            <div style={{textAlign:"center",padding:"30px 20px",background:"#fff",borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,0.05)"}}>
+              <div style={{color:"#888",fontSize:13}}>Aún no tienes entrenamientos registrados. Usa "Registrar" para tu primera sesión.</div>
+            </div>
+          )}
+          </>)}
         </div>
         );
       })()}
