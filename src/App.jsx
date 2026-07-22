@@ -450,6 +450,7 @@ function PatientApp({onLogout,user,token}){
   const [waterLog,setWaterLog]=useState([]);
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
+  const waterSyncTimer=useRef(null);
   const [dayAI,setDayAI]=useState({});
   const [planDiaAbierto,setPlanDiaAbierto]=useState(null);
   const [dayAiLoadingId,setDayAiLoadingId]=useState(null);
@@ -777,12 +778,17 @@ function PatientApp({onLogout,user,token}){
     dayAiBusyRef.current=false;setDayAiLoadingId(null);
   };
   useEffect(()=>{
-    if(!perfil||!history.length)return;
+    if(!perfil)return;
     const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
-    const tieneRegistros=history.some(r=>r.fecha===ayerDs||(typeof r.fecha==="string"&&r.fecha.split("T")[0]===ayerDs));
+    const fechaMatch=f=>f===ayerDs||(typeof f==="string"&&f.split("T")[0]===ayerDs);
+    const tieneComida=history.some(r=>fechaMatch(r.fecha));
+    const tieneEjercicio=exLog.some(e=>e.date===ayerDs);
+    const tieneSueno=sleepLog.some(s=>s.date===ayerDs);
+    const tieneAgua=waterHist[ayerDs]!=null;
+    const tieneRegistros=tieneComida||tieneEjercicio||tieneSueno||tieneAgua;
     if(tieneRegistros&&!dayAI[ayerDs])generarAnalisisDia(ayerDs,"día de ayer");
   // eslint-disable-next-line
-  },[perfil,history.length]);
+  },[perfil,history.length,exLog.length,sleepLog.length,waterHist]);
 
   const MESES_CORTO=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
   const MESES_LARGO=["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
@@ -853,19 +859,25 @@ function PatientApp({onLogout,user,token}){
     monthAiBusyRef.current=false;
   };
   useEffect(()=>{
-    if(!perfil||!history.length)return;
+    if(!perfil)return;
     const now=new Date();
     const mesAnt=new Date(now.getFullYear(),now.getMonth()-1,1);
     const key=`${mesAnt.getFullYear()}-${mesAnt.getMonth()}`;
     const mes={y:mesAnt.getFullYear(),m:mesAnt.getMonth()};
-    const tieneRegistros=history.some(r=>{
-      const f=typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha;
-      const p=typeof f==="string"?f.split("/"):null;
-      return p&&p.length===3&&Number(p[2])===mes.y&&Number(p[1])-1===mes.m;
-    });
+    const enMes=ds=>{
+      if(typeof ds!=="string")return false;
+      const f=ds.includes("T")?ds.split("T")[0]:ds;
+      const p=f.split("/");
+      return p.length===3&&Number(p[2])===mes.y&&Number(p[1])-1===mes.m;
+    };
+    const tieneComida=history.some(r=>enMes(r.fecha));
+    const tieneEjercicio=exLog.some(e=>enMes(e.date));
+    const tieneSueno=sleepLog.some(s=>enMes(s.date));
+    const tieneAgua=Object.keys(waterHist).some(enMes);
+    const tieneRegistros=tieneComida||tieneEjercicio||tieneSueno||tieneAgua;
     if(tieneRegistros&&!monthAI[key])generarAnalisisMes(key,mes,null);
   // eslint-disable-next-line
-  },[perfil,history.length]);
+  },[perfil,history.length,exLog.length,sleepLog.length,waterHist]);
 
   const recomendacionDia=(tipo,v)=>{
     if(v==null)return "Sin datos registrados este día.";
@@ -920,7 +932,7 @@ function PatientApp({onLogout,user,token}){
   };
 
   const persistWaterLog=(log)=>{try{localStorage.setItem(sk(perfil,"waterlog"),JSON.stringify(log));localStorage.setItem(sk(perfil,"water_date"),today);}catch(_){}};
-  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);syncWaterLog(isoHoy(),g);if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
+  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);if(waterSyncTimer.current)clearTimeout(waterSyncTimer.current);waterSyncTimer.current=setTimeout(()=>syncWaterLog(isoHoy(),g),600);if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
   const addWater=(ml)=>{if(!ml)return;const log=[{t:Date.now(),ml},...waterLog];setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const removeWaterAt=(i)=>{const log=waterLog.filter((_,j)=>j!==i);setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const changeWater=d=>{if(d>0){addWater(GLASS_ML*d);}else if(d<0){const log=waterLog.slice(Math.abs(d));setWaterLog(log);persistWaterLog(log);syncGlasses(log);}};
@@ -1145,7 +1157,7 @@ function PatientApp({onLogout,user,token}){
       syncExerciseLog(rec);
       setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});
     }
-    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);syncWaterLog(isoHoy(),nw);}
+    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);if(waterSyncTimer.current)clearTimeout(waterSyncTimer.current);waterSyncTimer.current=setTimeout(()=>syncWaterLog(isoHoy(),nw),600);}
     if(Array.isArray(p.comidas)&&p.comidas.length){
       const nuevos=[];
       p.comidas.forEach(c=>{
