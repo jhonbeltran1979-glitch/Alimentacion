@@ -451,6 +451,7 @@ function PatientApp({onLogout,user,token}){
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
   const waterSyncTimer=useRef(null);
+  const [mesSel,setMesSel]=useState(4);
   const [dayAI,setDayAI]=useState({});
   const [planDiaAbierto,setPlanDiaAbierto]=useState(null);
   const [dayAiLoadingId,setDayAiLoadingId]=useState(null);
@@ -1711,39 +1712,42 @@ function PatientApp({onLogout,user,token}){
             )}
           </div>
           <div style={{marginBottom:16}}>
-            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:12,textTransform:"uppercase",letterSpacing:.5}}>Progreso mensual · últimos 6 meses</div>
+            <div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:4,textTransform:"uppercase",letterSpacing:.5}}>Progreso mensual · últimos 6 meses</div>
+            <div style={{fontSize:10,color:"#bbb",marginBottom:10}}>Toca un mes para ver su detalle</div>
             {[["nutricion","Nutrición",mesData.nutriMes,"#3DAE5A"],["hidratacion","Hidratación",mesData.aguaMes,"#3DAEE6"],["ejercicio","Ejercicio",mesData.ejerMes,"#E9A23B"],["sueno","Sueño",mesData.suenoMes,"#6D5BD0"]].map(([tipo,lb,serie,cl])=>(
               <div key={tipo} style={{background:"#fff",borderRadius:16,padding:"14px 16px",marginBottom:10,boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
                 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
                   <IconoHabito tipo={tipo}/>
                   <span style={{flex:1,fontSize:13,fontWeight:800,color:"#333"}}>{lb}</span>
-                  <span style={{fontSize:13,fontWeight:900,color:cl}}>{serie[5]==null?"—":serie[5]+"%"}</span>
+                  <span style={{fontSize:13,fontWeight:900,color:cl}}>{serie[mesSel]==null?"—":serie[mesSel]+"%"}</span>
                 </div>
                 <div style={{display:"flex",gap:6,alignItems:"flex-end",height:44}}>
                   {serie.map((v,i)=>(
-                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end"}}>
-                      <div style={{width:"100%",background:i===5?cl:cl+"33",borderRadius:4,height:(v==null?3:Math.max(4,v*0.4))+"px",transition:"height .5s"}}/>
+                    <div key={i} onClick={()=>setMesSel(i)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:4,height:"100%",justifyContent:"flex-end",cursor:"pointer"}}>
+                      <div style={{width:"100%",background:i===mesSel?cl:cl+"33",borderRadius:4,height:(v==null?3:Math.max(4,v*0.4))+"px",transition:"height .5s"}}/>
                     </div>
                   ))}
                 </div>
                 <div style={{display:"flex",gap:6,marginTop:4}}>
-                  {mesData.meses.map((m,i)=>(<div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:i===5?cl:"#bbb",fontWeight:i===5?800:500}}>{m.lbl}</div>))}
+                  {mesData.meses.map((m,i)=>(<div key={i} onClick={()=>setMesSel(i)} style={{flex:1,textAlign:"center",fontSize:9,color:i===mesSel?cl:"#bbb",fontWeight:i===mesSel?800:500,cursor:"pointer"}}>{m.lbl}</div>))}
                 </div>
               </div>
             ))}
           </div>
 
           {(()=>{
-            const now=new Date();
-            const mesAnt=new Date(now.getFullYear(),now.getMonth()-1,1);
-            const key=`${mesAnt.getFullYear()}-${mesAnt.getMonth()}`;
-            const mes={y:mesAnt.getFullYear(),m:mesAnt.getMonth()};
+            const mesElegido=mesData.meses[mesSel];
+            const key=mesElegido.key;
+            const mes={y:mesElegido.y,m:mesElegido.m};
             const ai=monthAI[key];
-            const nombreMes=MESES_LARGO[mesAnt.getMonth()];
+            const nombreMes=MESES_LARGO[mesElegido.m];
+            const esMesActual=mesSel===5;
             return (
               <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:8,boxShadow:"0 2px 12px rgba(0,0,0,0.06)",borderLeft:"5px solid #6D5BD0"}}>
                 <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:10,textTransform:"capitalize"}}>📅 Cómo te fue en {nombreMes}</div>
-                {ai?(
+                {esMesActual?(
+                  <p style={{fontSize:12,color:"#888"}}>Este mes sigue en curso — el análisis de {nombreMes} se genera cuando el mes termine.</p>
+                ):ai?(
                   <div>
                     <div style={{fontSize:13,color:"#444",lineHeight:1.5,marginBottom:10}}>{ai.resumen}</div>
                     {ai.faltantes&&ai.faltantes.length>0&&(
