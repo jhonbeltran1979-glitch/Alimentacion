@@ -199,8 +199,11 @@ Responde SOLO JSON sin backticks:
 async function interpretarVoz(texto){
   return iaText(`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".
 Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimentos), ejercicio (tipo, minutos, intensidad) y vasos de agua. Alimentos en español colombiano. Si algo no se menciona: comidas=[], ejercicio=null, agua_vasos=null.
+
+IMPORTANTE sobre los alimentos: extrae CADA alimento mencionado en el texto, sin omitir ninguno y sin resumir a "los principales". Trata cada ítem distinto como un alimento separado en la lista, aunque el usuario los mencione rápido, con muletillas, o de forma coloquial (ej. "unos huevos con arepa y jugo" son 3 alimentos: huevo, arepa, jugo). Si el mismo alimento aparece dos veces en el texto, inclúyelo una sola vez.
+
 Responde SOLO JSON sin backticks:
-{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida de lo que entendiste"}`);
+{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida que repita EXACTAMENTE la lista de alimentos que entendiste, para que el usuario pueda notar si algo faltó"}`);
 }
 
 async function analisisSemanal(datos,hp){
@@ -1162,14 +1165,42 @@ function PatientApp({onLogout,user,token}){
     if(Array.isArray(p.comidas)&&p.comidas.length){
       const nuevos=[];
       p.comidas.forEach(c=>{
-        const all=Array.isArray(c.alimentos)?c.alimentos:[];
-        const matched=FOOD_CATEGORIES.flatMap(cat=>cat.items).filter(f=>all.some(a=>f.toLowerCase().includes(String(a).toLowerCase())||String(a).toLowerCase().includes(f.toLowerCase())));
+        const momento=c.momento||"Comida";
+        const nombreDe=x=>typeof x==="object"&&x?x.name:x;
+        const nuevosAlimentos=Array.isArray(c.alimentos)?c.alimentos:[];
+        const existente=history.find(r=>r.fecha===today&&r.comida===momento);
+        let all=nuevosAlimentos;
+        if(existente){
+          let prevAlimentos=[];
+          try{prevAlimentos=Array.isArray(existente.alimentos)?existente.alimentos:JSON.parse(existente.alimentos||"[]");}catch(_){prevAlimentos=[];}
+          const prevNombres=prevAlimentos.map(x=>String(nombreDe(x)).toLowerCase());
+          const extras=nuevosAlimentos.filter(x=>!prevNombres.includes(String(nombreDe(x)).toLowerCase()));
+          all=[...prevAlimentos,...extras];
+        }
+        const matched=FOOD_CATEGORIES.flatMap(cat=>cat.items).filter(f=>all.some(a=>f.toLowerCase().includes(String(nombreDe(a)).toLowerCase())||String(nombreDe(a)).toLowerCase().includes(f.toLowerCase())));
         const sc=calcScores(matched);
-        nuevos.push({fecha:today,comida:c.momento||"Comida",alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true});
-        syncMealLog({fecha:today,comida:c.momento||"Comida",alimentos:all,score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,notas:""});
+        nuevos.push({fecha:today,comida:momento,alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true,_reemplazaExistente:!!existente});
+        (async()=>{
+          if(existente&&user&&token){
+            try{await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&fecha=eq.${isoHoy()}&momento=eq.${encodeURIComponent(momento)}`,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});}catch(_){}
+          }
+          syncMealLog({fecha:today,comida:momento,alimentos:all,score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,notas:""});
+        })();
       });
-      setHistory(prev=>[...nuevos,...prev]);
+      setHistory(prev=>{
+        const sinDuplicados=prev.filter(r=>!nuevos.some(n=>n._reemplazaExistente&&n.fecha===r.fecha&&n.comida===r.comida));
+        return [...nuevos,...sinDuplicados];
+      });
     }
+  };
+  const hablar=(texto)=>{
+    try{
+      if(!("speechSynthesis" in window)||!texto)return;
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(texto);
+      u.lang="es-CO";u.rate=1;u.pitch=1;
+      window.speechSynthesis.speak(u);
+    }catch(_){}
   };
   const processVoice=async(texto)=>{
     setVoiceBusy(true);
@@ -1180,8 +1211,9 @@ function PatientApp({onLogout,user,token}){
       const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
       if(foods.length){try{analisis=await analizarTexto(foods,hp);}catch(_){}}
       setVoiceResult({...p,analisis});
+      hablar((p.respuesta||"")+" ¿Quedó bien? Si falta algo, toca el micrófono y dime qué le agrego.");
     }
-    catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});}
+    catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});hablar("No pude procesarlo, intenta de nuevo.");}
     setVoiceBusy(false);
   };
   const startVoice=()=>{
