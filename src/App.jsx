@@ -259,6 +259,9 @@ Responde SOLO JSON sin backticks:
 }
 
 const sk=(p,k)=>`vt_${p}_${k}`;
+const isoHoy=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;};
+const esCOfromISO=(iso)=>{if(!iso)return iso;const [y,m,d]=iso.split("-").map(Number);return `${d}/${m}/${y}`;};
+const isoFromEsCO=(ds)=>{if(typeof ds!=="string")return isoHoy();const p=ds.split("/");if(p.length!==3)return isoHoy();const [d,m,y]=p.map(Number);return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;};
 
 // ══ CONFETI ══════════════════════════════════════════════════════
 function Confeti({onDone}){
@@ -584,6 +587,46 @@ function PatientApp({onLogout,user,token}){
     apiGet({action:"getKey"}).then(r=>{if(r.ok&&r.k){CLAUDE_API_KEY=r.k;localStorage.setItem("vt_api_key_cache",r.k);}}).catch(()=>{});
   },[]);
 
+  const syncDailyLog=async(fechaISO,campos)=>{
+    if(!user||!token)return;
+    try{
+      await fetch(`${SB_URL}/rest/v1/daily_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({user_id:user.id,fecha:fechaISO,...campos})});
+    }catch(_){}
+  };
+  const syncExerciseLog=async(rec)=>{
+    if(!user||!token)return;
+    try{
+      await fetch(`${SB_URL}/rest/v1/exercise_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({user_id:user.id,fecha:isoFromEsCO(rec.date),tipo:rec.tipo,minutos:rec.min,intensidad:rec.intensidad,km:rec.km||null,calorias:rec.calorias||null,ritmo:rec.ritmoTxt||null})});
+    }catch(_){}
+  };
+  useEffect(()=>{
+    if(!user||!token)return;
+    (async()=>{
+      try{
+        const rDL=await fetch(`${SB_URL}/rest/v1/daily_logs?user_id=eq.${user.id}&select=fecha,water_glasses,sleep_hours&order=fecha.desc&limit=400`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const dl=await rDL.json();
+        if(Array.isArray(dl)&&dl.length){
+          const hoyISO=isoHoy();
+          const wh={};
+          dl.forEach(row=>{const ds=esCOfromISO(row.fecha);if(row.fecha!==hoyISO&&row.water_glasses!=null)wh[ds]=row.water_glasses;});
+          setWaterHist(wh);
+          const hoyRow=dl.find(row=>row.fecha===hoyISO);
+          if(hoyRow&&hoyRow.water_glasses!=null)setWater(hoyRow.water_glasses);
+          const slp=dl.filter(row=>row.sleep_hours!=null).map(row=>({date:esCOfromISO(row.fecha),hours:row.sleep_hours})).sort((a,b)=>isoFromEsCO(b.date).localeCompare(isoFromEsCO(a.date)));
+          if(slp.length)setSleepLog(slp);
+        }
+      }catch(_){}
+      try{
+        const rEL=await fetch(`${SB_URL}/rest/v1/exercise_logs?user_id=eq.${user.id}&select=*&order=created_at.desc&limit=200`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const el=await rEL.json();
+        if(Array.isArray(el)&&el.length){
+          const n=el.map(row=>({date:esCOfromISO(row.fecha),ts:new Date(row.created_at).getTime(),tipo:row.tipo,min:row.minutos,intensidad:row.intensidad,km:row.km||undefined,calorias:row.calorias||undefined,ritmoTxt:row.ritmo||undefined}));
+          setExLog(n);
+        }
+      }catch(_){}
+    })();
+  },[user,token]);
+
   useEffect(()=>{
     if(!perfil)return;
     const k=sk(perfil,"water"),d=sk(perfil,"water_date"),today=new Date().toLocaleDateString("es-CO");
@@ -597,7 +640,7 @@ function PatientApp({onLogout,user,token}){
     else{
       const prevDate=localStorage.getItem(d);
       const prevG=parseInt(localStorage.getItem(k)||"0");
-      if(prevDate&&prevG>0){wh={...wh,[prevDate]:prevG};localStorage.setItem(sk(perfil,"water_history"),JSON.stringify(wh));}
+      if(prevDate&&prevG>0){wh={...wh,[prevDate]:prevG};localStorage.setItem(sk(perfil,"water_history"),JSON.stringify(wh));syncDailyLog(isoFromEsCO(prevDate),{water_glasses:prevG});}
       setWater(0);setWaterLog([]);localStorage.setItem(k,"0");localStorage.setItem(sk(perfil,"waterlog"),"[]");localStorage.setItem(d,today);
     }
     setWaterHist(wh);
@@ -839,7 +882,7 @@ function PatientApp({onLogout,user,token}){
   };
 
   const persistWaterLog=(log)=>{try{localStorage.setItem(sk(perfil,"waterlog"),JSON.stringify(log));localStorage.setItem(sk(perfil,"water_date"),today);}catch(_){}};
-  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
+  const syncGlasses=(log)=>{const ml=log.reduce((a,d)=>a+(d.ml||0),0);const g=Math.round(ml/GLASS_ML);setWater(g);localStorage.setItem(sk(perfil,"water"),g);localStorage.setItem(sk(perfil,"water_date"),today);syncDailyLog(isoHoy(),{water_glasses:g});if(g>=WATER_GOAL)checkBadges({streak,water:g,lastScore,lastCats},history);};
   const addWater=(ml)=>{if(!ml)return;const log=[{t:Date.now(),ml},...waterLog];setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const removeWaterAt=(i)=>{const log=waterLog.filter((_,j)=>j!==i);setWaterLog(log);persistWaterLog(log);syncGlasses(log);};
   const changeWater=d=>{if(d>0){addWater(GLASS_ML*d);}else if(d<0){const log=waterLog.slice(Math.abs(d));setWaterLog(log);persistWaterLog(log);syncGlasses(log);}};
@@ -858,7 +901,7 @@ function PatientApp({onLogout,user,token}){
   // ── ACTÍVATE (pausas activas) ──────────────────────────
   const actBtn={padding:"14px 8px",borderRadius:14,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#6D5BD0",fontSize:14,fontWeight:800,cursor:"pointer"};
   const flashAct=(m)=>{setActMsg(m);setTimeout(()=>setActMsg(""),3500);};
-  const addQuickWorkout=(tipo,min,intensidad)=>{const rec={date:today,ts:Date.now(),tipo,min,intensidad};setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});};
+  const addQuickWorkout=(tipo,min,intensidad)=>{const rec={date:today,ts:Date.now(),tipo,min,intensidad};syncExerciseLog(rec);setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});};
   const startBreathing=()=>{setBreathing(true);setBreathPhase("Inhala");let inhale=true;if(breathRef.current)clearInterval(breathRef.current);breathRef.current=setInterval(()=>{inhale=!inhale;setBreathPhase(inhale?"Inhala":"Exhala");},5000);setTimeout(stopBreathing,60000);};
   const stopBreathing=()=>{if(breathRef.current){clearInterval(breathRef.current);breathRef.current=null;}setBreathing(false);};
   const quickActivate=(type)=>{
@@ -976,6 +1019,7 @@ function PatientApp({onLogout,user,token}){
   const logWorkout=()=>{
     if(!exLogMin){setExMsg("Pon los minutos");setTimeout(()=>setExMsg(""),2000);return;}
     const rec={date:today,ts:Date.now(),tipo:exType,min:exLogMin,intensidad:exInt};
+    syncExerciseLog(rec);
     const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
     setExMsg("✓ Entrenamiento registrado");setTimeout(()=>setExMsg(""),2500);
   };
@@ -1048,6 +1092,7 @@ function PatientApp({onLogout,user,token}){
     const ritmoMinKm=km>0?minutos/km:null;
     const ritmoTxt=ritmoMinKm?`${Math.floor(ritmoMinKm)}:${String(Math.round((ritmoMinKm%1)*60)).padStart(2,"0")} /km`:"—";
     const rec={date:today,ts:Date.now(),tipo:"Caminata GPS",min:minutos,intensidad,km,calorias,ritmoTxt};
+    syncExerciseLog(rec);
     const n=[rec,...exLog].slice(0,120);setExLog(n);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));
     setCaminataResumen({min:minutos,km,calorias,ritmoTxt});
     setCaminataActiva(false);
@@ -1058,9 +1103,10 @@ function PatientApp({onLogout,user,token}){
   const applyVoz=(p)=>{
     if(p.ejercicio&&p.ejercicio.minutos){
       const rec={date:today,ts:Date.now(),tipo:p.ejercicio.tipo||"Ejercicio",min:Number(p.ejercicio.minutos)||0,intensidad:p.ejercicio.intensidad||"media"};
+      syncExerciseLog(rec);
       setExLog(prev=>{const n=[rec,...prev].slice(0,120);localStorage.setItem(sk(perfil,"fit_log"),JSON.stringify(n));return n;});
     }
-    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);}
+    if(p.agua_vasos){const nw=Math.max(0,Math.min(12,Number(p.agua_vasos)));setWater(nw);localStorage.setItem(sk(perfil,"water"),nw);localStorage.setItem(sk(perfil,"water_date"),today);syncDailyLog(isoHoy(),{water_glasses:nw});}
     if(Array.isArray(p.comidas)&&p.comidas.length){
       const nuevos=[];
       p.comidas.forEach(c=>{
