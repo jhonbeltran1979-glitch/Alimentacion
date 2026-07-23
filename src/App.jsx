@@ -454,6 +454,8 @@ function PatientApp({onLogout,user,token}){
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
   const [recordatorio,setRecordatorio]=useState(null);
+  const [pushEstado,setPushEstado]=useState("desconocido");
+  const [pushBusy,setPushBusy]=useState(false);
   const waterSyncTimer=useRef(null);
   const [mesSel,setMesSel]=useState(4);
   const [dayAI,setDayAI]=useState({});
@@ -867,16 +869,42 @@ function PatientApp({onLogout,user,token}){
     monthAiBusyRef.current=false;
   };
   useEffect(()=>{
+    if("serviceWorker" in navigator){
+      navigator.serviceWorker.register("./sw.js").catch(()=>{});
+      if("Notification" in window)setPushEstado(Notification.permission);
+    }
+  },[]);
+  const activarPush=async()=>{
+    if(!user||!token){setPushEstado("error");return;}
+    if(!("serviceWorker" in navigator)||!("PushManager" in window)){setPushEstado("no_soportado");return;}
+    setPushBusy(true);
+    try{
+      const permiso=await Notification.requestPermission();
+      setPushEstado(permiso);
+      if(permiso!=="granted"){setPushBusy(false);return;}
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});}
+      const j=sub.toJSON();
+      await fetch(`${SB_URL}/rest/v1/push_subscriptions`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth})});
+      setPushEstado("activo");
+    }catch(_){setPushEstado("error");}
+    setPushBusy(false);
+  };
+
+  useEffect(()=>{
     if(!perfil)return;
     const revisar=()=>{
       const h=new Date().getHours();
       const yaVisto=k=>localStorage.getItem(sk(perfil,`rec_${k}_${today}`))==="1";
       const marcar=k=>localStorage.setItem(sk(perfil,`rec_${k}_${today}`),"1");
       const comidaHoy=lb=>history.some(r=>r.fecha===today&&r.comida===lb);
+      const ejercicioHoy=exLog.some(e=>e.date===today);
       const candidatos=[
         {k:"agua",cond:h>=10&&water===0,icon:"💧",msg:"Aún no has tomado agua hoy. ¡Un vasito te vendría bien!",accion:()=>setTab(4)},
         {k:"desayuno",cond:h>=10&&!comidaHoy("Desayuno"),icon:"☀️",msg:"No veo registrado tu desayuno de hoy. ¿Ya comiste algo?",accion:()=>irAComida(0)},
         {k:"almuerzo",cond:h>=14&&!comidaHoy("Almuerzo"),icon:"🍽️",msg:"Todavía no registras tu almuerzo. No te lo saltes.",accion:()=>irAComida(1)},
+        {k:"ejercicio",cond:h>=18&&!ejercicioHoy,icon:"💪",msg:"Hoy no has registrado actividad física. ¿Una caminata corta?",accion:()=>setTab(6)},
         {k:"cena",cond:h>=20&&!comidaHoy("Cena"),icon:"🌙",msg:"No has registrado la cena de hoy.",accion:()=>irAComida(2)},
       ];
       const pendiente=candidatos.find(c=>c.cond&&!yaVisto(c.k));
@@ -885,7 +913,7 @@ function PatientApp({onLogout,user,token}){
     const t=setTimeout(revisar,4000);
     const iv=setInterval(revisar,5*60*1000);
     return()=>{clearTimeout(t);clearInterval(iv);};
-  },[perfil,water,history.length,tab]);
+  },[perfil,water,history.length,exLog.length,tab]);
 
   useEffect(()=>{
     if(!perfil)return;
@@ -2622,6 +2650,19 @@ function PatientApp({onLogout,user,token}){
               </div>
             ))}
           </div>
+          <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>🔔 Notificaciones</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:10,lineHeight:1.5}}>Recibe un aviso en tu celular (aunque tengas la app cerrada) si no has tomado agua o registrado tus comidas y ejercicio.</div>
+            {pushEstado==="activo"||pushEstado==="granted"?(
+              <div style={{fontSize:13,fontWeight:800,color:"#2E9E5B",background:"#E9F7EF",padding:"10px 12px",borderRadius:10,textAlign:"center"}}>✓ Notificaciones activadas</div>
+            ):pushEstado==="denied"?(
+              <div style={{fontSize:12,color:"#C0392B",background:"#FEECEC",padding:"10px 12px",borderRadius:10}}>Bloqueaste los avisos del navegador. Actívalos desde los ajustes del sitio para poder recibirlos.</div>
+            ):pushEstado==="no_soportado"?(
+              <div style={{fontSize:12,color:"#888"}}>Tu navegador no soporta notificaciones push.</div>
+            ):(
+              <button onClick={activarPush} disabled={pushBusy} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontWeight:800,fontSize:13,cursor:pushBusy?"default":"pointer"}}>{pushBusy?"Activando…":"🔔 Activar notificaciones"}</button>
+            )}
+          </div>
           <button onClick={()=>setPrefsEditor(true)} style={{width:"100%",background:"#fff",border:"2px solid #6D5BD0",color:"#6D5BD0",borderRadius:14,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer",marginBottom:10}}>✏️ Editar mis preferencias</button>
           <button onClick={()=>{localStorage.removeItem("vt_perfil_actual");onLogout&&onLogout();}} style={{width:"100%",background:"#FEECEC",border:"none",color:"#C0392B",borderRadius:14,padding:"14px",fontWeight:800,fontSize:15,cursor:"pointer"}}>🚪 Cerrar sesión</button>
         </div>
@@ -2654,6 +2695,15 @@ function PatientApp({onLogout,user,token}){
    ════════════════════════════════════════════════════════════ */
 const SB_URL  = "https://xhplpwcfdtiarrpypyif.supabase.co";
 const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhocGxwd2NmZHRpYXJycHlweWlmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjM5MDksImV4cCI6MjA5NjMzOTkwOX0.tlCAIDo43LIShwFeGdP3kCSZTjPMV0s9_Ox6ana7Q3s";
+const VAPID_PUBLIC_KEY = "BGw9EHnNajsQUfYXNcnh2baJRgNFyZn7soCN0y8vQAYHCYRmyn6C7cXVycM20NSDyUPTFK2UFTydf0wrV_-MduU";
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const rawData=window.atob(base64);
+  const outputArray=new Uint8Array(rawData.length);
+  for(let i=0;i<rawData.length;i++)outputArray[i]=rawData.charCodeAt(i);
+  return outputArray;
+}
 
 const VT = { violeta:"#6D5BD0", violetaO:"#5B49C0", lila:"#EDEAFB", verde:"#3DAE5A",
              bg:"#F6F5FF", txt:"#1F2433", gris:"#7A7E8C", linea:"#E7E4F7" };
