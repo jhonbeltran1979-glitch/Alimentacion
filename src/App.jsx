@@ -453,6 +453,7 @@ function PatientApp({onLogout,user,token}){
   const [waterLog,setWaterLog]=useState([]);
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
+  const [recordatorio,setRecordatorio]=useState(null);
   const waterSyncTimer=useRef(null);
   const [mesSel,setMesSel]=useState(4);
   const [dayAI,setDayAI]=useState({});
@@ -865,6 +866,27 @@ function PatientApp({onLogout,user,token}){
     }catch(_){}
     monthAiBusyRef.current=false;
   };
+  useEffect(()=>{
+    if(!perfil)return;
+    const revisar=()=>{
+      const h=new Date().getHours();
+      const yaVisto=k=>localStorage.getItem(sk(perfil,`rec_${k}_${today}`))==="1";
+      const marcar=k=>localStorage.setItem(sk(perfil,`rec_${k}_${today}`),"1");
+      const comidaHoy=lb=>history.some(r=>r.fecha===today&&r.comida===lb);
+      const candidatos=[
+        {k:"agua",cond:h>=10&&water===0,icon:"💧",msg:"Aún no has tomado agua hoy. ¡Un vasito te vendría bien!",accion:()=>setTab(4)},
+        {k:"desayuno",cond:h>=10&&!comidaHoy("Desayuno"),icon:"☀️",msg:"No veo registrado tu desayuno de hoy. ¿Ya comiste algo?",accion:()=>irAComida(0)},
+        {k:"almuerzo",cond:h>=14&&!comidaHoy("Almuerzo"),icon:"🍽️",msg:"Todavía no registras tu almuerzo. No te lo saltes.",accion:()=>irAComida(1)},
+        {k:"cena",cond:h>=20&&!comidaHoy("Cena"),icon:"🌙",msg:"No has registrado la cena de hoy.",accion:()=>irAComida(2)},
+      ];
+      const pendiente=candidatos.find(c=>c.cond&&!yaVisto(c.k));
+      if(pendiente){setRecordatorio(pendiente);marcar(pendiente.k);}
+    };
+    const t=setTimeout(revisar,4000);
+    const iv=setInterval(revisar,5*60*1000);
+    return()=>{clearTimeout(t);clearInterval(iv);};
+  },[perfil,water,history.length,tab]);
+
   useEffect(()=>{
     if(!perfil)return;
     const now=new Date();
@@ -2416,6 +2438,16 @@ function PatientApp({onLogout,user,token}){
         </div>
       )}
       <style>{`@keyframes vtpulse{0%{box-shadow:0 0 0 0 rgba(193,18,31,.55)}70%{box-shadow:0 0 0 22px rgba(193,18,31,0)}100%{box-shadow:0 0 0 0 rgba(193,18,31,0)}}`}</style>
+      {recordatorio&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(26,20,50,0.45)",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center",padding:20}} onClick={()=>setRecordatorio(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:22,padding:"26px 22px",maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{fontSize:46,marginBottom:12}}>{recordatorio.icon}</div>
+            <div style={{fontSize:15,color:"#333",fontWeight:700,lineHeight:1.5,marginBottom:20}}>{recordatorio.msg}</div>
+            <button onClick={()=>{recordatorio.accion&&recordatorio.accion();setRecordatorio(null);}} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Registrar ahora</button>
+            <button onClick={()=>setRecordatorio(null)} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Más tarde</button>
+          </div>
+        </div>
+      )}
       {!(tab===0&&step===1)&&(<div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult)&&(
           <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#EFEDFC"}`,pointerEvents:"auto"}}>
@@ -2472,7 +2504,6 @@ function PatientApp({onLogout,user,token}){
           <div>
             <h2 style={{fontSize:20,fontWeight:900,color:"#1A1A1A",margin:"0 0 4px"}}>Tus registros 📋</h2>
             <div style={{fontSize:12,color:"#888",marginBottom:12}}>Lo que registraste por voz, con recomendaciones de la IA</div>
-            <div style={{fontSize:12,color:"#888",marginBottom:12}}>Lo que registraste por voz, con recomendaciones de la IA</div>
             {(()=>{
               const dateKeyToTs=ds=>{
                 if(typeof ds!=="string")return 0;
@@ -2498,7 +2529,7 @@ function PatientApp({onLogout,user,token}){
               return dias.map(ds=>{
                 const items=map[ds];
                 const scores=items.map(r=>r.score_total).filter(v=>typeof v==="number");
-                const scoreProm=scores.length?Math.round(scores.reduce((a,b)=>a+b,0)/scores.length):null;
+                const scoreProm=scores.length?Math.min(100,Math.round(scores.reduce((a,b)=>a+b,0)/3)):null;
                 const label=ds===today?"Hoy":ds===ayerDs?"Ayer":nombreDia(ds);
                 const abierto=planDiaAbierto===ds;
                 const ai=dayAI[ds];
