@@ -714,10 +714,6 @@ function PatientApp({onLogout,user,token}){
     })();
   },[user,token]);
 
-  if(!perfil)return <ProfileScreen onEnter={p=>{setPerfil(p);setShowHF(true);}}/>;
-  if(showHF&&!hp)return <HealthScreen perfil={perfil} user={user} token={token} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
-  if(prefsEditor) return <OnboardingPreferences user={user} token={token} onDone={()=>{setPrefsEditor(false);setTab(0);}}/>;
-
   const scores=calcScores(selected);
   const _nrecs=history.filter(r=>r&&r.score_total!=null&&r.score_total!=="").slice(0,14);
   const _avg=(k)=>{const v=_nrecs.filter(r=>r[k]!=null&&r[k]!=="");return v.length?Math.round(v.reduce((a,r)=>a+(Number(r[k])||0),0)/v.length):0;};
@@ -901,11 +897,11 @@ function PatientApp({onLogout,user,token}){
       const comidaHoy=lb=>history.some(r=>r.fecha===today&&r.comida===lb);
       const ejercicioHoy=exLog.some(e=>e.date===today);
       const candidatos=[
-        {k:"agua",cond:h>=10&&water===0,icon:"💧",msg:"Aún no has tomado agua hoy. ¡Un vasito te vendría bien!",accion:()=>setTab(4)},
-        {k:"desayuno",cond:h>=10&&!comidaHoy("Desayuno"),icon:"☀️",msg:"No veo registrado tu desayuno de hoy. ¿Ya comiste algo?",accion:()=>irAComida(0)},
-        {k:"almuerzo",cond:h>=14&&!comidaHoy("Almuerzo"),icon:"🍽️",msg:"Todavía no registras tu almuerzo. No te lo saltes.",accion:()=>irAComida(1)},
-        {k:"ejercicio",cond:h>=18&&!ejercicioHoy,icon:"💪",msg:"Hoy no has registrado actividad física. ¿Una caminata corta?",accion:()=>setTab(6)},
-        {k:"cena",cond:h>=20&&!comidaHoy("Cena"),icon:"🌙",msg:"No has registrado la cena de hoy.",accion:()=>irAComida(2)},
+        {k:"agua",cond:h>=10&&water===0,icon:"💧",msg:"Aún no has tomado agua hoy. ¡Un vasito te vendría bien!",accion:()=>setTab(4),negLabel:"No he tomado agua"},
+        {k:"desayuno",cond:h>=10&&!comidaHoy("Desayuno"),icon:"☀️",msg:"No veo registrado tu desayuno de hoy. ¿Ya comiste algo?",accion:()=>irAComida(0),negLabel:"No desayuné"},
+        {k:"almuerzo",cond:h>=14&&!comidaHoy("Almuerzo"),icon:"🍽️",msg:"Todavía no registras tu almuerzo. No te lo saltes.",accion:()=>irAComida(1),negLabel:"No almorcé"},
+        {k:"ejercicio",cond:h>=18&&!ejercicioHoy,icon:"💪",msg:"Hoy no has registrado actividad física. ¿Una caminata corta?",accion:()=>setTab(6),negLabel:"No hice ejercicio"},
+        {k:"cena",cond:h>=20&&!comidaHoy("Cena"),icon:"🌙",msg:"No has registrado la cena de hoy.",accion:()=>irAComida(2),negLabel:"No cené"},
       ];
       const pendiente=candidatos.find(c=>c.cond&&!yaVisto(c.k));
       if(pendiente){setRecordatorio(pendiente);marcar(pendiente.k);}
@@ -935,6 +931,12 @@ function PatientApp({onLogout,user,token}){
     if(tieneRegistros&&!monthAI[key])generarAnalisisMes(key,mes,null);
   // eslint-disable-next-line
   },[perfil,history.length,exLog.length,sleepLog.length,waterHist]);
+
+  // Estos 3 "return" van AQUÍ (después de todos los hooks de arriba) y no antes,
+  // para que React siempre llame la misma cantidad de hooks en cada render.
+  if(!perfil)return <ProfileScreen onEnter={p=>{setPerfil(p);setShowHF(true);}}/>;
+  if(showHF&&!hp)return <HealthScreen perfil={perfil} user={user} token={token} onComplete={h=>{setHp(h);setShowHF(false);}}/>;
+  if(prefsEditor) return <OnboardingPreferences user={user} token={token} onDone={()=>{setPrefsEditor(false);setTab(0);}}/>;
 
   const recomendacionDia=(tipo,v)=>{
     if(v==null)return "Sin datos registrados este día.";
@@ -2472,6 +2474,7 @@ function PatientApp({onLogout,user,token}){
             <div style={{fontSize:46,marginBottom:12}}>{recordatorio.icon}</div>
             <div style={{fontSize:15,color:"#333",fontWeight:700,lineHeight:1.5,marginBottom:20}}>{recordatorio.msg}</div>
             <button onClick={()=>{recordatorio.accion&&recordatorio.accion();setRecordatorio(null);}} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Registrar ahora</button>
+            {recordatorio.negLabel&&<button onClick={()=>setRecordatorio(null)} style={{width:"100%",padding:"12px",borderRadius:14,border:"1.5px solid #EFEDFC",background:"#fff",color:"#6D5BD0",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:8}}>{recordatorio.negLabel}</button>}
             <button onClick={()=>setRecordatorio(null)} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Más tarde</button>
           </div>
         </div>
