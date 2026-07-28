@@ -788,14 +788,31 @@ function PatientApp({onLogout,user,token}){
   };
   useEffect(()=>{
     if(!perfil)return;
-    const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
-    const fechaMatch=f=>f===ayerDs||(typeof f==="string"&&f.split("T")[0]===ayerDs);
-    const tieneComida=history.some(r=>fechaMatch(r.fecha));
-    const tieneEjercicio=exLog.some(e=>e.date===ayerDs);
-    const tieneSueno=sleepLog.some(s=>s.date===ayerDs);
-    const tieneAgua=waterHist[ayerDs]!=null;
-    const tieneRegistros=tieneComida||tieneEjercicio||tieneSueno||tieneAgua;
-    if(tieneRegistros&&!dayAI[ayerDs])generarAnalisisDia(ayerDs,"día de ayer");
+    (async()=>{
+      const hoyDs=today;
+      const dateKeyToTs=ds=>{
+        if(typeof ds!=="string")return 0;
+        const p=ds.split("/");
+        if(p.length===3){const [d,m,y]=p.map(Number);return new Date(y,m-1,d).getTime();}
+        const t=Date.parse(ds);return isNaN(t)?0:t;
+      };
+      const fechaKey=f=>(typeof f==="string"&&f.includes("T"))?f.split("T")[0]:f;
+      const dias=new Set();
+      history.forEach(r=>{const f=fechaKey(r.fecha);if(f&&f!==hoyDs)dias.add(f);});
+      exLog.forEach(e=>{if(e.date&&e.date!==hoyDs)dias.add(e.date);});
+      sleepLog.forEach(s=>{if(s.date&&s.date!==hoyDs)dias.add(s.date);});
+      Object.keys(waterHist).forEach(ds=>{if(ds!==hoyDs)dias.add(ds);});
+      const limite=Date.now()-14*864e5;
+      const pendientes=[...dias]
+        .filter(ds=>dateKeyToTs(ds)>=limite)
+        .filter(ds=>!dayAI[ds])
+        .sort((a,b)=>dateKeyToTs(a)-dateKeyToTs(b));
+      const ayerDs=new Date(Date.now()-864e5).toLocaleDateString("es-CO");
+      for(const ds of pendientes.slice(0,5)){
+        const label=ds===ayerDs?"día de ayer":ds;
+        await generarAnalisisDia(ds,label);
+      }
+    })();
   // eslint-disable-next-line
   },[perfil,history.length,exLog.length,sleepLog.length,waterHist]);
 
