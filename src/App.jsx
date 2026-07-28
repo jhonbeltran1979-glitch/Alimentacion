@@ -116,7 +116,7 @@ async function iaText(prompt){
 }
 
 async function analizarTexto(alimentos,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".`:"";
+  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".`:"";
   return iaText(`Eres nutricionista experto en gastronomía colombiana, basas tus recomendaciones en las guías de alimentación saludable de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, limitar sal a <5g/día, priorizar proteínas magras). ${ctx}
 Alimentos registrados: ${alimentos.join(", ")}.
 
@@ -127,7 +127,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analizarFoto(b64,type,hp){
-  const ctx=hp?`${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}"`:"";
+  const ctx=hp?`${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}"`:"";
   const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/ai-analyze-photo",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -138,7 +138,7 @@ async function analizarFoto(b64,type,hp){
   return d.analysis;
 }
 async function analizarSueno(noches,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const resumen=noches.map(n=>`${n.date}: durmió ${n.hours}h (${n.bed}→${n.wake}), calidad ${n.quality}/5, ${n.awakenings} despertares${n.note?", nota: "+n.note:""}`).join("\n");
   return iaText(`Eres experto en higiene del sueño en Colombia. ${ctx}
 Últimas noches del usuario:
@@ -151,7 +151,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function resumenNoche(noche,contexto,hp,dieta){
-  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   const det=noche.measured
     ?(noche.tooShort
       ?`Medición por sensor MUY CORTA (${noche.mins} min de grabación): NO alcanza para estimar duración ni fases del sueño. IGNORA por completo las fases y la duración medida; básate solo en la autoevaluación del usuario. Ruidos detectados: ${noche.snores}.`
@@ -181,7 +181,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function planSemana(prefs,hp,contexto,historial){
-  const ctxP=hp?`Perfil: ${hp.edad} años, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
   const DIF=["muy fácil","fácil","moderado","duro","intenso"];
   const difTxt=DIF[Math.max(0,Math.min(4,(prefs.dificultad||3)-1))];
   return iaText(`Eres un entrenador personal certificado y prudente, como un coach de IA que ajusta el plan según el desempeño real del usuario. ${ctxP}
@@ -213,7 +213,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisSemanal(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   return iaText(`Eres un coach de salud integral, cálido y realista. ${ctxP}
 Datos de la última semana del usuario (todo lo que registró):
 - Alimentación: ${datos.comida}
@@ -228,7 +228,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisDia(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido, cercano y directo. ${ctxP}
 Esto es lo que el usuario registró el ${datos.dia}:
 - Comidas: ${datos.comida}
@@ -243,16 +243,17 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisMes(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido y directo, hablando con el usuario al iniciar un nuevo mes. ${ctxP}
 Esto es lo que el usuario registró durante ${datos.mes}:
 - Nutrición: ${datos.nutricion}
 - Hidratación: ${datos.hidratacion}
 - Ejercicio: ${datos.ejercicio}
 - Sueño: ${datos.sueno}
+- Peso: ${datos.peso}
 ${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
 
-Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay mejora respecto al mes anterior, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
+Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay datos de peso de al menos 2 mediciones, comenta la tendencia con cautela (sin diagnosticar ni prometer resultados) — si el peso no se movió o falta un segundo dato, dilo con naturalidad e invita a registrar el peso seguido para poder verlo con claridad. Si hay mejora respecto al mes anterior en cualquier pilar, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
 
 Responde SOLO JSON sin backticks:
 {"resumen":"2-3 oraciones sobre cómo estuvo el mes en general","faltantes":["cosas concretas que faltaron ese mes, máx 4"],"metas":["2-3 metas concretas y alcanzables para el próximo mes"]}`);
@@ -338,21 +339,25 @@ function ProfileScreen({onEnter}){
 
 // ══ ONBOARDING SALUD ═════════════════════════════════════════════
 function HealthScreen({perfil,user,token,onComplete}){
-  const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [talla,setTalla]=useState("");const [sexo,setSexo]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
   const EJERCICIOS=[{e:"🛋️ Sedentario",d:"Poca o ninguna actividad"},{e:"🚶 Caminata",d:"Menos de 3 veces/semana"},{e:"🏃 Activo",d:"3-4 veces por semana"},{e:"💪 Intenso",d:"Diario o competitivo"}];
   const ENFERMEDADES=["Ninguna","Diabetes","Hipertensión","Colesterol alto","Hipotiroidismo","Gastritis","Otra"];
+  const SEXOS=["Femenino","Masculino","Prefiero no decirlo"];
   const save=async()=>{
     if(!edad||+edad<1||+edad>110){setErr("Ingresa una edad válida");return;}
     if(!peso||+peso<20||+peso>300){setErr("Ingresa un peso válido (kg)");return;}
+    if(!talla||+talla<100||+talla>250){setErr("Ingresa una talla válida (cm)");return;}
+    if(!sexo){setErr("Selecciona una opción");return;}
     if(!ejercicio){setErr("Selecciona tu nivel de actividad");return;}
     if(!enf){setErr("Selecciona una opción");return;}
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
     if(user&&token){
-      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),condicion:e2,actividad:ejercicio})});}catch(_){}
+      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),talla_cm:Number(talla),sexo,condicion:e2,actividad:ejercicio})});}catch(_){}
+      try{await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoHoy(),peso_kg:Number(peso)})});}catch(_){}
     }
-    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,ejercicio,enfermedad:e2}));
-    setLoading(false);onComplete({edad,peso,ejercicio,enfermedad:e2});
+    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,talla,sexo,ejercicio,enfermedad:e2}));
+    setLoading(false);onComplete({edad,peso,talla,sexo,ejercicio,enfermedad:e2});
   };
   return(
     <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
@@ -373,6 +378,35 @@ function HealthScreen({perfil,user,token,onComplete}){
             <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Peso (kg)</div>
             <input type="number" value={peso} onChange={e=>{setPeso(e.target.value);setErr("");}} placeholder="Ej: 70"
               style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+          </div>
+        </div>
+        {/* Talla y sexo */}
+        <div style={{display:"flex",gap:12,marginBottom:12}}>
+          <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+            <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Talla (cm)</div>
+            <input type="number" value={talla} onChange={e=>{setTalla(e.target.value);setErr("");}} placeholder="Ej: 170"
+              style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+          </div>
+          <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
+            {peso&&talla&&+talla>0?(()=>{
+              const imc=Number(peso)/((Number(talla)/100)**2);
+              return(<>
+                <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tu IMC</div>
+                <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A"}}>{imc.toFixed(1)}</div>
+                <div style={{fontSize:10,color:"#999",marginTop:2}}>Se calcula solo con tu peso y talla</div>
+              </>);
+            })():(
+              <div style={{fontSize:11,color:"#aaa",textAlign:"center"}}>Ingresa peso y talla para ver tu IMC</div>
+            )}
+          </div>
+        </div>
+        {/* Sexo */}
+        <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Sexo biológico <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(para calcular mejor tus necesidades)</span></div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+            {SEXOS.map(s=>(
+              <button key={s} onClick={()=>{setSexo(s);setErr("");}} style={{padding:"9px 16px",borderRadius:20,border:`2px solid ${sexo===s?"#6D5BD0":"#EFEDFC"}`,background:sexo===s?"#6D5BD0":"#F8F7FE",color:sexo===s?"#fff":"#555",fontSize:13,cursor:"pointer",fontWeight:sexo===s?800:400,transition:"all .15s"}}>{s}</button>
+            ))}
           </div>
         </div>
         {/* Ejercicio */}
@@ -460,6 +494,9 @@ function PatientApp({onLogout,user,token}){
   const [waterHist,setWaterHist]=useState({});
   const [diaSel,setDiaSel]=useState(6);
   const [recordatorio,setRecordatorio]=useState(null);
+  const [chequeoMensual,setChequeoMensual]=useState(null);
+  const [pesoNuevo,setPesoNuevo]=useState("");
+  const [pesoHist,setPesoHist]=useState([]);
   const [pushEstado,setPushEstado]=useState("desconocido");
   const [pushBusy,setPushBusy]=useState(false);
   const waterSyncTimer=useRef(null);
@@ -663,10 +700,15 @@ function PatientApp({onLogout,user,token}){
         const hpRows=await rHP.json();
         if(Array.isArray(hpRows)&&hpRows.length){
           const row=hpRows[0];
-          const h2={edad:row.edad,peso:row.peso_kg,ejercicio:row.actividad,enfermedad:row.condicion};
+          const h2={edad:row.edad,peso:row.peso_kg,talla:row.talla_cm,sexo:row.sexo,ejercicio:row.actividad,enfermedad:row.condicion};
           setHp(h2);setShowHF(false);
           if(perfil)localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify(h2));
         }
+      }catch(_){}
+      try{
+        const rW=await fetch(`${SB_URL}/rest/v1/weight_logs?patient_id=eq.${user.id}&select=fecha,peso_kg&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const wRows=await rW.json();
+        if(Array.isArray(wRows))setPesoHist(wRows);
       }catch(_){}
     })();
   },[user,token]);
@@ -875,7 +917,16 @@ function PatientApp({onLogout,user,token}){
     const ejercicio=minsEj>0?`${minsEj} min totales en el mes`:"sin actividad física registrada";
     const nochesS=sleepLog.filter(s=>enMes(s.date));
     const sueno=nochesS.length?`promedio ${Math.round(nochesS.reduce((a,s)=>a+(s.hours||0),0)/nochesS.length*10)/10}h en ${nochesS.length} noches registradas`:"sin registros de sueño";
-    return {nutricion,hidratacion,ejercicio,sueno};
+    const mesISO=`${mes.y}-${String(mes.m+1).padStart(2,"0")}`;
+    const pesosMes=pesoHist.filter(w=>w.fecha&&w.fecha.startsWith(mesISO)).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    let peso="sin registro de peso este mes";
+    if(pesosMes.length>=2){
+      const dif=Math.round((pesosMes[pesosMes.length-1].peso_kg-pesosMes[0].peso_kg)*10)/10;
+      peso=`de ${pesosMes[0].peso_kg}kg a ${pesosMes[pesosMes.length-1].peso_kg}kg (${dif>0?"+":""}${dif}kg en el mes)`;
+    }else if(pesosMes.length===1){
+      peso=`${pesosMes[0].peso_kg}kg registrado este mes (sin un segundo dato para ver tendencia)`;
+    }
+    return {nutricion,hidratacion,ejercicio,sueno,peso};
   };
   const generarAnalisisMes=async(key,mes,mesAnteriorTxt)=>{
     if(monthAiBusyRef.current||monthAI[key])return;
@@ -933,6 +984,37 @@ function PatientApp({onLogout,user,token}){
     const iv=setInterval(revisar,5*60*1000);
     return()=>{clearTimeout(t);clearInterval(iv);};
   },[perfil,water,history.length,exLog.length,tab]);
+
+  useEffect(()=>{
+    if(!perfil||!hp)return;
+    const yaVistoMes=localStorage.getItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)));
+    if(yaVistoMes)return;
+    const ultimoRegistro=pesoHist[0];
+    const diasDesde=ultimoRegistro?Math.floor((Date.now()-new Date(ultimoRegistro.fecha).getTime())/864e5):9999;
+    if(diasDesde>=30){
+      const t=setTimeout(()=>{
+        setPesoNuevo(hp.peso||"");
+        setChequeoMensual({pesoAnterior:ultimoRegistro?ultimoRegistro.peso_kg:(hp.peso?Number(hp.peso):null)});
+      },6000);
+      return()=>clearTimeout(t);
+    }
+  // eslint-disable-next-line
+  },[perfil,hp,pesoHist.length]);
+
+  const guardarChequeoMensual=async()=>{
+    const p=Number(pesoNuevo);
+    if(!p||p<20||p>300)return;
+    const hoyISO=isoHoy();
+    if(user&&token){
+      try{await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:hoyISO,peso_kg:p})});}catch(_){}
+      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,peso_kg:p})});}catch(_){}
+    }
+    setPesoHist(prev=>[{fecha:hoyISO,peso_kg:p},...prev]);
+    const h2={...hp,peso:String(p)};setHp(h2);
+    if(perfil)localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify(h2));
+    localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");
+    setChequeoMensual(null);
+  };
 
   useEffect(()=>{
     if(!perfil)return;
@@ -2427,6 +2509,19 @@ function PatientApp({onLogout,user,token}){
             <button onClick={()=>{recordatorio.accion&&recordatorio.accion();setRecordatorio(null);}} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Registrar ahora</button>
             {recordatorio.negLabel&&<button onClick={()=>setRecordatorio(null)} style={{width:"100%",padding:"12px",borderRadius:14,border:"1.5px solid #EFEDFC",background:"#fff",color:"#6D5BD0",fontSize:13,fontWeight:700,cursor:"pointer",marginBottom:8}}>{recordatorio.negLabel}</button>}
             <button onClick={()=>setRecordatorio(null)} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Más tarde</button>
+          </div>
+        </div>
+      )}
+      {chequeoMensual&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(26,20,50,0.45)",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+          <div style={{background:"#fff",borderRadius:22,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
+            <div style={{fontSize:42,marginBottom:10}}>📅</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#333",marginBottom:6}}>Chequeo mensual</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:20,lineHeight:1.5}}>Actualiza tu peso para que podamos ver si las recomendaciones están funcionando de verdad.</div>
+            {chequeoMensual.pesoAnterior!=null&&<div style={{fontSize:12,color:"#6D5BD0",fontWeight:700,marginBottom:14}}>Tu último registro: {chequeoMensual.pesoAnterior} kg</div>}
+            <input type="number" value={pesoNuevo} onChange={e=>setPesoNuevo(e.target.value)} placeholder="Tu peso hoy (kg)" style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:20,fontWeight:800,textAlign:"center",marginBottom:16,boxSizing:"border-box"}}/>
+            <button onClick={guardarChequeoMensual} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Guardar</button>
+            <button onClick={()=>{localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");setChequeoMensual(null);}} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Recuérdamelo después</button>
           </div>
         </div>
       )}
