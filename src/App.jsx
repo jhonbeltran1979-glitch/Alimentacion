@@ -116,7 +116,7 @@ async function iaText(prompt){
 }
 
 async function analizarTexto(alimentos,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".`:"";
+  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres nutricionista experto en gastronomía colombiana, basas tus recomendaciones en las guías de alimentación saludable de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, limitar sal a <5g/día, priorizar proteínas magras). ${ctx}
 Alimentos registrados: ${alimentos.join(", ")}.
 
@@ -127,7 +127,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analizarFoto(b64,type,hp){
-  const ctx=hp?`${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}"`:"";
+  const ctx=hp?`${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}"${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/ai-analyze-photo",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -138,7 +138,7 @@ async function analizarFoto(b64,type,hp){
   return d.analysis;
 }
 async function analizarSueno(noches,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   const resumen=noches.map(n=>`${n.date}: durmió ${n.hours}h (${n.bed}→${n.wake}), calidad ${n.quality}/5, ${n.awakenings} despertares${n.note?", nota: "+n.note:""}`).join("\n");
   return iaText(`Eres experto en higiene del sueño en Colombia. ${ctx}
 Últimas noches del usuario:
@@ -151,7 +151,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function resumenNoche(noche,contexto,hp,dieta){
-  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   const det=noche.measured
     ?(noche.tooShort
       ?`Medición por sensor MUY CORTA (${noche.mins} min de grabación): NO alcanza para estimar duración ni fases del sueño. IGNORA por completo las fases y la duración medida; básate solo en la autoevaluación del usuario. Ruidos detectados: ${noche.snores}.`
@@ -181,7 +181,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function planSemana(prefs,hp,contexto,historial){
-  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad actual "${hp.ejercicio}", condición de salud "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   const DIF=["muy fácil","fácil","moderado","duro","intenso"];
   const difTxt=DIF[Math.max(0,Math.min(4,(prefs.dificultad||3)-1))];
   return iaText(`Eres un entrenador personal certificado y prudente, como un coach de IA que ajusta el plan según el desempeño real del usuario. ${ctxP}
@@ -213,7 +213,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisSemanal(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un coach de salud integral, cálido y realista. ${ctxP}
 Datos de la última semana del usuario (todo lo que registró):
 - Alimentación: ${datos.comida}
@@ -228,7 +228,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisDia(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido, cercano y directo. ${ctxP}
 Esto es lo que el usuario registró el ${datos.dia}:
 - Comidas: ${datos.comida}
@@ -243,7 +243,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function analisisMes(datos,hp){
-  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
+  const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido y directo, hablando con el usuario al iniciar un nuevo mes. ${ctxP}
 Esto es lo que el usuario registró durante ${datos.mes}:
 - Nutrición: ${datos.nutricion}
@@ -339,7 +339,7 @@ function ProfileScreen({onEnter}){
 
 // ══ ONBOARDING SALUD ═════════════════════════════════════════════
 function HealthScreen({perfil,user,token,onComplete}){
-  const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [talla,setTalla]=useState("");const [sexo,setSexo]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
+  const [edad,setEdad]=useState("");const [peso,setPeso]=useState("");const [talla,setTalla]=useState("");const [sexo,setSexo]=useState("");const [cintura,setCintura]=useState("");const [cadera,setCadera]=useState("");const [ejercicio,setEjercicio]=useState("");const [enf,setEnf]=useState("");const [otra,setOtra]=useState("");const [loading,setLoading]=useState(false);const [err,setErr]=useState("");
   const EJERCICIOS=[{e:"🛋️ Sedentario",d:"Poca o ninguna actividad"},{e:"🚶 Caminata",d:"Menos de 3 veces/semana"},{e:"🏃 Activo",d:"3-4 veces por semana"},{e:"💪 Intenso",d:"Diario o competitivo"}];
   const ENFERMEDADES=["Ninguna","Diabetes","Hipertensión","Colesterol alto","Hipotiroidismo","Gastritis","Otra"];
   const SEXOS=["Femenino","Masculino","Prefiero no decirlo"];
@@ -348,16 +348,18 @@ function HealthScreen({perfil,user,token,onComplete}){
     if(!peso||+peso<20||+peso>300){setErr("Ingresa un peso válido (kg)");return;}
     if(!talla||+talla<100||+talla>250){setErr("Ingresa una talla válida (cm)");return;}
     if(!sexo){setErr("Selecciona una opción");return;}
+    if(cintura&&(+cintura<40||+cintura>200)){setErr("Ingresa una medida de cintura válida (cm)");return;}
+    if(cadera&&(+cadera<40||+cadera>200)){setErr("Ingresa una medida de cadera válida (cm)");return;}
     if(!ejercicio){setErr("Selecciona tu nivel de actividad");return;}
     if(!enf){setErr("Selecciona una opción");return;}
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
     if(user&&token){
-      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),talla_cm:Number(talla),sexo,condicion:e2,actividad:ejercicio})});}catch(_){}
+      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),talla_cm:Number(talla),sexo,cintura_cm:cintura?Number(cintura):null,cadera_cm:cadera?Number(cadera):null,condicion:e2,actividad:ejercicio})});}catch(_){}
       try{await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoHoy(),peso_kg:Number(peso)})});}catch(_){}
     }
-    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,talla,sexo,ejercicio,enfermedad:e2}));
-    setLoading(false);onComplete({edad,peso,talla,sexo,ejercicio,enfermedad:e2});
+    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,talla,sexo,cintura,cadera,ejercicio,enfermedad:e2}));
+    setLoading(false);onComplete({edad,peso,talla,sexo,cintura,cadera,ejercicio,enfermedad:e2});
   };
   return(
     <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
@@ -408,6 +410,37 @@ function HealthScreen({perfil,user,token,onComplete}){
               <button key={s} onClick={()=>{setSexo(s);setErr("");}} style={{padding:"9px 16px",borderRadius:20,border:`2px solid ${sexo===s?"#6D5BD0":"#EFEDFC"}`,background:sexo===s?"#6D5BD0":"#F8F7FE",color:sexo===s?"#fff":"#555",fontSize:13,cursor:"pointer",fontWeight:sexo===s?800:400,transition:"all .15s"}}>{s}</button>
             ))}
           </div>
+        </div>
+        {/* Índice cintura-cadera */}
+        <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
+          <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Índice cintura-cadera <span style={{fontWeight:400,textTransform:"none",letterSpacing:0}}>(opcional)</span></div>
+          <div style={{fontSize:11.5,color:"#888",lineHeight:1.5,marginBottom:12}}>
+            📏 <b>Cintura:</b> mide en el punto más angosto del abdomen (usualmente a la altura del ombligo), sin apretar la cinta, al terminar de exhalar.<br/>
+            📏 <b>Cadera:</b> mide en el punto más ancho de tus caderas/glúteos.
+          </div>
+          <div style={{display:"flex",gap:12}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#999",marginBottom:6,fontWeight:700}}>Cintura (cm)</div>
+              <input type="number" value={cintura} onChange={e=>{setCintura(e.target.value);setErr("");}} placeholder="Ej: 85"
+                style={{width:"100%",padding:"12px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:18,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+            </div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,color:"#999",marginBottom:6,fontWeight:700}}>Cadera (cm)</div>
+              <input type="number" value={cadera} onChange={e=>{setCadera(e.target.value);setErr("");}} placeholder="Ej: 100"
+                style={{width:"100%",padding:"12px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:18,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+            </div>
+          </div>
+          {cintura&&cadera&&+cadera>0&&(()=>{
+            const icc=Number(cintura)/Number(cadera);
+            const umbral=sexo==="Femenino"?0.85:sexo==="Masculino"?0.90:null;
+            const riesgo=umbral!=null?(icc>=umbral):null;
+            return(
+              <div style={{marginTop:12,padding:"12px 14px",borderRadius:12,background:riesgo===true?"#FEECEC":"#F0EDFC"}}>
+                <div style={{fontSize:12,color:"#6D5BD0",fontWeight:700,marginBottom:2}}>Tu índice cintura-cadera: <span style={{fontSize:16,fontWeight:900}}>{icc.toFixed(2)}</span></div>
+                {umbral!=null&&<div style={{fontSize:10.5,color:riesgo?"#C0392B":"#5B8A6B"}}>Según la OMS, {sexo==="Femenino"?"0.85":"0.90"} es el umbral de referencia para {sexo.toLowerCase()}s. Esto es orientativo, no un diagnóstico — coméntalo con tu médico.</div>}
+              </div>
+            );
+          })()}
         </div>
         {/* Ejercicio */}
         <div style={{background:"#fff",borderRadius:20,padding:18,marginBottom:12,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
@@ -497,6 +530,7 @@ function PatientApp({onLogout,user,token}){
   const [chequeoMensual,setChequeoMensual]=useState(null);
   const [pesoNuevo,setPesoNuevo]=useState("");
   const [pesoHist,setPesoHist]=useState([]);
+  const [prefsIA,setPrefsIA]=useState(null);
   const [pushEstado,setPushEstado]=useState("desconocido");
   const [pushBusy,setPushBusy]=useState(false);
   const waterSyncTimer=useRef(null);
@@ -700,7 +734,7 @@ function PatientApp({onLogout,user,token}){
         const hpRows=await rHP.json();
         if(Array.isArray(hpRows)&&hpRows.length){
           const row=hpRows[0];
-          const h2={edad:row.edad,peso:row.peso_kg,talla:row.talla_cm,sexo:row.sexo,ejercicio:row.actividad,enfermedad:row.condicion};
+          const h2={edad:row.edad,peso:row.peso_kg,talla:row.talla_cm,sexo:row.sexo,cintura:row.cintura_cm,cadera:row.cadera_cm,ejercicio:row.actividad,enfermedad:row.condicion};
           setHp(h2);setShowHF(false);
           if(perfil)localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify(h2));
         }
@@ -709,6 +743,11 @@ function PatientApp({onLogout,user,token}){
         const rW=await fetch(`${SB_URL}/rest/v1/weight_logs?patient_id=eq.${user.id}&select=fecha,peso_kg&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const wRows=await rW.json();
         if(Array.isArray(wRows))setPesoHist(wRows);
+      }catch(_){}
+      try{
+        const rP=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${user.id}&select=tipo_dieta,alergias,alimentos_no_gustan`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const pRows=await rP.json();
+        if(Array.isArray(pRows)&&pRows.length)setPrefsIA(pRows[0]);
       }catch(_){}
     })();
   },[user,token]);
@@ -768,6 +807,7 @@ function PatientApp({onLogout,user,token}){
   const eatScore=_nrecs.length?{total:_avg("score_total"),immunity:_avg("score_inmunidad"),energy:_avg("score_energia"),focus:_avg("score_concentracion"),vitality:_avg("score_vitalidad"),n:_nrecs.length}:null;
   const scoreView=eatScore||scores;
   const today=new Date().toLocaleDateString("es-CO");
+  const hpConDieta=hp?{...hp,tipo_dieta:prefsIA?.tipo_dieta,alergias:prefsIA?.alergias}:hp;
   const nivel=getNivel(streak,history.length);
   const waterPct=Math.min(100,(water/WATER_GOAL)*100);
   const waterMl=waterLog.reduce((a,d)=>a+(d.ml||0),0);
@@ -823,7 +863,7 @@ function PatientApp({onLogout,user,token}){
     dayAiBusyRef.current=true;setDayAiLoadingId(ds);
     try{
       const dd=datosDelDia(ds);
-      const r=await analisisDia({dia:label||ds,comida:dd.comidaTxt,agua:dd.aguaTxt,ejercicio:dd.ejercicioTxt,sueno:dd.suenoTxt},hp);
+      const r=await analisisDia({dia:label||ds,comida:dd.comidaTxt,agua:dd.aguaTxt,ejercicio:dd.ejercicioTxt,sueno:dd.suenoTxt},hpConDieta);
       setDayAI(prev=>{const n={...prev,[ds]:r};try{localStorage.setItem(sk(perfil,"day_ai"),JSON.stringify(n));}catch(_){}return n;});
     }catch(_){/* si falla, se reintenta la próxima vez que abra la app */}
     dayAiBusyRef.current=false;setDayAiLoadingId(null);
@@ -933,7 +973,7 @@ function PatientApp({onLogout,user,token}){
     monthAiBusyRef.current=true;
     try{
       const dd=datosDelMes(mes);
-      const r=await analisisMes({mes:MESES_LARGO[mes.m],...dd,mesAnterior:mesAnteriorTxt},hp);
+      const r=await analisisMes({mes:MESES_LARGO[mes.m],...dd,mesAnterior:mesAnteriorTxt},hpConDieta);
       setMonthAI(prev=>{const n={...prev,[key]:r};try{localStorage.setItem(sk(perfil,"month_ai"),JSON.stringify(n));}catch(_){}return n;});
     }catch(_){}
     monthAiBusyRef.current=false;
@@ -1075,7 +1115,7 @@ function PatientApp({onLogout,user,token}){
     if(all.length===0){setSavedMsg("⚠️ Selecciona al menos un alimento");setTimeout(()=>setSavedMsg(""),2500);return;}
     setSaving(true);setSavedMsg("Analizando nutrición...");
     let analisis=photoResult;
-    if(!analisis){try{const r=await analizarTexto(all,hp);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
+    if(!analisis){try{const r=await analizarTexto(all,hpConDieta);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
     try{
       const ok=await syncMealLog({fecha:today,comida:MEALS[meal].label,alimentos:all,score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,semaforo:analisis?.semaforo,calorias_aprox:analisis?.calorias_aprox,notas:analisis?.recomendacion||""});
       if(ok){
@@ -1369,7 +1409,7 @@ function PatientApp({onLogout,user,token}){
       applyVoz(p);
       let analisis=null;
       const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
-      if(foods.length){try{analisis=await analizarTexto(foods,hp);}catch(_){}}
+      if(foods.length){try{analisis=await analizarTexto(foods,hpConDieta);}catch(_){}}
       setVoiceResult({...p,analisis});
       hablar((p.respuesta||"")+" ¿Quedó bien? Si falta algo, toca el micrófono y dime qué le agrego.");
     }
