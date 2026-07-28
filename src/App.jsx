@@ -116,8 +116,14 @@ async function iaText(prompt){
 }
 
 async function analizarTexto(alimentos,hp){
-  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".`:"";
-  return iaText(`Nutricionista experto en gastronomía colombiana. ${ctx}\nAlimentos: ${alimentos.join(", ")}.\nJSON sin backticks:\n{"recomendacion":"consejo personalizado según perfil 2-3 oraciones concretas","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes faltantes según perfil"]}`);
+  const ctx=hp?`Perfil: ${hp.edad} años, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".`:"";
+  return iaText(`Eres nutricionista experto en gastronomía colombiana, basas tus recomendaciones en las guías de alimentación saludable de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, limitar sal a <5g/día, priorizar proteínas magras). ${ctx}
+Alimentos registrados: ${alimentos.join(", ")}.
+
+Da un consejo concreto y accionable citando cifras u orientaciones de la OMS cuando aplique (no solo "come más variado", di cuánto o qué tipo). Si la condición reportada del perfil es un valor de laboratorio (ej. "hemoglobina alta", "colesterol alto"), NO des instrucciones dietéticas específicas basadas en asumir la causa — esos valores pueden tener explicaciones normales (ej. en Bogotá y otras ciudades de altura, la hemoglobina alta suele ser una adaptación fisiológica normal, no una enfermedad). En esos casos da recomendaciones nutricionales generales y sugiere que consulte a su médico o nutricionista para interpretar ese valor correctamente, sin asumir tú la causa.
+
+Responde SOLO JSON sin backticks:
+{"recomendacion":"consejo concreto 2-3 oraciones, con referencia a una pauta de la OMS cuando aplique","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes o grupos de alimentos faltantes según la pauta OMS del plato saludable"]}`);
 }
 
 async function analizarFoto(b64,type,hp){
