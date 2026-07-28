@@ -343,10 +343,12 @@ function HealthScreen({perfil,user,token,onComplete}){
   const EJERCICIOS=[{e:"🛋️ Sedentario",d:"Poca o ninguna actividad"},{e:"🚶 Caminata",d:"Menos de 3 veces/semana"},{e:"🏃 Activo",d:"3-4 veces por semana"},{e:"💪 Intenso",d:"Diario o competitivo"}];
   const ENFERMEDADES=["Ninguna","Diabetes","Hipertensión","Colesterol alto","Hipotiroidismo","Gastritis","Otra"];
   const SEXOS=["Femenino","Masculino","Prefiero no decirlo"];
+  const normTalla=v=>{const n=+v;if(!v||isNaN(n)||n<=0)return 0;return n<3?Math.round(n*100):n;};
+  const tallaN=normTalla(talla);
   const save=async()=>{
     if(!edad||+edad<1||+edad>110){setErr("Ingresa una edad válida");return;}
     if(!peso||+peso<20||+peso>300){setErr("Ingresa un peso válido (kg)");return;}
-    if(!talla||+talla<100||+talla>250){setErr("Ingresa una talla válida (cm)");return;}
+    if(!tallaN||tallaN<100||tallaN>250){setErr("Ingresa una talla válida: es tu estatura, ej: 170 (o 1.70)");return;}
     if(!sexo){setErr("Selecciona una opción");return;}
     if(cintura&&(+cintura<40||+cintura>200)){setErr("Ingresa una medida de cintura válida (cm)");return;}
     if(cadera&&(+cadera<40||+cadera>200)){setErr("Ingresa una medida de cadera válida (cm)");return;}
@@ -355,11 +357,11 @@ function HealthScreen({perfil,user,token,onComplete}){
     setLoading(true);
     const e2=enf==="Otra"?(otra||"Otra condición"):enf;
     if(user&&token){
-      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),talla_cm:Number(talla),sexo,cintura_cm:cintura?Number(cintura):null,cadera_cm:cadera?Number(cadera):null,condicion:e2,actividad:ejercicio})});}catch(_){}
+      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,edad:Number(edad),peso_kg:Number(peso),talla_cm:tallaN,sexo,cintura_cm:cintura?Number(cintura):null,cadera_cm:cadera?Number(cadera):null,condicion:e2,actividad:ejercicio})});}catch(_){}
       try{await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:isoHoy(),peso_kg:Number(peso)})});}catch(_){}
     }
-    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,talla,sexo,cintura,cadera,ejercicio,enfermedad:e2}));
-    setLoading(false);onComplete({edad,peso,talla,sexo,cintura,cadera,ejercicio,enfermedad:e2});
+    localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify({edad,peso,talla:String(tallaN),sexo,cintura,cadera,ejercicio,enfermedad:e2}));
+    setLoading(false);onComplete({edad,peso,talla:String(tallaN),sexo,cintura,cadera,ejercicio,enfermedad:e2});
   };
   return(
     <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",overflowY:"auto"}}>
@@ -385,13 +387,19 @@ function HealthScreen({perfil,user,token,onComplete}){
         {/* Talla y sexo */}
         <div style={{display:"flex",gap:12,marginBottom:12}}>
           <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)"}}>
-            <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Talla (cm)</div>
+            <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Talla / Estatura (cm)</div>
             <input type="number" value={talla} onChange={e=>{setTalla(e.target.value);setErr("");}} placeholder="Ej: 170"
-              style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+              style={{width:"100%",padding:"14px",borderRadius:12,border:`2px solid ${talla&&(tallaN<100||tallaN>250)?"#E53935":"#EFEDFC"}`,background:"#F8F7FE",color:"#1A1A1A",fontSize:22,fontWeight:800,outline:"none",boxSizing:"border-box",textAlign:"center"}}/>
+            {talla&&(tallaN<100||tallaN>250)&&(
+              <div style={{fontSize:10,color:"#E53935",marginTop:6,fontWeight:700,textAlign:"center"}}>⚠️ La talla es tu estatura. Ej: 170 (o 1.70)</div>
+            )}
+            {talla&&+talla>0&&+talla<3&&tallaN>=100&&tallaN<=250&&(
+              <div style={{fontSize:10,color:"#3DAE5A",marginTop:6,fontWeight:700,textAlign:"center"}}>✓ Se guardará como {tallaN} cm</div>
+            )}
           </div>
           <div style={{flex:1,background:"#fff",borderRadius:20,padding:18,boxShadow:"0 4px 20px rgba(0,0,0,0.06)",display:"flex",flexDirection:"column",justifyContent:"center"}}>
-            {peso&&talla&&+talla>0?(()=>{
-              const imc=Number(peso)/((Number(talla)/100)**2);
+            {peso&&tallaN>=100&&tallaN<=250?(()=>{
+              const imc=Number(peso)/((tallaN/100)**2);
               return(<>
                 <div style={{color:"#6D5BD0",fontSize:12,fontWeight:800,marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Tu IMC</div>
                 <div style={{fontSize:22,fontWeight:800,color:"#1A1A1A"}}>{imc.toFixed(1)}</div>
