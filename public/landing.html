@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VitalTrack — Tu salud, sincronizada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --violeta: #6D5BD0;
+    --violeta-osc: #4A3B9E;
+    --violeta-prof: #2E2470;
+    --lila: #EDEAFB;
+    --bg: #FAF9FF;
+    --verde: #3DAE5A;
+    --azul: #3DAEE6;
+    --ambar: #E9A23B;
+    --noche: #4A3B9E;
+    --texto: #1F1B3A;
+    --texto-suave: #635C85;
+    --borde: #E4E0F7;
+    --display: 'Sora', sans-serif;
+    --cuerpo: 'Plus Jakarta Sans', sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{font-family:var(--cuerpo);color:var(--texto);background:var(--bg);line-height:1.6;overflow-x:hidden;}
+  h1,h2,h3,h4{font-family:var(--display);font-weight:700;letter-spacing:-0.02em;color:var(--texto);}
+  a{text-decoration:none;color:inherit;}
+  img{max-width:100%;display:block;}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px;}
+  .pill{display:inline-flex;align-items:center;gap:8px;background:var(--lila);color:var(--violeta-osc);font-weight:600;font-size:13px;padding:7px 16px;border-radius:100px;}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:var(--cuerpo);font-weight:700;font-size:15px;padding:14px 26px;border-radius:14px;border:none;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;}
+  .btn:hover{transform:translateY(-2px);}
+  .btn-primario{background:linear-gradient(135deg,var(--violeta),#8B7BE8);color:#fff;box-shadow:0 10px 24px rgba(109,91,208,.35);}
+  .btn-primario:hover{box-shadow:0 14px 30px rgba(109,91,208,.45);}
+  .btn-fantasma{background:#fff;color:var(--violeta-osc);border:2px solid var(--borde);}
+  .btn-fantasma:hover{border-color:var(--violeta);}
+
+  /* ===== NAV ===== */
+  header{position:sticky;top:0;z-index:50;background:rgba(250,249,255,.85);backdrop-filter:blur(10px);border-bottom:1px solid var(--borde);}
+  nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;max-width:1160px;margin:0 auto;}
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:800;font-size:19px;}
+  .logo .icono{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--violeta),#8B7BE8);display:flex;align-items:center;justify-content:center;font-size:17px;}
+  .nav-links{display:flex;gap:32px;align-items:center;}
+  .nav-links a{font-weight:600;font-size:14px;color:var(--texto-suave);}
+  .nav-links a:hover{color:var(--violeta);}
+  .nav-cta{display:flex;gap:12px;align-items:center;}
+  .nav-cta .btn{padding:10px 20px;font-size:14px;}
+  .menu-movil{display:none;background:none;border:none;font-size:24px;cursor:pointer;}
+  @media(max-width:860px){.nav-links{display:none;}.menu-movil{display:block;}}
+
+  /* ===== HERO ===== */
+  .hero{position:relative;padding:76px 0 40px;overflow:hidden;}
+  .hero::before{content:"";position:absolute;top:-180px;right:-180px;width:520px;height:520px;background:radial-gradient(circle,rgba(109,91,208,.16),transparent 70%);border-radius:50%;}
+  .hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center;position:relative;z-index:1;}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr;gap:40px;}}
+  .hero h1{font-size:clamp(34px,4.6vw,54px);line-height:1.06;margin:20px 0 18px;}
+  .hero h1 em{font-style:normal;background:linear-gradient(120deg,var(--violeta),#9B7FE8);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero p.lead{font-size:18px;color:var(--texto-suave);max-width:480px;margin-bottom:30px;}
+  .hero-ctas{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:28px;}
+  .hero-nota{font-size:13px;color:var(--texto-suave);display:flex;align-items:center;gap:8px;}
+  .hero-nota .puntos{display:flex;}
+  .hero-nota .puntos span{width:26px;height:26px;border-radius:50%;background:var(--lila);border:2px solid var(--bg);margin-left:-8px;}
+
+  /* Visual: mockup de teléfono con los 4 pilares */
+  .hero-visual{position:relative;display:flex;justify-content:center;}
+  .telefono{width:290px;background:#fff;border-radius:38px;padding:14px;box-shadow:0 30px 70px rgba(46,36,112,.25);position:relative;z-index:2;}
+  .telefono-pantalla{background:linear-gradient(160deg,var(--violeta),#8B7BE8);border-radius:26px;padding:22px 18px 26px;color:#fff;}
+  .telefono-top{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+  .telefono-avatar{width:38px;height:38px;border-radius:12px;overflow:hidden;background:#fff;flex-shrink:0;}
+  .telefono-avatar img{width:100%;height:100%;object-fit:cover;}
+  .telefono-saludo{font-size:13px;font-weight:700;}
+  .telefono-sub{font-size:10.5px;opacity:.85;}
+  .anillo-wrap{background:#fff;border-radius:20px;padding:16px;color:var(--texto);}
+  .anillo{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+  .anillo svg{flex-shrink:0;}
+  .barras{flex:1;display:flex;flex-direction:column;gap:8px;}
+  .barra-fila{display:flex;align-items:center;gap:7px;}
+  .barra-icono{width:20px;height:20px;border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;}
+  .barra-track{flex:1;height:6px;border-radius:6px;background:#F0EEFC;overflow:hidden;}
+  .barra-fill{height:100%;border-radius:6px;}
+  .ia-nota{background:var(--lila);border-radius:12px;padding:10px 12px;font-size:11px;color:var(--violeta-osc);font-weight:600;line-height:1.4;}
+  .flotante{position:absolute;background:#fff;border-radius:16px;padding:10px 14px;box-shadow:0 14px 34px rgba(46,36,112,.2);font-size:12px;font-weight:700;display:flex;align-items:center;gap:8px;z-index:3;animation:flotar 5s ease-in-out infinite;}
+  .flotante.f1{top:10%;left:-6%;animation-delay:.3s;color:var(--verde);}
+  .flotante.f2{bottom:14%;right:-8%;animation-delay:1.1s;color:var(--azul);}
+  @keyframes flotar{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+  @media(max-width:520px){.flotante{display:none;}}
+
+  /* ===== LOGOS / CONFIANZA ===== */
+  .confianza{padding:34px 0;border-top:1px solid var(--borde);border-bottom:1px solid var(--borde);}
+  .confianza-fila{display:flex;flex-wrap:wrap;gap:28px;justify-content:space-between;align-items:center;}
+  .confianza-item{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;color:var(--texto-suave);}
+  .confianza-item .punto{width:8px;height:8px;border-radius:50%;background:var(--verde);}
+
+  /* ===== PROBLEMA / SOLUCION ===== */
+  .seccion{padding:90px 0;}
+  .encabezado-seccion{max-width:600px;margin:0 auto 56px;text-align:center;}
+  .encabezado-seccion .pill{margin-bottom:16px;}
+  .encabezado-seccion h2{font-size:clamp(28px,3.6vw,40px);margin-bottom:14px;}
+  .encabezado-seccion p{color:var(--texto-suave);font-size:16px;}
+
+  .pilares-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;}
+  @media(max-width:900px){.pilares-grid{grid-template-columns:repeat(2,1fr);}}
+  @media(max-width:520px){.pilares-grid{grid-template-columns:1fr;}}
+  .pilar-card{background:#fff;border:1px solid var(--borde);border-radius:22px;padding:28px 22px;transition:transform .2s ease, box-shadow .2s ease;}
+  .pilar-card:hover{transform:translateY(-6px);box-shadow:0 20px 40px rgba(46,36,112,.1);}
+  .pilar-icono{width:52px;height:52px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:18px;}
+  .pilar-card h3{font-size:17px;margin-bottom:8px;}
+  .pilar-card p{font-size:13.5px;color:var(--texto-suave);}
+
+  /* ===== VOZ / IA feature destacada ===== */
+  .destacado{background:linear-gradient(135deg,var(--violeta-prof),var(--violeta));border-radius:32px;padding:64px 48px;color:#fff;position:relative;overflow:hidden;}
+  .destacado::after{content:"";position:absolute;bottom:-140px;left:-100px;width:380px;height:380px;background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);border-radius:50%;}
+  .destacado-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;position:relative;z-index:1;}
+  @media(max-width:860px){.destacado-grid{grid-template-columns:1fr;}}
+  .destacado h2{color:#fff;font-size:clamp(26px,3.2vw,36px);margin-bottom:16px;}
+  .destacado p{color:rgba(255,255,255,.85);font-size:16px;margin-bottom:22px;}
+  .destacado-lista{display:flex;flex-direction:column;gap:12px;}
+  .destacado-lista li{list-style:none;display:flex;gap:12px;align-items:flex-start;font-size:14.5px;color:rgba(255,255,255,.92);}
+  .destacado-lista .check{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.18);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;margin-top:1px;}
+  .burbuja-voz{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:20px;backdrop-filter:blur(6px);}
+  .burbuja-voz .mic{width:44px;height:44px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px;}
+  .burbuja-voz .texto-usuario{font-size:13px;font-style:italic;color:rgba(255,255,255,.8);margin-bottom:12px;}
+  .burbuja-voz .respuesta{background:#fff;border-radius:14px;padding:12px 14px;font-size:13px;color:var(--violeta-osc);font-weight:600;}
+
+  /* ===== PARA QUIEN ===== */
+  .audiencias{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+  @media(max-width:900px){.audiencias{grid-template-columns:1fr;}}
+  .audiencia-card{background:#fff;border:1px solid var(--borde);border-radius:24px;padding:32px 28px;}
+  .audiencia-card .etiqueta{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--violeta);margin-bottom:12px;}
+  .audiencia-card h3{font-size:21px;margin-bottom:10px;}
+  .audiencia-card p{font-size:14px;color:var(--texto-suave);margin-bottom:18px;}
+  .audiencia-card ul{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:20px;}
+  .audiencia-card ul li{font-size:13.5px;color:var(--texto);display:flex;gap:8px;}
+  .audiencia-card ul li::before{content:"—";color:var(--violeta);font-weight:700;}
+  .audiencia-card.destaca{background:linear-gradient(160deg,#fff,var(--lila));border-color:var(--violeta);position:relative;}
+
+  /* ===== PRECIOS ===== */
+  .precios-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;align-items:stretch;}
+  @media(max-width:900px){.precios-grid{grid-template-columns:1fr;}}
+  .precio-card{background:#fff;border:1.5px solid var(--borde);border-radius:26px;padding:34px 28px;display:flex;flex-direction:column;}
+  .precio-card.pro{border-color:var(--violeta);box-shadow:0 24px 50px rgba(109,91,208,.18);position:relative;}
+  .precio-badge{position:absolute;top:-13px;left:28px;background:var(--violeta);color:#fff;font-size:11px;font-weight:700;padding:5px 14px;border-radius:100px;}
+  .precio-nombre{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--texto-suave);margin-bottom:10px;}
+  .precio-valor{font-family:var(--display);font-size:36px;font-weight:800;margin-bottom:4px;}
+  .precio-valor span{font-size:14px;font-weight:600;color:var(--texto-suave);}
+  .precio-desc{font-size:13px;color:var(--texto-suave);margin-bottom:24px;}
+  .precio-card ul{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:26px;flex:1;}
+  .precio-card ul li{font-size:13.5px;display:flex;gap:10px;align-items:flex-start;}
+  .precio-card ul li .chk{color:var(--verde);font-weight:800;flex-shrink:0;}
+  .precio-card .btn{width:100%;}
+
+  /* ===== CTA FINAL ===== */
+  .cta-final{background:var(--lila);border-radius:32px;padding:64px 40px;text-align:center;}
+  .cta-final h2{font-size:clamp(26px,3.4vw,38px);margin-bottom:14px;}
+  .cta-final p{color:var(--texto-suave);font-size:16px;margin-bottom:28px;max-width:480px;margin-left:auto;margin-right:auto;}
+
+  /* ===== FOOTER ===== */
+  footer{padding:48px 0 32px;border-top:1px solid var(--borde);}
+  .footer-grid{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;}
+  .footer-links{display:flex;gap:24px;flex-wrap:wrap;}
+  .footer-links a{font-size:13.5px;color:var(--texto-suave);font-weight:600;}
+  .footer-links a:hover{color:var(--violeta);}
+  .footer-copy{font-size:12.5px;color:var(--texto-suave);}
+</style>
+</head>
+<body>
+
+<header>
+  <nav>
+    <a href="#" class="logo"><span class="icono">🌱</span> VitalTrack</a>
+    <div class="nav-links">
+      <a href="#pilares">Cómo funciona</a>
+      <a href="#para-quien">Para quién es</a>
+      <a href="#precios">Planes</a>
+      <a href="#profesionales">Profesionales</a>
+    </div>
+    <div class="nav-cta">
+      <a href="#precios" class="btn btn-primario">Empieza gratis</a>
+    </div>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="pill">🇨🇴 Hecho para Colombia</span>
+      <h1>Tu nutrición, hidratación, <br>ejercicio y sueño — <em>en una sola app que sí se conecta.</em></h1>
+      <p class="lead">VitalTrack registra lo que dices por voz y usa IA para mostrarte, día a día, cómo van tus 4 pilares de salud juntos — no por separado.</p>
+      <div class="hero-ctas">
+        <a href="#precios" class="btn btn-primario">Empieza gratis →</a>
+        <a href="#profesionales" class="btn btn-fantasma">Soy nutricionista o entrenador</a>
+      </div>
+      <div class="hero-nota">
+        <span class="puntos"><span></span><span></span><span></span></span>
+        Sin tarjeta de crédito para el plan gratuito
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="flotante f1">🎙️ "hoy desayuné arepa y huevo"</div>
+      <div class="flotante f2">💧 7 de 8 vasos</div>
+      <div class="telefono">
+        <div class="telefono-pantalla">
+          <div class="telefono-top">
+            <div class="telefono-avatar"><img src="https://jhonbeltran1979-glitch.github.io/Alimentacion/otter/otter-feliz-1.png" alt=""></div>
+            <div>
+              <div class="telefono-saludo">¡Hola! 👋</div>
+              <div class="telefono-sub">Hoy es un buen día para cuidar de ti</div>
+            </div>
+          </div>
+          <div class="anillo-wrap">
+            <div class="anillo">
+              <svg width="72" height="72" viewBox="0 0 72 72">
+                <circle cx="36" cy="36" r="30" fill="none" stroke="#EDEAFB" stroke-width="8"/>
+                <circle cx="36" cy="36" r="30" fill="none" stroke="#6D5BD0" stroke-width="8" stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="47" transform="rotate(-90 36 36)"/>
+              </svg>
+              <div class="barras">
+                <div class="barra-fila"><div class="barra-icono" style="background:#E5F5E9;">🌱</div><div class="barra-track"><div class="barra-fill" style="width:83%;background:#3DAE5A;"></div></div></div>
+                <div class="barra-fila"><div class="barra-icono" style="background:#DDF1FA;">💧</div><div class="barra-track"><div class="barra-fill" style="width:88%;background:#3DAEE6;"></div></div></div>
+                <div class="barra-fila"><div class="barra-icono" style="background:#FCEEDB;">💪</div><div class="barra-track"><div class="barra-fill" style="width:45%;background:#E9A23B;"></div></div></div>
+                <div class="barra-fila"><div class="barra-icono" style="background:#EDEAFB;">🌙</div><div class="barra-track"><div class="barra-fill" style="width:70%;background:#4A3B9E;"></div></div></div>
+              </div>
+            </div>
+            <div class="ia-nota">🤖 Vas muy bien en nutrición e hidratación — te falta moverte un poco más hoy.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="confianza">
+  <div class="wrap confianza-fila">
+    <div class="confianza-item"><span class="punto"></span> Registro por voz en español</div>
+    <div class="confianza-item"><span class="punto"></span> Análisis con IA todos los días</div>
+    <div class="confianza-item"><span class="punto"></span> Tus datos, respaldados y solo tuyos</div>
+    <div class="confianza-item"><span class="punto"></span> Pensado con perfiles de salud reales</div>
+  </div>
+</div>
+
+<section class="seccion" id="pilares">
+  <div class="wrap">
+    <div class="encabezado-seccion">
+      <span class="pill">Cómo funciona</span>
+      <h2>4 pilares. Una sola conversación.</h2>
+      <p>Le cuentas a VitalTrack lo que comiste, cuánta agua tomaste, si hiciste ejercicio y cómo dormiste — con tu voz. La IA conecta los 4 y te dice qué está funcionando y qué te falta.</p>
+    </div>
+    <div class="pilares-grid">
+      <div class="pilar-card">
+        <div class="pilar-icono" style="background:#E5F5E9;">🌱</div>
+        <h3>Nutrición</h3>
+        <p>Dictas lo que comiste y la IA analiza tu comida al instante, con recomendaciones basadas en guías de la OMS.</p>
+      </div>
+      <div class="pilar-card">
+        <div class="pilar-icono" style="background:#DDF1FA;">💧</div>
+        <h3>Hidratación</h3>
+        <p>Registra tus vasos de agua en un toque y recibe un aviso si llevas el día sin tomar.</p>
+      </div>
+      <div class="pilar-card">
+        <div class="pilar-icono" style="background:#FCEEDB;">💪</div>
+        <h3>Ejercicio</h3>
+        <p>Desde una caminata con mapa GPS hasta un plan semanal de entrenamiento que se ajusta según tu cumplimiento.</p>
+      </div>
+      <div class="pilar-card">
+        <div class="pilar-icono" style="background:#EDEAFB;">🌙</div>
+        <h3>Sueño</h3>
+        <p>Lleva el registro de tus horas y calidad de sueño, y entiende cómo afecta a los otros 3 pilares.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="seccion" style="padding-top:0;">
+  <div class="wrap">
+    <div class="destacado">
+      <div class="destacado-grid">
+        <div>
+          <span class="pill" style="background:rgba(255,255,255,.15);color:#fff;">🤖 IA que analiza, no solo registra</span>
+          <h2 style="margin-top:16px;">No te muestra números — te dice qué hacer con ellos.</h2>
+          <p>Cada día, VitalTrack revisa tus 4 pilares juntos y te da una recomendación concreta y honesta: solo sobre lo que de verdad registraste, nunca inventada.</p>
+          <ul class="destacado-lista">
+            <li><span class="check">✓</span> Análisis diario y mensual automático</li>
+            <li><span class="check">✓</span> Recomendaciones basadas en tu perfil de salud</li>
+            <li><span class="check">✓</span> Avisos si no has tomado agua o comido a tiempo</li>
+          </ul>
+        </div>
+        <div class="burbuja-voz">
+          <div class="mic">🎙️</div>
+          <div class="texto-usuario">"hoy desayuné arroz, huevo, avena y arándanos"</div>
+          <div class="respuesta">✓ Registré tu desayuno. Buen aporte de fibra — te recomiendo sumar una porción de verduras en el almuerzo, según la guía de la OMS.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="seccion" id="para-quien">
+  <div class="wrap">
+    <div class="encabezado-seccion">
+      <span class="pill">Para quién es</span>
+      <h2>Una app, tres formas de usarla</h2>
+      <p>Ya seas paciente, profesional de la salud, o una institución — VitalTrack se adapta a cómo trabajas.</p>
+    </div>
+    <div class="audiencias">
+      <div class="audiencia-card">
+        <div class="etiqueta">Pacientes</div>
+        <h3>Cuida tu salud sin pensarlo dos veces</h3>
+        <p>Registra por voz en segundos y entiende tu progreso real, semana a semana.</p>
+        <ul>
+          <li>Registro por voz de comidas, agua, ejercicio y sueño</li>
+          <li>Recomendaciones diarias con IA</li>
+          <li>Recordatorios automáticos</li>
+        </ul>
+      </div>
+      <div class="audiencia-card destaca" id="profesionales">
+        <div class="etiqueta">Nutricionistas y entrenadores</div>
+        <h3>Acompaña a tus pacientes entre consultas</h3>
+        <p>Un panel para ver cómo le va a cada paciente, sin tener que preguntarle.</p>
+        <ul>
+          <li>Panel de seguimiento por paciente</li>
+          <li>Revende bajo tu propia marca</li>
+          <li>Ahorra tiempo en el registro manual</li>
+        </ul>
+      </div>
+      <div class="audiencia-card">
+        <div class="etiqueta">Instituciones</div>
+        <h3>Bienestar medible para tu equipo</h3>
+        <p>Para empresas, colegios, cajas de compensación y clínicas.</p>
+        <ul>
+          <li>Reportes agregados, sin exponer datos individuales</li>
+          <li>Precio por volumen de usuarios</li>
+          <li>Marca blanca disponible</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="seccion" id="precios">
+  <div class="wrap">
+    <div class="encabezado-seccion">
+      <span class="pill">Planes</span>
+      <h2>Empieza gratis. Crece cuando lo necesites.</h2>
+      <p>Precios en pesos colombianos. Cambia o cancela cuando quieras.</p>
+    </div>
+    <div class="precios-grid">
+      <div class="precio-card">
+        <div class="precio-nombre">Individual</div>
+        <div class="precio-valor">$24.900 <span>COP/mes</span></div>
+        <div class="precio-desc">Para cuidar tu salud día a día. $219.000/año.</div>
+        <ul>
+          <li><span class="chk">✓</span> Los 4 pilares sin límite</li>
+          <li><span class="chk">✓</span> Registro por voz e IA ilimitada</li>
+          <li><span class="chk">✓</span> Notificaciones inteligentes</li>
+          <li><span class="chk">✓</span> Historial y progreso completo</li>
+        </ul>
+        <a href="#" class="btn btn-fantasma">Empieza gratis</a>
+      </div>
+      <div class="precio-card pro">
+        <div class="precio-badge">Más elegido</div>
+        <div class="precio-nombre">Profesional</div>
+        <div class="precio-valor">$89.000 <span>COP/mes</span></div>
+        <div class="precio-desc">Hasta 15 pacientes incluidos, +$7.000/paciente extra.</div>
+        <ul>
+          <li><span class="chk">✓</span> Todo lo del plan Individual</li>
+          <li><span class="chk">✓</span> Panel de seguimiento de pacientes</li>
+          <li><span class="chk">✓</span> Marca personal en la experiencia</li>
+          <li><span class="chk">✓</span> Soporte prioritario</li>
+        </ul>
+        <a href="#" class="btn btn-primario">Quiero probarlo</a>
+      </div>
+      <div class="precio-card">
+        <div class="precio-nombre">Institucional</div>
+        <div class="precio-valor">Desde $7.000 <span>COP/usuario/mes</span></div>
+        <div class="precio-desc">Escalonado por volumen. Cotización a la medida.</div>
+        <ul>
+          <li><span class="chk">✓</span> Panel administrativo con reportes agregados</li>
+          <li><span class="chk">✓</span> Marca blanca disponible</li>
+          <li><span class="chk">✓</span> Onboarding asistido para tu equipo</li>
+          <li><span class="chk">✓</span> Soporte dedicado</li>
+        </ul>
+        <a href="#" class="btn btn-fantasma">Hablemos</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="seccion" style="padding-top:0;">
+  <div class="wrap">
+    <div class="cta-final">
+      <h2>Tu salud no debería vivir en 4 apps distintas.</h2>
+      <p>Empieza gratis hoy y deja que VitalTrack conecte lo que comes, tomas, mueves y duermes.</p>
+      <a href="#" class="btn btn-primario">Crear mi cuenta gratis →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap footer-grid">
+    <a href="#" class="logo" style="font-size:16px;"><span class="icono" style="width:28px;height:28px;font-size:14px;">🌱</span> VitalTrack</a>
+    <div class="footer-links">
+      <a href="#pilares">Cómo funciona</a>
+      <a href="#para-quien">Para quién es</a>
+      <a href="#precios">Planes</a>
+      <a href="#">Privacidad</a>
+    </div>
+    <div class="footer-copy">© 2026 VitalTrack · Hecho en Colombia 🇨🇴</div>
+  </div>
+</footer>
+
+</body>
+</html>
