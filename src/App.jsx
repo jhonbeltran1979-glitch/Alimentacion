@@ -202,8 +202,15 @@ Responde SOLO JSON sin backticks:
 {"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","ajuste":"si hay historial, 1 frase explicando qué cambiaste vs la semana pasada y por qué (si no hay historial, deja string vacío)","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","duracion":"X min","intensidad":"baja|media|alta","ejercicios":[{"nombre":"nombre concreto del ejercicio","series":3,"reps":"10-12 o 30s","descanso":"45s"}]}]}`);
 }
 
-async function interpretarVoz(texto){
-  return iaText(`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".
+async function interpretarVoz(texto,ctx){
+  const ctxTxt=ctx?`
+Contexto: hora actual ${ctx.hora}. Comidas ya registradas hoy: ${ctx.registrados&&ctx.registrados.length?ctx.registrados.join(", "):"ninguna"}.${ctx.ultimo?` La última comida registrada fue: ${ctx.ultimo}.`:""}
+REGLAS para asignar "momento" cuando el usuario NO lo menciona explícitamente:
+1) Si acaba de registrar una comida (última: ${ctx.ultimo||"ninguna"}) y ahora dicta uno o pocos alimentos o bebidas sueltos que suenan a complemento de esa comida (un jugo, un postre, "también comí..."), asígnalos a ese MISMO momento, para que se unan a esa comida.
+2) Si no aplica lo anterior, deduce el momento por la hora actual: 05:00-10:59 Desayuno, 11:00-15:59 Almuerzo, 18:00-23:59 Cena.
+3) Usa "Merienda" SOLO si el usuario lo dice explícitamente o si por la hora (16:00-17:59, madrugada) es claramente un snack entre comidas.
+`:"";
+  return iaText(`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".${ctxTxt}
 Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimentos), ejercicio (tipo, minutos, intensidad) y vasos de agua. Alimentos en español colombiano. Si algo no se menciona: comidas=[], ejercicio=null, agua_vasos=null.
 
 IMPORTANTE sobre los alimentos: extrae CADA alimento mencionado en el texto, sin omitir ninguno y sin resumir a "los principales". Trata cada ítem distinto como un alimento separado en la lista, aunque el usuario los mencione rápido, con muletillas, o de forma coloquial (ej. "unos huevos con arepa y jugo" son 3 alimentos: huevo, arepa, jugo). Si el mismo alimento aparece dos veces en el texto, inclúyelo una sola vez.
@@ -1413,7 +1420,9 @@ function PatientApp({onLogout,user,token}){
   const processVoice=async(texto)=>{
     setVoiceBusy(true);
     try{
-      const p=await interpretarVoz(texto);
+      const ahora=new Date();
+      const hoyMeals=history.filter(r=>r.fecha===today).map(r=>r.comida);
+      const p=await interpretarVoz(texto,{hora:`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`,registrados:[...new Set(hoyMeals)],ultimo:hoyMeals[0]||null});
       applyVoz(p);
       let analisis=null;
       const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
