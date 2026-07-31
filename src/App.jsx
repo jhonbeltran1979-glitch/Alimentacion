@@ -219,6 +219,19 @@ Responde SOLO JSON sin backticks:
 {"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida que repita EXACTAMENTE la lista de alimentos que entendiste, para que el usuario pueda notar si algo faltó"}`);
 }
 
+async function corregirVoz(texto,pend){
+  return iaText(`El usuario está confirmando POR VOZ un registro de salud que aún NO se ha guardado. Registro pendiente: ${JSON.stringify({comidas:pend.comidas||[],ejercicio:pend.ejercicio||null,agua_vasos:pend.agua_vasos||null})}.
+El usuario acaba de decir: "${texto}".
+Decide la acción:
+- Si dice que está bien, listo, guarda, correcto, perfecto → accion "guardar".
+- Si dice cancela, olvídalo, borra todo, no guardes → accion "cancelar".
+- Si pide agregar, quitar o cambiar alimentos, ejercicio o agua (ej: "falta la pera", "también comí arroz", "quita el tomate", "no era pollo sino carne", "fueron 3 vasos") → accion "actualizar" y devuelve el registro COMPLETO ya corregido, manteniendo intacto todo lo que no pidió cambiar. Alimentos en español colombiano.
+- Si menciona alimentos nuevos sin decir momento, agrégalos a la comida ya presente en el registro pendiente.
+
+Responde SOLO JSON sin backticks:
+{"accion":"guardar|cancelar|actualizar","comidas":[{"momento":"Desayuno","alimentos":["papaya","banano"]}],"ejercicio":null,"agua_vasos":null,"respuesta":"si actualizaste: confirmación corta repitiendo la lista COMPLETA actualizada; si guardar/cancelar: frase corta de cierre"}`);
+}
+
 async function analisisSemanal(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un coach de salud integral, cálido y realista. ${ctxP}
@@ -646,6 +659,9 @@ function PatientApp({onLogout,user,token}){
   const [voiceText,setVoiceText]=useState("");
   const [voiceBusy,setVoiceBusy]=useState(false);
   const [voiceResult,setVoiceResult]=useState(null);
+  const [voicePending,setVoicePendingState]=useState(null);
+  const voicePendingRef=useRef(null);
+  const setVoicePending=(v)=>{voicePendingRef.current=v;setVoicePendingState(v);};
   const [weeklyAI,setWeeklyAI]=useState(null);
   const [weeklyBusy,setWeeklyBusy]=useState(false);
   const recRef=useRef(null);
@@ -809,7 +825,8 @@ function PatientApp({onLogout,user,token}){
       try{
         const r=await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&select=*&order=created_at.desc&limit=300`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const rows=await r.json();
-        const mapped=Array.isArray(rows)?rows.map(row=>({fecha:esCOfromISO(row.fecha),comida:row.momento,alimentos:row.alimentos,score_total:row.score_total,score_inmunidad:row.score_inmunidad,score_energia:row.score_energia,score_concentracion:row.score_concentracion,score_vitalidad:row.score_vitalidad,notas:row.recomendacion})):[];
+        const _seen=new Set();
+        const mapped=Array.isArray(rows)?rows.filter(row=>{const k=`${row.fecha}|${row.momento}`;if(_seen.has(k))return false;_seen.add(k);return true;}).map(row=>({fecha:esCOfromISO(row.fecha),comida:row.momento,alimentos:row.alimentos,score_total:row.score_total,score_inmunidad:row.score_inmunidad,score_energia:row.score_energia,score_concentracion:row.score_concentracion,score_vitalidad:row.score_vitalidad,notas:row.recomendacion})):[];
         setHistory(mapped);
       }catch(_){}
       setLoadingHist(false);
@@ -1408,44 +1425,85 @@ function PatientApp({onLogout,user,token}){
       });
     }
   };
-  const hablar=(texto)=>{
+  const hablar=(texto,onEnd)=>{
     try{
-      if(!("speechSynthesis" in window)||!texto)return;
+      if(!("speechSynthesis" in window)||!texto){if(onEnd)setTimeout(onEnd,300);return;}
       window.speechSynthesis.cancel();
       const u=new SpeechSynthesisUtterance(texto);
       u.lang="es-CO";u.rate=1;u.pitch=1;
+      if(onEnd){let done=false;const fin=()=>{if(done)return;done=true;setTimeout(onEnd,300);};u.onend=fin;u.onerror=fin;setTimeout(fin,Math.min(20000,2500+texto.length*90));}
       window.speechSynthesis.speak(u);
-    }catch(_){}
+    }catch(_){if(onEnd)setTimeout(onEnd,300);}
   };
+  const VOICE_OK=/(^|\s)(listo|lista|guardar|guarda|gu[aá]rdalo|as[ií] est[aá] bien|est[aá] bien|correcto|perfecto|s[ií],? guarda)(\s|$|\.)/i;
+  const VOICE_NO=/(^|\s)(cancela|cancelar|canc[eé]lalo|olv[ií]dalo|no guardes|borra todo|desc[aá]rtalo|descartar)(\s|$|\.)/i;
+  const guardarPendiente=async(p)=>{
+    if(!p)return;
+    setVoiceBusy(true);
+    applyVoz(p);
+    let analisis=p.analisis||null;
+    const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
+    if(!analisis&&foods.length){try{analisis=await analizarTexto(foods,hpConDieta);}catch(_){}}
+    setVoicePending(null);
+    setVoiceResult({respuesta:"¡Guardado! ✅",analisis});
+    hablar("¡Listo, guardado!");
+    setVoiceBusy(false);
+  };
+  const descartarPendiente=()=>{setVoicePending(null);setVoiceResult({respuesta:"Descartado, no guardé nada."});hablar("Listo, no guardé nada.");};
   const processVoice=async(texto)=>{
     setVoiceBusy(true);
     try{
-      const ahora=new Date();
-      const hoyMeals=history.filter(r=>r.fecha===today).map(r=>r.comida);
-      const p=await interpretarVoz(texto,{hora:`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`,registrados:[...new Set(hoyMeals)],ultimo:hoyMeals[0]||null});
-      applyVoz(p);
-      let analisis=null;
-      const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
-      if(foods.length){try{analisis=await analizarTexto(foods,hpConDieta);}catch(_){}}
-      setVoiceResult({...p,analisis});
-      hablar((p.respuesta||"")+" ¿Quedó bien? Si falta algo, toca el micrófono y dime qué le agrego.");
+      const pend=voicePendingRef.current;
+      if(pend){
+        if(VOICE_NO.test(texto)){descartarPendiente();}
+        else if(VOICE_OK.test(texto)){await guardarPendiente(pend);}
+        else{
+          const c=await corregirVoz(texto,pend);
+          if(c.accion==="cancelar")descartarPendiente();
+          else if(c.accion==="guardar")await guardarPendiente(pend);
+          else{
+            const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null};
+            setVoicePending(upd);
+            hablar((c.respuesta||"Actualizado.")+" ¿Guardo así? Di listo, o sigue corrigiendo.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
+          }
+        }
+      }
+      else{
+        const ahora=new Date();
+        const hoyMeals=history.filter(r=>r.fecha===today).map(r=>r.comida);
+        const p=await interpretarVoz(texto,{hora:`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`,registrados:[...new Set(hoyMeals)],ultimo:hoyMeals[0]||null});
+        const tieneAlgo=(Array.isArray(p.comidas)&&p.comidas.length)||(p.ejercicio&&p.ejercicio.minutos)||p.agua_vasos;
+        if(!tieneAlgo){
+          setVoiceResult({respuesta:p.respuesta||"No entendí nada para registrar, intenta de nuevo."});
+          hablar(p.respuesta||"No entendí nada para registrar, intenta de nuevo.");
+        }
+        else{
+          setVoicePending({...p,analisis:null});
+          hablar((p.respuesta||"")+" ¿Falta algo? Dime qué agrego o quito, o di listo para guardar.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
+        }
+      }
     }
     catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});hablar("No pude procesarlo, intenta de nuevo.");}
     setVoiceBusy(false);
   };
-  const startVoice=()=>{
+  const startVoice=(auto)=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
     let acc="";
     recRef.userStop=false;
-    setVoiceText("");setVoiceResult(null);setListening(true);
+    setVoiceText("");if(!auto)setVoiceResult(null);setListening(true);
     const run=()=>{
       const r=new SR();r.lang="es-CO";r.interimResults=true;r.continuous=false;r._fin="";
       recRef.current=r;
       r.onresult=(e)=>{let fin="",inter="";for(let i=0;i<e.results.length;i++){const seg=e.results[i];if(seg.isFinal)fin+=seg[0].transcript+" ";else inter=seg[0].transcript;}r._fin=fin.trim();setVoiceText((acc+" "+(fin?fin:inter)).trim());};
       r.onerror=(ev)=>{if(ev.error==="not-allowed"||ev.error==="service-not-allowed"){recRef.userStop=true;setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});}};
-      r.onend=()=>{if(r._fin)acc=(acc+" "+r._fin).trim();if(recRef.userStop){setListening(false);if(acc.trim())processVoice(acc.trim());else setVoiceResult(null);}else{try{run();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}};
-      try{r.start();}catch(_){}
+      r.onend=()=>{
+        if(r._fin)acc=(acc+" "+r._fin).trim();
+        if(auto){setListening(false);if(acc.trim())processVoice(acc.trim());return;}
+        if(recRef.userStop){setListening(false);if(acc.trim())processVoice(acc.trim());else if(!voicePendingRef.current)setVoiceResult(null);}
+        else{try{run();}catch(_){setListening(false);if(acc.trim())processVoice(acc.trim());}}
+      };
+      try{r.start();}catch(_){if(auto)setListening(false);}
     };
     run();
   };
@@ -1826,9 +1884,23 @@ function PatientApp({onLogout,user,token}){
               )}
             </button>
             <div style={{fontSize:14,fontWeight:800,color:"#4A3B9E",marginTop:12}}>{listening?"Escuchando… habla tranquilo":"Graba lo que comiste"}</div>
-            <div style={{fontSize:11,color:"#8A82B8",marginTop:3}}>{listening?"Toca ⏹️ para guardar y analizar":"Ej: \"desayuné huevos con arepa y jugo de naranja\""}</div>
+            <div style={{fontSize:11,color:"#8A82B8",marginTop:3}}>{listening?"Cuando termines, toca ⏹️ y te confirmo lo que entendí":"Ej: \"desayuné huevos con arepa y jugo de naranja\""}</div>
             {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:12,fontStyle:"italic",lineHeight:1.4,background:"#fff",borderRadius:12,padding:"10px 12px"}}>"{voiceText}"</div>}
-            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:10}}>🤔 Guardando y analizando…</div>}
+            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:10}}>🤔 Procesando…</div>}
+            {voicePending&&!voiceBusy&&(
+              <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:"#fff",border:"1.5px dashed #6D5BD0",textAlign:"left"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#4A3B9E",marginBottom:6}}>📝 Por guardar — di qué agrego o quito, o di "listo"</div>
+                {(voicePending.comidas||[]).map((c,i)=>(
+                  <div key={i} style={{fontSize:12,color:"#333",marginBottom:3}}><b style={{color:"#6D5BD0"}}>{c.momento}:</b> {(c.alimentos||[]).join(", ")}</div>
+                ))}
+                {voicePending.ejercicio&&voicePending.ejercicio.minutos?<div style={{fontSize:12,color:"#333",marginBottom:3}}>🏃 {voicePending.ejercicio.tipo||"Ejercicio"} · {voicePending.ejercicio.minutos} min</div>:null}
+                {voicePending.agua_vasos?<div style={{fontSize:12,color:"#333",marginBottom:3}}>💧 {voicePending.agua_vasos} vasos de agua</div>:null}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button onClick={()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}guardarPendiente(voicePendingRef.current);}} style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",background:"#2E9E5B",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer"}}>✓ Guardar</button>
+                  <button onClick={()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}descartarPendiente();}} style={{padding:"9px 14px",borderRadius:9,border:"1.5px solid #E76F51",background:"#fff",color:"#E76F51",fontWeight:800,fontSize:12,cursor:"pointer"}}>Descartar</button>
+                </div>
+              </div>
+            )}
             {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#6D5BD0",fontWeight:700,marginTop:10,background:"#fff",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
             {voiceResult&&voiceResult.analisis&&(
               <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#fff",textAlign:"left",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2E9E5B":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
@@ -2583,12 +2655,26 @@ function PatientApp({onLogout,user,token}){
         </div>
       )}
       {!(tab===0&&step===1)&&(<div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
-        {(listening||voiceBusy||voiceResult)&&(
+        {(listening||voiceBusy||voiceResult||voicePending)&&(
           <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#EFEDFC"}`,pointerEvents:"auto"}}>
             {listening&&<div style={{display:"flex",alignItems:"center",gap:8,fontSize:13,color:"#C1121F",fontWeight:800}}><span style={{width:10,height:10,borderRadius:"50%",background:"#C1121F",animation:"vtpulse 1.3s infinite"}}/>Escuchando… habla tranquilo</div>}
-            {listening&&<div style={{fontSize:11,color:"#888",marginTop:4}}>Cuando termines, toca ⏹️ para guardar y analizar.</div>}
+            {listening&&<div style={{fontSize:11,color:"#888",marginTop:4}}>Cuando termines, toca ⏹️ y te confirmo lo que entendí.</div>}
             {voiceText&&<div style={{fontSize:13,color:"#333",marginTop:8,fontStyle:"italic",lineHeight:1.4}}>"{voiceText}"</div>}
-            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:8}}>🤔 Guardando y analizando…</div>}
+            {voiceBusy&&<div style={{fontSize:12,color:"#888",marginTop:8}}>🤔 Procesando…</div>}
+            {voicePending&&!voiceBusy&&(
+              <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8F7FE",border:"1.5px dashed #6D5BD0"}}>
+                <div style={{fontSize:11,fontWeight:800,color:"#4A3B9E",marginBottom:6}}>📝 Por guardar — di qué agrego o quito, o di "listo"</div>
+                {(voicePending.comidas||[]).map((c,i)=>(
+                  <div key={i} style={{fontSize:12,color:"#333",marginBottom:3}}><b style={{color:"#6D5BD0"}}>{c.momento}:</b> {(c.alimentos||[]).join(", ")}</div>
+                ))}
+                {voicePending.ejercicio&&voicePending.ejercicio.minutos?<div style={{fontSize:12,color:"#333",marginBottom:3}}>🏃 {voicePending.ejercicio.tipo||"Ejercicio"} · {voicePending.ejercicio.minutos} min</div>:null}
+                {voicePending.agua_vasos?<div style={{fontSize:12,color:"#333",marginBottom:3}}>💧 {voicePending.agua_vasos} vasos de agua</div>:null}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button onClick={()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}guardarPendiente(voicePendingRef.current);}} style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",background:"#2E9E5B",color:"#fff",fontWeight:800,fontSize:12,cursor:"pointer"}}>✓ Guardar</button>
+                  <button onClick={()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}descartarPendiente();}} style={{padding:"9px 14px",borderRadius:9,border:"1.5px solid #E76F51",background:"#fff",color:"#E76F51",fontWeight:800,fontSize:12,cursor:"pointer"}}>Descartar</button>
+                </div>
+              </div>
+            )}
             {voiceResult&&voiceResult.respuesta&&<div style={{fontSize:13,color:"#6D5BD0",fontWeight:700,marginTop:8,background:"#EFEDFC",padding:"10px 12px",borderRadius:10}}>✓ {voiceResult.respuesta}</div>}
             {voiceResult&&voiceResult.analisis&&(
               <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8F7FE",borderLeft:`4px solid ${voiceResult.analisis.semaforo==="verde"?"#2E9E5B":voiceResult.analisis.semaforo==="rojo"?"#E76F51":"#E9C46A"}`}}>
