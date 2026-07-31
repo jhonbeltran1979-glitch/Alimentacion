@@ -1550,6 +1550,7 @@ function PatientApp({onLogout,user,token}){
       const pend=voicePendingRef.current;
       if(pend){
         const c=await corregirVozAudio(b64,mime,pend);
+        voiceFailsRef.current=0;
         if(c.transcripcion)setVoiceText(c.transcripcion);
         const t=c.transcripcion||"";
         if(c.accion==="cancelar"||VOICE_NO.test(t)){descartarPendiente();}
@@ -1565,6 +1566,7 @@ function PatientApp({onLogout,user,token}){
         const ahora=new Date();
         const hoyMeals=history.filter(r=>r.fecha===today).map(r=>r.comida);
         const p=await interpretarVozAudio(b64,mime,{hora:`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`,registrados:[...new Set(hoyMeals)],ultimo:hoyMeals[0]||null});
+        voiceFailsRef.current=0;
         if(p.transcripcion)setVoiceText(p.transcripcion);
         const tieneAlgo=(Array.isArray(p.comidas)&&p.comidas.length)||(p.ejercicio&&p.ejercicio.minutos)||p.agua_vasos;
         if(!tieneAlgo){
@@ -1577,7 +1579,14 @@ function PatientApp({onLogout,user,token}){
         }
       }
     }
-    catch(e){setVoiceResult({respuesta:"No pude procesar el audio, intenta de nuevo."});hablar("No pude procesar el audio, intenta de nuevo.");}
+    catch(e){
+      voiceFailsRef.current++;
+      if(voicePendingRef.current){
+        if(voiceFailsRef.current<=2){hablar("No te escuché bien, ¿me repites?",()=>{if(voicePendingRef.current)startVoice(true);});}
+        else{setVoiceResult({respuesta:"No logro procesar el audio — usa los botones ✓ Guardar o Descartar."});hablar("No logro procesar el audio. Usa los botones para guardar o descartar.");}
+      }
+      else{setVoiceResult({respuesta:"No pude procesar el audio, intenta de nuevo."});hablar("No pude procesar el audio, intenta de nuevo.");}
+    }
     setVoiceBusy(false);
   };
   const processVoice=async(texto)=>{
@@ -1617,13 +1626,15 @@ function PatientApp({onLogout,user,token}){
     setVoiceBusy(false);
   };
   const mediaRef=useRef(null);
+  const audioCtxRef=useRef(null);
+  const voiceFailsRef=useRef(0);
   const canRecord=()=>!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&(window.AudioContext||window.webkitAudioContext));
   const startVoice=async(auto)=>{
     if(canRecord()){
       try{
         const stream=await navigator.mediaDevices.getUserMedia({audio:true});
         const AC=window.AudioContext||window.webkitAudioContext;
-        const ctx=new AC();
+        const ctx=audioCtxRef.current&&audioCtxRef.current.state!=="closed"?audioCtxRef.current:(audioCtxRef.current=new AC());
         try{await ctx.resume();}catch(_){}
         const srcNode=ctx.createMediaStreamSource(stream);
         const proc=ctx.createScriptProcessor(4096,1,1);
@@ -1670,7 +1681,6 @@ function PatientApp({onLogout,user,token}){
       try{m.proc.disconnect();}catch(_){}
       try{m.srcNode.disconnect();}catch(_){}
       try{m.stream.getTracks().forEach(t=>t.stop());}catch(_){}
-      try{m.ctx.close();}catch(_){}
       setListening(false);
       const total=m.chunks.reduce((a,c)=>a+c.length,0);
       if(total<m.sampleRate*0.4){if(!voicePendingRef.current)setVoiceResult(null);return;}
