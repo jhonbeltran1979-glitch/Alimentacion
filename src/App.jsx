@@ -115,9 +115,16 @@ async function iaText(prompt){
   return d.result;
 }
 
+let GUIA_OMS="";
+const guiaOMSCtx=()=>GUIA_OMS?`
+GUÍA OMS VIGENTE (resumen actualizado desde la web — si alguna cifra difiere de tu conocimiento previo, usa ESTAS cifras):
+${GUIA_OMS}
+`:"";
+
 async function analizarTexto(alimentos,hp){
   const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres nutricionista experto en gastronomía colombiana, basas tus recomendaciones en las guías de alimentación saludable de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, limitar sal a <5g/día, priorizar proteínas magras). ${ctx}
+${guiaOMSCtx()}
 Alimentos registrados: ${alimentos.join(", ")}.
 
 Da un consejo concreto y accionable citando cifras u orientaciones de la OMS cuando aplique (no solo "come más variado", di cuánto o qué tipo). Si la condición reportada del perfil es un valor de laboratorio (ej. "hemoglobina alta", "colesterol alto"), NO des instrucciones dietéticas específicas basadas en asumir la causa — esos valores pueden tener explicaciones normales (ej. en Bogotá y otras ciudades de altura, la hemoglobina alta suele ser una adaptación fisiológica normal, no una enfermedad). En esos casos da recomendaciones nutricionales generales y sugiere que consulte a su médico o nutricionista para interpretar ese valor correctamente, sin asumir tú la causa.
@@ -185,6 +192,7 @@ async function planSemana(prefs,hp,contexto,historial){
   const DIF=["muy fácil","fácil","moderado","duro","intenso"];
   const difTxt=DIF[Math.max(0,Math.min(4,(prefs.dificultad||3)-1))];
   return iaText(`Eres un entrenador personal certificado y prudente, como un coach de IA que ajusta el plan según el desempeño real del usuario. ${ctxP}
+${guiaOMSCtx()}
 Objetivo principal: ${prefs.objetivo||prefs.goal}. Resultados que busca conseguir: ${(prefs.resultados&&prefs.resultados.length)?prefs.resultados.join(", "):"bienestar general"}. Nivel de dificultad deseado: ${difTxt}. Equipo disponible: ${prefs.equip}. Días que quiere entrenar por semana: ${prefs.dias}. Minutos por sesión: ${prefs.min}.
 ${contexto||""}
 ${historial?`HISTORIAL DE LA SEMANA ANTERIOR (usa esto para reajustar la dificultad): ${historial}`:""}
@@ -215,6 +223,8 @@ Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimen
 
 IMPORTANTE sobre los alimentos: extrae CADA alimento mencionado en el texto, sin omitir ninguno y sin resumir a "los principales". Trata cada ítem distinto como un alimento separado en la lista, aunque el usuario los mencione rápido, con muletillas, o de forma coloquial (ej. "unos huevos con arepa y jugo" son 3 alimentos: huevo, arepa, jugo). Si el mismo alimento aparece dos veces en el texto, inclúyelo una sola vez.
 
+OJO: el texto viene de un reconocedor de voz y puede traer alimentos mal transcritos, cortados o sin tilde. Corrige cada alimento al nombre REAL más cercano de un alimento en español colombiano (ej: "sag" o "sagu" → "sagú", "guanabana" → "guanábana", "aguacat" → "aguacate", "arepa de choclo" mal oído como "arepa de chocolo" → "arepa de chócolo"). Solo corrige cuando la palabra suene claramente a un alimento real; nunca inventes alimentos que no se parezcan a lo dictado.
+
 Responde SOLO JSON sin backticks:
 {"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida que repita EXACTAMENTE la lista de alimentos que entendiste, para que el usuario pueda notar si algo faltó"}`);
 }
@@ -227,6 +237,7 @@ Decide la acción:
 - Si dice cancela, olvídalo, borra todo, no guardes → accion "cancelar".
 - Si pide agregar, quitar o cambiar alimentos, ejercicio o agua (ej: "falta la pera", "también comí arroz", "quita el tomate", "no era pollo sino carne", "fueron 3 vasos") → accion "actualizar" y devuelve el registro COMPLETO ya corregido, manteniendo intacto todo lo que no pidió cambiar. Alimentos en español colombiano.
 - Si menciona alimentos nuevos sin decir momento, agrégalos a la comida ya presente en el registro pendiente.
+- El texto viene de un reconocedor de voz: corrige alimentos mal transcritos o cortados al nombre real más cercano en español colombiano (ej: "sag"/"sagu" → "sagú", "guanabana" → "guanábana"). Si el usuario dice que un alimento quedó mal escrito (ej: "no es sag, es sagú"), reemplázalo por el nombre correcto.
 
 Responde SOLO JSON sin backticks:
 {"accion":"guardar|cancelar|actualizar","comidas":[{"momento":"Desayuno","alimentos":["papaya","banano"]}],"ejercicio":null,"agua_vasos":null,"respuesta":"si actualizaste: confirmación corta repitiendo la lista COMPLETA actualizada; si guardar/cancelar: frase corta de cierre"}`);
@@ -235,6 +246,7 @@ Responde SOLO JSON sin backticks:
 async function analisisSemanal(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un coach de salud integral, cálido y realista. ${ctxP}
+${guiaOMSCtx()}
 Datos de la última semana del usuario (todo lo que registró):
 - Alimentación: ${datos.comida}
 - Sueño: ${datos.sueno}
@@ -250,6 +262,7 @@ Responde SOLO JSON sin backticks:
 async function analisisDia(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido, cercano y directo. ${ctxP}
+${guiaOMSCtx()}
 Esto es lo que el usuario registró el ${datos.dia}:
 - Comidas: ${datos.comida}
 - Hidratación: ${datos.agua}
@@ -265,6 +278,7 @@ Responde SOLO JSON sin backticks:
 async function analisisMes(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres un nutricionista y coach de salud cálido y directo, hablando con el usuario al iniciar un nuevo mes. ${ctxP}
+${guiaOMSCtx()}
 Esto es lo que el usuario registró durante ${datos.mes}:
 - Nutrición: ${datos.nutricion}
 - Hidratación: ${datos.hidratacion}
@@ -779,6 +793,11 @@ function PatientApp({onLogout,user,token}){
         const rP=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${user.id}&select=tipo_dieta,alergias,alimentos_no_gustan`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const pRows=await rP.json();
         if(Array.isArray(pRows)&&pRows.length)setPrefsIA(pRows[0]);
+      }catch(_){}
+      try{
+        const rG=await fetch(`${SB_URL}/rest/v1/ai_guidelines?id=eq.oms&select=contenido`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const gRows=await rG.json();
+        if(Array.isArray(gRows)&&gRows.length&&gRows[0].contenido)GUIA_OMS=gRows[0].contenido;
       }catch(_){}
     })();
   },[user,token]);
