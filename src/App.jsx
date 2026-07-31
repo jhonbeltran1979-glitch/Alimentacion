@@ -115,6 +115,19 @@ async function iaText(prompt){
   return d.result;
 }
 
+async function iaAudio(prompt,audioB64,mime){
+  const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/ai-audio",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt,audio:audioB64,mime})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error);
+  return d.result;
+}
+
+const blobToB64=(blob)=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=()=>rej(new Error("read failed"));r.readAsDataURL(blob);});
+
 let GUIA_OMS="";
 const guiaOMSCtx=()=>GUIA_OMS?`
 GUÍA OMS VIGENTE (resumen actualizado desde la web — si alguna cifra difiere de tu conocimiento previo, usa ESTAS cifras):
@@ -210,7 +223,7 @@ Responde SOLO JSON sin backticks:
 {"meta_semanal":"meta clara de la semana en 1 frase","consejo":"un consejo clave para cumplir el plan","ajuste":"si hay historial, 1 frase explicando qué cambiaste vs la semana pasada y por qué (si no hay historial, deja string vacío)","dias":[{"dia":"Lunes","foco":"ej: Fuerza tren superior, Cardio, Movilidad o Descanso","duracion":"X min","intensidad":"baja|media|alta","ejercicios":[{"nombre":"nombre concreto del ejercicio","series":3,"reps":"10-12 o 30s","descanso":"45s"}]}]}`);
 }
 
-async function interpretarVoz(texto,ctx){
+function promptVoz(fuente,ctx){
   const ctxTxt=ctx?`
 Contexto: hora actual ${ctx.hora}. Comidas ya registradas hoy: ${ctx.registrados&&ctx.registrados.length?ctx.registrados.join(", "):"ninguna"}.${ctx.ultimo?` La última comida registrada fue: ${ctx.ultimo}.`:""}
 REGLAS para asignar "momento" cuando el usuario NO lo menciona explícitamente:
@@ -218,30 +231,39 @@ REGLAS para asignar "momento" cuando el usuario NO lo menciona explícitamente:
 2) Si no aplica lo anterior, deduce el momento por la hora actual: 05:00-10:59 Desayuno, 11:00-15:59 Almuerzo, 18:00-23:59 Cena.
 3) Usa "Merienda" SOLO si el usuario lo dice explícitamente o si por la hora (16:00-17:59, madrugada) es claramente un snack entre comidas.
 `:"";
-  return iaText(`El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. Texto dictado: "${texto}".${ctxTxt}
+  return `El usuario dictó por voz lo que hizo hoy. Extrae lo registrable. ${fuente}${ctxTxt}
 Identifica: comidas (con su momento Desayuno/Almuerzo/Cena/Merienda y los alimentos), ejercicio (tipo, minutos, intensidad) y vasos de agua. Alimentos en español colombiano. Si algo no se menciona: comidas=[], ejercicio=null, agua_vasos=null.
 
 IMPORTANTE sobre los alimentos: extrae CADA alimento mencionado en el texto, sin omitir ninguno y sin resumir a "los principales". Trata cada ítem distinto como un alimento separado en la lista, aunque el usuario los mencione rápido, con muletillas, o de forma coloquial (ej. "unos huevos con arepa y jugo" son 3 alimentos: huevo, arepa, jugo). Si el mismo alimento aparece dos veces en el texto, inclúyelo una sola vez.
 
-OJO: el texto viene de un reconocedor de voz y puede traer alimentos mal transcritos, cortados o sin tilde. Corrige cada alimento al nombre REAL más cercano de un alimento en español colombiano (ej: "sag" o "sagu" → "sagú", "guanabana" → "guanábana", "aguacat" → "aguacate", "arepa de choclo" mal oído como "arepa de chocolo" → "arepa de chócolo"). Solo corrige cuando la palabra suene claramente a un alimento real; nunca inventes alimentos que no se parezcan a lo dictado.
+OJO: el texto viene de un reconocedor de voz y puede traer alimentos mal transcritos, cortados o sin tilde. Corrige cada alimento al nombre REAL más cercano de un alimento en español colombiano (ej: "sag" o "sagu" → "sagú", "guanabana" → "guanábana", "aguacat" → "aguacate"). Además, el reconocedor a veces transcribe un alimento como OTRO alimento real que suena parecido: si el resultado es un alimento inusual o incoherente con el contexto de una comida casera colombiana pero existe uno mucho más común y frecuente en Colombia que suena casi igual, usa el común. Ejemplo típico: "almeja" o "almeja verde" en un almuerzo casero es casi siempre "alverja" (arveja); "sopa de mariscos" en cambio sí haría plausible "almeja". Solo corrige cuando la palabra suene claramente parecida; nunca inventes alimentos que no se parezcan a lo dictado.
+
+Además, REVISA la transcripción: si corregiste algún alimento respecto a lo que decía literalmente el texto dictado (por corte, tilde o confusión fonética), repórtalo en "correcciones" y menciónalo brevemente en "respuesta" para que el usuario confirme (ej: "...anoté alverja, que creo que era lo que dijiste donde entendí almeja"). Si no corregiste nada, "correcciones" es [].
 
 Responde SOLO JSON sin backticks:
-{"comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"respuesta":"confirmación corta y cálida que repita EXACTAMENTE la lista de alimentos que entendiste, para que el usuario pueda notar si algo faltó"}`);
+{"transcripcion":"lo que dictó el usuario tal cual (si vino en audio, tu transcripción fiel)","comidas":[{"momento":"Desayuno","alimentos":["arepa","huevo"]}],"ejercicio":{"tipo":"Caminar","minutos":30,"intensidad":"media"},"agua_vasos":null,"correcciones":[{"escuchado":"almeja verde","interpretado":"alverja verde"}],"respuesta":"confirmación corta y cálida que repita EXACTAMENTE la lista de alimentos que entendiste (mencionando las correcciones si las hubo), para que el usuario pueda notar si algo faltó"}`;
 }
 
-async function corregirVoz(texto,pend){
-  return iaText(`El usuario está confirmando POR VOZ un registro de salud que aún NO se ha guardado. Registro pendiente: ${JSON.stringify({comidas:pend.comidas||[],ejercicio:pend.ejercicio||null,agua_vasos:pend.agua_vasos||null})}.
-El usuario acaba de decir: "${texto}".
+async function interpretarVoz(texto,ctx){return iaText(promptVoz(`Texto dictado: "${texto}".`,ctx));}
+async function interpretarVozAudio(audioB64,mime,ctx){return iaAudio(promptVoz(`El dictado del usuario viene en el AUDIO adjunto (español con acento colombiano). Escúchalo con atención, transcríbelo fielmente e inclúyelo en el campo "transcripcion"; usa esa transcripción como el texto dictado.`,ctx),audioB64,mime);}
+
+function promptCorregir(fuente,pend){
+  return `El usuario está confirmando POR VOZ un registro de salud que aún NO se ha guardado. Registro pendiente: ${JSON.stringify({comidas:pend.comidas||[],ejercicio:pend.ejercicio||null,agua_vasos:pend.agua_vasos||null})}.
+${fuente}
 Decide la acción:
 - Si dice que está bien, listo, guarda, correcto, perfecto → accion "guardar".
 - Si dice cancela, olvídalo, borra todo, no guardes → accion "cancelar".
 - Si pide agregar, quitar o cambiar alimentos, ejercicio o agua (ej: "falta la pera", "también comí arroz", "quita el tomate", "no era pollo sino carne", "fueron 3 vasos") → accion "actualizar" y devuelve el registro COMPLETO ya corregido, manteniendo intacto todo lo que no pidió cambiar. Alimentos en español colombiano.
 - Si menciona alimentos nuevos sin decir momento, agrégalos a la comida ya presente en el registro pendiente.
-- El texto viene de un reconocedor de voz: corrige alimentos mal transcritos o cortados al nombre real más cercano en español colombiano (ej: "sag"/"sagu" → "sagú", "guanabana" → "guanábana"). Si el usuario dice que un alimento quedó mal escrito (ej: "no es sag, es sagú"), reemplázalo por el nombre correcto.
+- Si el audio no contiene voz clara, está en silencio o no se entiende → accion "nada" (no cambies el registro) y en respuesta pide amablemente que repita.
+- El texto viene de un reconocedor de voz: corrige alimentos mal transcritos o cortados al nombre real más cercano en español colombiano (ej: "sag"/"sagu" → "sagú", "guanabana" → "guanábana"), y ten en cuenta que a veces transcribe un alimento como otro que suena parecido (ej: "almeja" en comida casera es casi siempre "alverja"/arveja). Si el usuario dice que un alimento quedó mal escrito (ej: "no es almeja, es alverja"), reemplázalo por el correcto — incluso si lo que el reconocedor te entrega de esa corrección vuelve a sonar al alimento equivocado, entiende la intención por contexto.
 
 Responde SOLO JSON sin backticks:
-{"accion":"guardar|cancelar|actualizar","comidas":[{"momento":"Desayuno","alimentos":["papaya","banano"]}],"ejercicio":null,"agua_vasos":null,"respuesta":"si actualizaste: confirmación corta repitiendo la lista COMPLETA actualizada; si guardar/cancelar: frase corta de cierre"}`);
+{"accion":"guardar|cancelar|actualizar|nada","transcripcion":"lo que dijo el usuario tal cual (si vino en audio, tu transcripción fiel)","comidas":[{"momento":"Desayuno","alimentos":["papaya","banano"]}],"ejercicio":null,"agua_vasos":null,"respuesta":"si actualizaste: confirmación corta repitiendo la lista COMPLETA actualizada; si guardar/cancelar: frase corta de cierre; si nada: pide amablemente que repita"}`;
 }
+
+async function corregirVoz(texto,pend){return iaText(promptCorregir(`El usuario acaba de decir: "${texto}".`,pend));}
+async function corregirVozAudio(audioB64,mime,pend){return iaAudio(promptCorregir(`La respuesta del usuario viene en el AUDIO adjunto (español con acento colombiano). Escúchala, transcríbela fielmente en "transcripcion" y decide la acción a partir de ella.`,pend),audioB64,mime);}
 
 async function analisisSemanal(datos,hp){
   const ctxP=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
@@ -1496,6 +1518,42 @@ function PatientApp({onLogout,user,token}){
     setVoiceBusy(false);
   };
   const descartarPendiente=()=>{setVoicePending(null);setVoiceResult({respuesta:"Descartado, no guardé nada."});hablar("Listo, no guardé nada.");};
+  const processVoiceAudio=async(b64,mime)=>{
+    setVoiceBusy(true);
+    try{
+      const pend=voicePendingRef.current;
+      if(pend){
+        const c=await corregirVozAudio(b64,mime,pend);
+        if(c.transcripcion)setVoiceText(c.transcripcion);
+        const t=c.transcripcion||"";
+        if(c.accion==="cancelar"||VOICE_NO.test(t)){descartarPendiente();}
+        else if(c.accion==="guardar"||VOICE_OK.test(t)){await guardarPendiente(pend);}
+        else if(c.accion==="nada"){hablar(c.respuesta||"No te escuché bien, ¿me repites?",()=>{if(voicePendingRef.current)startVoice(true);});}
+        else{
+          const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null,correcciones:[]};
+          setVoicePending(upd);
+          hablar((c.respuesta||"Actualizado.")+" ¿Guardo así? Di listo, o sigue corrigiendo.",()=>{if(voicePendingRef.current)startVoice(true);});
+        }
+      }
+      else{
+        const ahora=new Date();
+        const hoyMeals=history.filter(r=>r.fecha===today).map(r=>r.comida);
+        const p=await interpretarVozAudio(b64,mime,{hora:`${String(ahora.getHours()).padStart(2,"0")}:${String(ahora.getMinutes()).padStart(2,"0")}`,registrados:[...new Set(hoyMeals)],ultimo:hoyMeals[0]||null});
+        if(p.transcripcion)setVoiceText(p.transcripcion);
+        const tieneAlgo=(Array.isArray(p.comidas)&&p.comidas.length)||(p.ejercicio&&p.ejercicio.minutos)||p.agua_vasos;
+        if(!tieneAlgo){
+          setVoiceResult({respuesta:p.respuesta||"No entendí nada para registrar, intenta de nuevo."});
+          hablar(p.respuesta||"No entendí nada para registrar, intenta de nuevo.");
+        }
+        else{
+          setVoicePending({...p,analisis:null,textoDictado:p.transcripcion||""});
+          hablar((p.respuesta||"")+" ¿Falta algo? Dime qué agrego o quito, o di listo para guardar.",()=>{if(voicePendingRef.current)startVoice(true);});
+        }
+      }
+    }
+    catch(e){setVoiceResult({respuesta:"No pude procesar el audio, intenta de nuevo."});hablar("No pude procesar el audio, intenta de nuevo.");}
+    setVoiceBusy(false);
+  };
   const processVoice=async(texto)=>{
     setVoiceBusy(true);
     try{
@@ -1508,7 +1566,7 @@ function PatientApp({onLogout,user,token}){
           if(c.accion==="cancelar")descartarPendiente();
           else if(c.accion==="guardar")await guardarPendiente(pend);
           else{
-            const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null};
+            const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null,correcciones:[]};
             setVoicePending(upd);
             hablar((c.respuesta||"Actualizado.")+" ¿Guardo así? Di listo, o sigue corrigiendo.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
           }
@@ -1524,7 +1582,7 @@ function PatientApp({onLogout,user,token}){
           hablar(p.respuesta||"No entendí nada para registrar, intenta de nuevo.");
         }
         else{
-          setVoicePending({...p,analisis:null});
+          setVoicePending({...p,analisis:null,textoDictado:texto});
           hablar((p.respuesta||"")+" ¿Falta algo? Dime qué agrego o quito, o di listo para guardar.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
         }
       }
@@ -1532,7 +1590,38 @@ function PatientApp({onLogout,user,token}){
     catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});hablar("No pude procesarlo, intenta de nuevo.");}
     setVoiceBusy(false);
   };
-  const startVoice=(auto)=>{
+  const mediaRef=useRef({rec:null,chunks:[],stream:null,timer:null,mime:""});
+  const canRecord=()=>!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+  const startVoice=async(auto)=>{
+    if(canRecord()){
+      try{
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        const mime=(window.MediaRecorder.isTypeSupported&&window.MediaRecorder.isTypeSupported("audio/webm"))?"audio/webm":((window.MediaRecorder.isTypeSupported&&window.MediaRecorder.isTypeSupported("audio/mp4"))?"audio/mp4":"");
+        const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+        mediaRef.current={rec,chunks:[],stream,timer:null,mime:rec.mimeType||mime||"audio/webm"};
+        rec.ondataavailable=(e)=>{if(e.data&&e.data.size)mediaRef.current.chunks.push(e.data);};
+        rec.onstop=async()=>{
+          try{stream.getTracks().forEach(t=>t.stop());}catch(_){}
+          if(mediaRef.current.timer){clearTimeout(mediaRef.current.timer);mediaRef.current.timer=null;}
+          setListening(false);
+          const blob=new Blob(mediaRef.current.chunks,{type:mediaRef.current.mime});
+          mediaRef.current.chunks=[];
+          if(blob.size<1500){if(!voicePendingRef.current)setVoiceResult(null);return;}
+          try{const b64=await blobToB64(blob);processVoiceAudio(b64,(mediaRef.current.mime||"audio/webm").split(";")[0]);}
+          catch(_){setVoiceResult({respuesta:"No pude leer el audio, intenta de nuevo."});}
+        };
+        setVoiceText("");if(!auto)setVoiceResult(null);setListening(true);
+        rec.start();
+        if(auto){mediaRef.current.timer=setTimeout(()=>{try{if(rec.state!=="inactive")rec.stop();}catch(_){}},8000);}
+        return;
+      }catch(err){
+        if(err&&(err.name==="NotAllowedError"||err.name==="SecurityError")){setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});return;}
+        /* otro error (sin MediaRecorder útil) → caemos al reconocedor de Chrome */
+      }
+    }
+    startVoiceSR(auto);
+  };
+  const startVoiceSR=(auto)=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
     if(!SR){setVoiceResult({respuesta:"Tu navegador no soporta dictado. Abre la app en Chrome."});return;}
     let acc="";
@@ -1553,7 +1642,11 @@ function PatientApp({onLogout,user,token}){
     };
     run();
   };
-  const stopVoice=()=>{recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}};
+  const stopVoice=()=>{
+    const m=mediaRef.current;
+    if(m&&m.rec&&m.rec.state&&m.rec.state!=="inactive"){if(m.timer){clearTimeout(m.timer);m.timer=null;}try{m.rec.stop();}catch(_){}return;}
+    recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}
+  };
   const mealByHour=()=>{const h=new Date().getHours();if(h<11)return 0;if(h<15)return 1;if(h<18)return 3;return 2;};
   const irAComida=(m)=>{const idx=(typeof m==="number")?m:mealByHour();setMeal(idx);setTab(0);setStep(1);setPhotoResult(null);setSavedMsg("");setMealPrompt(idx);};
 
@@ -1936,6 +2029,10 @@ function PatientApp({onLogout,user,token}){
             {voicePending&&!voiceBusy&&(
               <div style={{marginTop:10,padding:"10px 12px",borderRadius:10,background:"#fff",border:"1.5px dashed #6D5BD0",textAlign:"left"}}>
                 <div style={{fontSize:11,fontWeight:800,color:"#4A3B9E",marginBottom:6}}>📝 Por guardar — di qué agrego o quito, o di "listo"</div>
+                {voicePending.textoDictado&&<div style={{fontSize:10.5,color:"#999",marginBottom:5,fontStyle:"italic"}}>🎤 Escuché: «{voicePending.textoDictado}»</div>}
+                {Array.isArray(voicePending.correcciones)&&voicePending.correcciones.map((c,i)=>(
+                  <div key={"ct"+i} style={{fontSize:10.5,color:"#B8860B",marginBottom:4,fontWeight:700}}>✏️ Corregí: "{c.escuchado}" → "{c.interpretado}" (dime si no era eso)</div>
+                ))}
                 {(voicePending.comidas||[]).map((c,i)=>(
                   <div key={i} style={{fontSize:12,color:"#333",marginBottom:3}}><b style={{color:"#6D5BD0"}}>{c.momento}:</b> {(c.alimentos||[]).join(", ")}</div>
                 ))}
@@ -2715,6 +2812,10 @@ function PatientApp({onLogout,user,token}){
             {voicePending&&!voiceBusy&&(
               <div style={{marginTop:8,padding:"10px 12px",borderRadius:10,background:"#F8F7FE",border:"1.5px dashed #6D5BD0"}}>
                 <div style={{fontSize:11,fontWeight:800,color:"#4A3B9E",marginBottom:6}}>📝 Por guardar — di qué agrego o quito, o di "listo"</div>
+                {voicePending.textoDictado&&<div style={{fontSize:10.5,color:"#999",marginBottom:5,fontStyle:"italic"}}>🎤 Escuché: «{voicePending.textoDictado}»</div>}
+                {Array.isArray(voicePending.correcciones)&&voicePending.correcciones.map((c,i)=>(
+                  <div key={"cx"+i} style={{fontSize:10.5,color:"#B8860B",marginBottom:4,fontWeight:700}}>✏️ Corregí: "{c.escuchado}" → "{c.interpretado}" (dime si no era eso)</div>
+                ))}
                 {(voicePending.comidas||[]).map((c,i)=>(
                   <div key={i} style={{fontSize:12,color:"#333",marginBottom:3}}><b style={{color:"#6D5BD0"}}>{c.momento}:</b> {(c.alimentos||[]).join(", ")}</div>
                 ))}
