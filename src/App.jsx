@@ -2690,9 +2690,9 @@ function PatientApp({onLogout,user,token}){
       {chequeoMensual&&(
         <div style={{position:"fixed",inset:0,background:"rgba(26,20,50,0.45)",zIndex:90,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
           <div style={{background:"#fff",borderRadius:22,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
-            <div style={{fontSize:42,marginBottom:10}}>📅</div>
-            <div style={{fontSize:16,fontWeight:800,color:"#333",marginBottom:6}}>Chequeo mensual</div>
-            <div style={{fontSize:13,color:"#888",marginBottom:20,lineHeight:1.5}}>Actualiza tu peso y tus medidas para ver si las recomendaciones están funcionando de verdad.</div>
+            <div style={{fontSize:42,marginBottom:10}}>{chequeoMensual.manual?"📏":"📅"}</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#333",marginBottom:6}}>{chequeoMensual.manual?"Peso y medidas":"Chequeo mensual"}</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:20,lineHeight:1.5}}>{chequeoMensual.manual?"Registra tu peso, cintura y cadera para calcular tu ICC y seguir tu progreso.":"Actualiza tu peso y tus medidas para ver si las recomendaciones están funcionando de verdad."}</div>
             {chequeoMensual.pesoAnterior!=null&&<div style={{fontSize:12,color:"#6D5BD0",fontWeight:700,marginBottom:14}}>Tu último registro: {chequeoMensual.pesoAnterior} kg</div>}
             <input type="number" value={pesoNuevo} onChange={e=>setPesoNuevo(e.target.value)} placeholder="Tu peso hoy (kg)" style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:20,fontWeight:800,textAlign:"center",marginBottom:10,boxSizing:"border-box"}}/>
             <div style={{display:"flex",gap:8,marginBottom:6}}>
@@ -2701,7 +2701,7 @@ function PatientApp({onLogout,user,token}){
             </div>
             {(Number(cinturaNueva)>0&&Number(caderaNueva)>0)?<div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:12}}>Tu ICC: {(Number(cinturaNueva)/Number(caderaNueva)).toFixed(2)}</div>:<div style={{fontSize:10.5,color:"#aaa",marginBottom:12}}>Cintura y cadera son opcionales, pero permiten seguir tu ICC mes a mes.</div>}
             <button onClick={guardarChequeoMensual} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Guardar</button>
-            <button onClick={()=>{localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");setChequeoMensual(null);}} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Recuérdamelo después</button>
+            <button onClick={()=>{if(!chequeoMensual.manual)localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");setChequeoMensual(null);}} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>{chequeoMensual.manual?"Cancelar":"Recuérdamelo después"}</button>
           </div>
         </div>
       )}
@@ -2886,12 +2886,13 @@ function PatientApp({onLogout,user,token}){
           </div>
           <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>Tus datos de salud</div>
-            {[["Edad",hp?hp.edad+" años":"—"],["Condición",hp?hp.enfermedad:"—"],["Actividad",hp?hp.ejercicio:"—"],["ICC (cintura-cadera)",(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0)?(Number(hp.cintura)/Number(hp.cadera)).toFixed(2):"—"]].map(([k,v])=>(
+            {[["Edad",hp?hp.edad+" años":"—"],["Condición",hp?hp.enfermedad:"—"],["Actividad",hp?hp.ejercicio:"—"],["Peso",(hp&&hp.peso)?hp.peso+" kg":"—"],["ICC (cintura-cadera)",(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0)?(Number(hp.cintura)/Number(hp.cadera)).toFixed(2):"—"]].map(([k,v])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #F2F2F2"}}>
                 <span style={{fontSize:13,color:"#888"}}>{k}</span>
                 <span style={{fontSize:13,fontWeight:700,color:"#444"}}>{v}</span>
               </div>
             ))}
+            <button onClick={()=>{setPesoNuevo((hp&&hp.peso)||"");setCinturaNueva((hp&&hp.cintura)||"");setCaderaNueva((hp&&hp.cadera)||"");setChequeoMensual({pesoAnterior:(hp&&hp.peso)?Number(hp.peso):null,manual:true});}} style={{width:"100%",marginTop:12,padding:"12px",borderRadius:12,border:"1.5px solid #6D5BD0",background:"#F8F7FE",color:"#6D5BD0",fontWeight:800,fontSize:13,cursor:"pointer"}}>📏 Actualizar peso y medidas</button>
           </div>
           <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>🔔 Notificaciones</div>
