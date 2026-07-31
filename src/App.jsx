@@ -2931,6 +2931,7 @@ async function sbAuth(path, body){
 }
 const sbSignup = (email,password,nombre,role)=>sbAuth("signup",{ email, password, data:{ nombre, role } });
 const sbLogin  = (email,password)=>sbAuth("token?grant_type=password",{ email, password });
+const sbRefresh= (refresh_token)=>sbAuth("token?grant_type=refresh_token",{ refresh_token });
 async function sbGetUser(token){
   const res = await fetch(`${SB_URL}/auth/v1/user`,{ headers:{ apikey:SB_ANON, Authorization:`Bearer ${token}` }});
   if(!res.ok) throw new Error("sesión inválida");
@@ -3283,12 +3284,36 @@ export default function App(){
   useEffect(()=>{
     (async()=>{
       if(sesion&&sesion.access_token){
+        // 1) Intentar renovar la sesión con el refresh_token (los access_token caducan en ~1h)
+        if(sesion.refresh_token){
+          try{
+            const d=await sbRefresh(sesion.refresh_token);
+            const ses={ access_token:d.access_token, refresh_token:d.refresh_token||sesion.refresh_token, user:d.user||sesion.user };
+            localStorage.setItem("vt_session",JSON.stringify(ses));
+            setSesion(ses);setVerif(false);return;
+          }catch(_){/* si falla (sin red o token revocado), probamos el access_token actual */}
+        }
+        // 2) Plan B: validar el access_token que había
         try{ const u=await sbGetUser(sesion.access_token); setSesion(s=>({...s,user:u})); }
         catch(_){ localStorage.removeItem("vt_session"); setSesion(null); }
       }
       setVerif(false);
     })();
   // eslint-disable-next-line
+  },[]);
+  useEffect(()=>{
+    // Renovación periódica mientras la app está abierta (antes de que caduque la 1h)
+    const t=setInterval(async()=>{
+      try{
+        const s=JSON.parse(localStorage.getItem("vt_session")||"null");
+        if(!s||!s.refresh_token)return;
+        const d=await sbRefresh(s.refresh_token);
+        const ses={ access_token:d.access_token, refresh_token:d.refresh_token||s.refresh_token, user:d.user||s.user };
+        localStorage.setItem("vt_session",JSON.stringify(ses));
+        setSesion(ses);
+      }catch(_){}
+    },50*60*1000);
+    return()=>clearInterval(t);
   },[]);
   useEffect(()=>{
     (async()=>{
