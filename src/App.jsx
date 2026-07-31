@@ -128,6 +128,32 @@ async function iaAudio(prompt,audioB64,mime){
 
 const blobToB64=(blob)=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(",")[1]);r.onerror=()=>rej(new Error("read failed"));r.readAsDataURL(blob);});
 
+function encodeWav16k(chunks,inRate){
+  let len=0;for(const c of chunks)len+=c.length;
+  const data=new Float32Array(len);let off=0;
+  for(const c of chunks){data.set(c,off);off+=c.length;}
+  const outRate=16000;
+  const ratio=inRate/outRate;
+  const outLen=Math.max(1,Math.floor(len/ratio));
+  const out=new Int16Array(outLen);
+  for(let i=0;i<outLen;i++){
+    const start=Math.floor(i*ratio),end=Math.min(len,Math.floor((i+1)*ratio)||start+1);
+    let sum=0,n=0;for(let j=start;j<end;j++){sum+=data[j];n++;}
+    let s=n?sum/n:0;s=Math.max(-1,Math.min(1,s));
+    out[i]=s<0?s*0x8000:s*0x7FFF;
+  }
+  const buf=new ArrayBuffer(44+out.length*2);const dv=new DataView(buf);
+  const wstr=(o,t)=>{for(let i=0;i<t.length;i++)dv.setUint8(o+i,t.charCodeAt(i));};
+  wstr(0,"RIFF");dv.setUint32(4,36+out.length*2,true);wstr(8,"WAVE");
+  wstr(12,"fmt ");dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);
+  dv.setUint32(24,outRate,true);dv.setUint32(28,outRate*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);
+  wstr(36,"data");dv.setUint32(40,out.length*2,true);
+  new Int16Array(buf,44).set(out);
+  let bin="";const bytes=new Uint8Array(buf);const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH){bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH));}
+  return btoa(bin);
+}
+
 let GUIA_OMS="";
 const guiaOMSCtx=()=>GUIA_OMS?`
 GUÍA OMS VIGENTE (resumen actualizado desde la web — si alguna cifra difiere de tu conocimiento previo, usa ESTAS cifras):
@@ -1590,33 +1616,27 @@ function PatientApp({onLogout,user,token}){
     catch(e){setVoiceResult({respuesta:"No pude procesarlo, intenta de nuevo."});hablar("No pude procesarlo, intenta de nuevo.");}
     setVoiceBusy(false);
   };
-  const mediaRef=useRef({rec:null,chunks:[],stream:null,timer:null,mime:""});
-  const canRecord=()=>!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&window.MediaRecorder);
+  const mediaRef=useRef(null);
+  const canRecord=()=>!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&(window.AudioContext||window.webkitAudioContext));
   const startVoice=async(auto)=>{
     if(canRecord()){
       try{
         const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-        const mime=(window.MediaRecorder.isTypeSupported&&window.MediaRecorder.isTypeSupported("audio/webm"))?"audio/webm":((window.MediaRecorder.isTypeSupported&&window.MediaRecorder.isTypeSupported("audio/mp4"))?"audio/mp4":"");
-        const rec=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
-        mediaRef.current={rec,chunks:[],stream,timer:null,mime:rec.mimeType||mime||"audio/webm"};
-        rec.ondataavailable=(e)=>{if(e.data&&e.data.size)mediaRef.current.chunks.push(e.data);};
-        rec.onstop=async()=>{
-          try{stream.getTracks().forEach(t=>t.stop());}catch(_){}
-          if(mediaRef.current.timer){clearTimeout(mediaRef.current.timer);mediaRef.current.timer=null;}
-          setListening(false);
-          const blob=new Blob(mediaRef.current.chunks,{type:mediaRef.current.mime});
-          mediaRef.current.chunks=[];
-          if(blob.size<1500){if(!voicePendingRef.current)setVoiceResult(null);return;}
-          try{const b64=await blobToB64(blob);processVoiceAudio(b64,(mediaRef.current.mime||"audio/webm").split(";")[0]);}
-          catch(_){setVoiceResult({respuesta:"No pude leer el audio, intenta de nuevo."});}
-        };
+        const AC=window.AudioContext||window.webkitAudioContext;
+        const ctx=new AC();
+        try{await ctx.resume();}catch(_){}
+        const srcNode=ctx.createMediaStreamSource(stream);
+        const proc=ctx.createScriptProcessor(4096,1,1);
+        const chunks=[];
+        proc.onaudioprocess=(e)=>{chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));};
+        srcNode.connect(proc);proc.connect(ctx.destination);
+        mediaRef.current={ctx,stream,proc,srcNode,chunks,sampleRate:ctx.sampleRate,timer:null,active:true};
         setVoiceText("");if(!auto)setVoiceResult(null);setListening(true);
-        rec.start();
-        if(auto){mediaRef.current.timer=setTimeout(()=>{try{if(rec.state!=="inactive")rec.stop();}catch(_){}},8000);}
+        if(auto){mediaRef.current.timer=setTimeout(()=>{stopVoice();},8000);}
         return;
       }catch(err){
         if(err&&(err.name==="NotAllowedError"||err.name==="SecurityError")){setListening(false);setVoiceResult({respuesta:"Necesito permiso de micrófono para escucharte."});return;}
-        /* otro error (sin MediaRecorder útil) → caemos al reconocedor de Chrome */
+        /* otro error → caemos al reconocedor de Chrome */
       }
     }
     startVoiceSR(auto);
@@ -1644,7 +1664,22 @@ function PatientApp({onLogout,user,token}){
   };
   const stopVoice=()=>{
     const m=mediaRef.current;
-    if(m&&m.rec&&m.rec.state&&m.rec.state!=="inactive"){if(m.timer){clearTimeout(m.timer);m.timer=null;}try{m.rec.stop();}catch(_){}return;}
+    if(m&&m.active){
+      m.active=false;mediaRef.current=null;
+      if(m.timer){clearTimeout(m.timer);m.timer=null;}
+      try{m.proc.disconnect();}catch(_){}
+      try{m.srcNode.disconnect();}catch(_){}
+      try{m.stream.getTracks().forEach(t=>t.stop());}catch(_){}
+      try{m.ctx.close();}catch(_){}
+      setListening(false);
+      const total=m.chunks.reduce((a,c)=>a+c.length,0);
+      if(total<m.sampleRate*0.4){if(!voicePendingRef.current)setVoiceResult(null);return;}
+      try{
+        const wavB64=encodeWav16k(m.chunks,m.sampleRate);
+        processVoiceAudio(wavB64,"audio/wav");
+      }catch(_){setVoiceResult({respuesta:"No pude leer el audio, intenta de nuevo."});}
+      return;
+    }
     recRef.userStop=true;try{recRef.current&&recRef.current.stop();}catch(_){}
   };
   const mealByHour=()=>{const h=new Date().getHours();if(h<11)return 0;if(h<15)return 1;if(h<18)return 3;return 2;};
