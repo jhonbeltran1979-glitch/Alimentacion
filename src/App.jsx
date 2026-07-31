@@ -285,9 +285,10 @@ Esto es lo que el usuario registró durante ${datos.mes}:
 - Ejercicio: ${datos.ejercicio}
 - Sueño: ${datos.sueno}
 - Peso: ${datos.peso}
+- Índice cintura-cadera: ${datos.icc||"sin datos"}
 ${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
 
-Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay datos de peso de al menos 2 mediciones, comenta la tendencia con cautela (sin diagnosticar ni prometer resultados) — si el peso no se movió o falta un segundo dato, dilo con naturalidad e invita a registrar el peso seguido para poder verlo con claridad. Si hay mejora respecto al mes anterior en cualquier pilar, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
+Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay datos de peso de al menos 2 mediciones, comenta la tendencia con cautela (sin diagnosticar ni prometer resultados) — si el peso no se movió o falta un segundo dato, dilo con naturalidad e invita a registrar el peso seguido para poder verlo con claridad. Si hay medición de índice cintura-cadera, coméntala con la misma cautela usando los umbrales de referencia de la OMS (0.90 hombres, 0.85 mujeres) como orientación, nunca como diagnóstico. Si hay mejora respecto al mes anterior en cualquier pilar, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
 
 Responde SOLO JSON sin backticks:
 {"resumen":"2-3 oraciones sobre cómo estuvo el mes en general","faltantes":["cosas concretas que faltaron ese mes, máx 4"],"metas":["2-3 metas concretas y alcanzables para el próximo mes"]}`);
@@ -571,6 +572,8 @@ function PatientApp({onLogout,user,token}){
   const [recordatorio,setRecordatorio]=useState(null);
   const [chequeoMensual,setChequeoMensual]=useState(null);
   const [pesoNuevo,setPesoNuevo]=useState("");
+  const [cinturaNueva,setCinturaNueva]=useState("");
+  const [caderaNueva,setCaderaNueva]=useState("");
   const [pesoHist,setPesoHist]=useState([]);
   const [prefsIA,setPrefsIA]=useState(null);
   const [pushEstado,setPushEstado]=useState("desconocido");
@@ -785,7 +788,7 @@ function PatientApp({onLogout,user,token}){
         }
       }catch(_){}
       try{
-        const rW=await fetch(`${SB_URL}/rest/v1/weight_logs?patient_id=eq.${user.id}&select=fecha,peso_kg&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const rW=await fetch(`${SB_URL}/rest/v1/weight_logs?patient_id=eq.${user.id}&select=*&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const wRows=await rW.json();
         if(Array.isArray(wRows))setPesoHist(wRows);
       }catch(_){}
@@ -1017,7 +1020,16 @@ function PatientApp({onLogout,user,token}){
     }else if(pesosMes.length===1){
       peso=`${pesosMes[0].peso_kg}kg registrado este mes (sin un segundo dato para ver tendencia)`;
     }
-    return {nutricion,hidratacion,ejercicio,sueno,peso};
+    const iccMes=pesosMes.filter(w=>w.cintura_cm&&w.cadera_cm&&Number(w.cadera_cm)>0).map(w=>({fecha:w.fecha,icc:Number(w.cintura_cm)/Number(w.cadera_cm)}));
+    let icc="sin medidas de cintura-cadera este mes";
+    if(iccMes.length>=2){
+      icc=`ICC de ${iccMes[0].icc.toFixed(2)} a ${iccMes[iccMes.length-1].icc.toFixed(2)} en el mes`;
+    }else if(iccMes.length===1){
+      icc=`ICC ${iccMes[0].icc.toFixed(2)} registrado este mes`;
+    }else if(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0){
+      icc=`ICC actual del perfil: ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)} (sin nueva medición este mes)`;
+    }
+    return {nutricion,hidratacion,ejercicio,sueno,peso,icc};
   };
   const generarAnalisisMes=async(key,mes,mesAnteriorTxt)=>{
     if(monthAiBusyRef.current||monthAI[key])return;
@@ -1085,6 +1097,8 @@ function PatientApp({onLogout,user,token}){
     if(diasDesde>=30){
       const t=setTimeout(()=>{
         setPesoNuevo(hp.peso||"");
+        setCinturaNueva(hp.cintura||"");
+        setCaderaNueva(hp.cadera||"");
         setChequeoMensual({pesoAnterior:ultimoRegistro?ultimoRegistro.peso_kg:(hp.peso?Number(hp.peso):null)});
       },6000);
       return()=>clearTimeout(t);
@@ -1095,13 +1109,26 @@ function PatientApp({onLogout,user,token}){
   const guardarChequeoMensual=async()=>{
     const p=Number(pesoNuevo);
     if(!p||p<20||p>300)return;
+    const ci=(Number(cinturaNueva)>=40&&Number(cinturaNueva)<=200)?Number(cinturaNueva):null;
+    const ca=(Number(caderaNueva)>=40&&Number(caderaNueva)<=200)?Number(caderaNueva):null;
     const hoyISO=isoHoy();
     if(user&&token){
-      try{await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:hoyISO,peso_kg:p})});}catch(_){}
-      try{await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,peso_kg:p})});}catch(_){}
+      try{
+        const body1={patient_id:user.id,fecha:hoyISO,peso_kg:p};
+        if(ci)body1.cintura_cm=ci;if(ca)body1.cadera_cm=ca;
+        const r=await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(body1)});
+        if(!r.ok&&(ci||ca)){await fetch(`${SB_URL}/rest/v1/weight_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({patient_id:user.id,fecha:hoyISO,peso_kg:p})});}
+      }catch(_){}
+      try{
+        const hpBody={patient_id:user.id,peso_kg:p};
+        if(ci)hpBody.cintura_cm=ci;if(ca)hpBody.cadera_cm=ca;
+        await fetch(`${SB_URL}/rest/v1/health_profiles`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(hpBody)});
+      }catch(_){}
     }
-    setPesoHist(prev=>[{fecha:hoyISO,peso_kg:p},...prev]);
-    const h2={...hp,peso:String(p)};setHp(h2);
+    setPesoHist(prev=>[{fecha:hoyISO,peso_kg:p,cintura_cm:ci,cadera_cm:ca},...prev]);
+    const h2={...hp,peso:String(p)};
+    if(ci)h2.cintura=String(ci);if(ca)h2.cadera=String(ca);
+    setHp(h2);
     if(perfil)localStorage.setItem(sk(perfil,"perfil_salud"),JSON.stringify(h2));
     localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");
     setChequeoMensual(null);
@@ -2665,9 +2692,14 @@ function PatientApp({onLogout,user,token}){
           <div style={{background:"#fff",borderRadius:22,padding:"28px 24px",maxWidth:340,width:"100%",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,0.3)"}}>
             <div style={{fontSize:42,marginBottom:10}}>📅</div>
             <div style={{fontSize:16,fontWeight:800,color:"#333",marginBottom:6}}>Chequeo mensual</div>
-            <div style={{fontSize:13,color:"#888",marginBottom:20,lineHeight:1.5}}>Actualiza tu peso para que podamos ver si las recomendaciones están funcionando de verdad.</div>
+            <div style={{fontSize:13,color:"#888",marginBottom:20,lineHeight:1.5}}>Actualiza tu peso y tus medidas para ver si las recomendaciones están funcionando de verdad.</div>
             {chequeoMensual.pesoAnterior!=null&&<div style={{fontSize:12,color:"#6D5BD0",fontWeight:700,marginBottom:14}}>Tu último registro: {chequeoMensual.pesoAnterior} kg</div>}
-            <input type="number" value={pesoNuevo} onChange={e=>setPesoNuevo(e.target.value)} placeholder="Tu peso hoy (kg)" style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:20,fontWeight:800,textAlign:"center",marginBottom:16,boxSizing:"border-box"}}/>
+            <input type="number" value={pesoNuevo} onChange={e=>setPesoNuevo(e.target.value)} placeholder="Tu peso hoy (kg)" style={{width:"100%",padding:"14px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:20,fontWeight:800,textAlign:"center",marginBottom:10,boxSizing:"border-box"}}/>
+            <div style={{display:"flex",gap:8,marginBottom:6}}>
+              <input type="number" value={cinturaNueva} onChange={e=>setCinturaNueva(e.target.value)} placeholder="Cintura (cm)" style={{flex:1,minWidth:0,padding:"12px 6px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:16,fontWeight:800,textAlign:"center",boxSizing:"border-box"}}/>
+              <input type="number" value={caderaNueva} onChange={e=>setCaderaNueva(e.target.value)} placeholder="Cadera (cm)" style={{flex:1,minWidth:0,padding:"12px 6px",borderRadius:12,border:"2px solid #EFEDFC",background:"#F8F7FE",fontSize:16,fontWeight:800,textAlign:"center",boxSizing:"border-box"}}/>
+            </div>
+            {(Number(cinturaNueva)>0&&Number(caderaNueva)>0)?<div style={{fontSize:12,color:"#6D5BD0",fontWeight:800,marginBottom:12}}>Tu ICC: {(Number(cinturaNueva)/Number(caderaNueva)).toFixed(2)}</div>:<div style={{fontSize:10.5,color:"#aaa",marginBottom:12}}>Cintura y cadera son opcionales, pero permiten seguir tu ICC mes a mes.</div>}
             <button onClick={guardarChequeoMensual} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:"pointer",marginBottom:10}}>Guardar</button>
             <button onClick={()=>{localStorage.setItem(sk(perfil,"chequeo_peso_"+new Date().toISOString().slice(0,7)),"1");setChequeoMensual(null);}} style={{width:"100%",padding:"11px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>Recuérdamelo después</button>
           </div>
@@ -2854,7 +2886,7 @@ function PatientApp({onLogout,user,token}){
           </div>
           <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>Tus datos de salud</div>
-            {[["Edad",hp?hp.edad+" años":"—"],["Condición",hp?hp.enfermedad:"—"],["Actividad",hp?hp.ejercicio:"—"]].map(([k,v])=>(
+            {[["Edad",hp?hp.edad+" años":"—"],["Condición",hp?hp.enfermedad:"—"],["Actividad",hp?hp.ejercicio:"—"],["ICC (cintura-cadera)",(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0)?(Number(hp.cintura)/Number(hp.cadera)).toFixed(2):"—"]].map(([k,v])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #F2F2F2"}}>
                 <span style={{fontSize:13,color:"#888"}}>{k}</span>
                 <span style={{fontSize:13,fontWeight:700,color:"#444"}}>{v}</span>
