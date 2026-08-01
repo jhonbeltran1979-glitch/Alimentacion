@@ -335,7 +335,16 @@ Esto es lo que el usuario registró durante ${datos.mes}:
 - Sueño: ${datos.sueno}
 - Peso: ${datos.peso}
 - Índice cintura-cadera: ${datos.icc||"sin datos"}
+- BIENESTAR Y VÍNCULOS (respuestas del usuario, escala 1 a 4 donde 4 es lo más favorable): ${datos.bienestar}
 ${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
+
+${datos.tieneBienestar?`LONGEVIDAD — analiza también esta dimensión, con el mismo peso que la comida:
+- La OMS enmarca el envejecimiento saludable como mantener la CAPACIDAD FUNCIONAL (moverse, pensar y relacionarse con autonomía), no solo vivir más años; y recuerda que el entorno físico y social pesa más que la genética.
+- Vínculos sociales: comenta con calidez lo que respondió sobre contacto, red de apoyo y soledad. El aislamiento social es un factor de riesgo de salud comparable a otros hábitos, así que si sus respuestas son bajas (1 o 2), sugiere acciones pequeñas, concretas y sin culpa (una llamada semanal a alguien querido, retomar un grupo, caminar acompañado, un plan fijo al mes).
+- Ánimo y propósito: si están bajos, valida lo que siente sin dramatizar, sugiere actividades con sentido que le gusten y menciona con naturalidad que hablar con alguien de confianza o un profesional es una buena opción. NUNCA diagnostiques depresión, ansiedad ni ningún trastorno, ni sugieras que "tiene" algo.
+- Fuerza: la OMS pide trabajo de fuerza de los grandes grupos musculares 2 o más días por semana, además de 150-300 min semanales de actividad moderada. La masa muscular es lo que sostiene la autonomía en la vejez, así que si respondió poco o nada, propón un inicio realista y sin gimnasio (sentadillas a la silla, bandas, cargar mercado, subir escaleras).
+- Integra todo: relaciona lo social, el ánimo y el movimiento con lo que comió, porque en la práctica van juntos (ej. comer acompañado, caminar con alguien).
+Al menos una de las metas del mes debe ser social o de fuerza, no solo de alimentación.`:`El usuario aún no ha respondido el chequeo de bienestar, así que no opines sobre sus vínculos ni su ánimo. Invítalo una sola vez, con calidez, a responderlo desde su Perfil para que el próximo informe incluya la dimensión social, que la OMS considera clave para la longevidad.`}
 
 ${datos.totalComidas?`ANALIZA COMO NUTRICIONISTA, con los alimentos reales de la lista — esta es la parte más importante:
 1. Nombra alimentos CONCRETOS de su lista al elogiar y al señalar excesos (ej. "veo arroz en casi todos tus almuerzos", "el aguacate y la papaya suman muy bien"). Nada de frases genéricas tipo "mejora tu alimentación".
@@ -632,6 +641,10 @@ function PatientApp({onLogout,user,token}){
   const [cinturaNueva,setCinturaNueva]=useState("");
   const [caderaNueva,setCaderaNueva]=useState("");
   const [pesoHist,setPesoHist]=useState([]);
+  const [bienestarHist,setBienestarHist]=useState([]);
+  const [chequeoBienestar,setChequeoBienestar]=useState(null);
+  const [bienestarResp,setBienestarResp]=useState({});
+  const [aviso,setAviso]=useState(null);
   const [prefsIA,setPrefsIA]=useState(null);
   const [pushEstado,setPushEstado]=useState("desconocido");
   const [pushBusy,setPushBusy]=useState(false);
@@ -848,6 +861,11 @@ function PatientApp({onLogout,user,token}){
         const rW=await fetch(`${SB_URL}/rest/v1/weight_logs?patient_id=eq.${user.id}&select=*&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const wRows=await rW.json();
         if(Array.isArray(wRows))setPesoHist(wRows);
+      }catch(_){}
+      try{
+        const rB=await fetch(`${SB_URL}/rest/v1/wellbeing_logs?patient_id=eq.${user.id}&select=*&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const bRows=await rB.json();
+        if(Array.isArray(bRows))setBienestarHist(bRows);
       }catch(_){}
       try{
         const rP=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${user.id}&select=tipo_dieta,alergias,alimentos_no_gustan`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
@@ -1096,7 +1114,12 @@ function PatientApp({onLogout,user,token}){
     }else if(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0){
       icc=`ICC actual del perfil: ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)} (sin nueva medición este mes)`;
     }
-    return {nutricion,alimentosTxt,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc};
+    const bMes=bienestarHist.filter(b=>b.fecha&&enMes(b.fecha));
+    const bUlt=bMes[0]||null;
+    const bienestar=bUlt
+      ?BIENESTAR_PREGUNTAS.map(p=>`${BIENESTAR_TXT[p.id]}: ${(p.ops.find(o=>o.v===bUlt[p.id])||{}).t||"sin dato"} (${bUlt[p.id]||"-"}/4)`).join("; ")
+      :"el usuario no respondió el chequeo de bienestar este mes";
+    return {nutricion,alimentosTxt,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc,bienestar,tieneBienestar:!!bUlt};
   };
   const generarAnalisisMes=async(key,mes,mesAnteriorTxt,forzar)=>{
     if(monthAiBusyRef.current||(monthAI[key]&&!forzar))return;
@@ -1175,6 +1198,43 @@ function PatientApp({onLogout,user,token}){
   // eslint-disable-next-line
   },[perfil,hp,pesoHist.length]);
 
+  useEffect(()=>{
+    if(!perfil||!hp)return;
+    if(chequeoMensual)return; // no encimar los dos popups
+    const mesKey=new Date().toISOString().slice(0,7);
+    if(localStorage.getItem(sk(perfil,"bienestar_"+mesKey)))return;
+    const ultimo=bienestarHist[0];
+    const diasDesde=ultimo&&ultimo.fecha?Math.floor((Date.now()-new Date(ultimo.fecha).getTime())/864e5):9999;
+    if(diasDesde>=30){
+      const t=setTimeout(()=>{setBienestarResp({});setChequeoBienestar({auto:true});},14000);
+      return()=>clearTimeout(t);
+    }
+  // eslint-disable-next-line
+  },[perfil,hp,bienestarHist.length,chequeoMensual]);
+
+  const BIENESTAR_PREGUNTAS=[
+    {id:"contacto",icon:"👥",q:"Este mes, ¿con qué frecuencia compartiste con familia o amigos (en persona o por llamada)?",ej:"Cuenta almuerzos en familia, visitas, salir con amigos, llamadas o videollamadas de verdad — no cuenta escribir por WhatsApp o ver publicaciones.",ops:[{v:4,t:"Casi todos los días"},{v:3,t:"Varias veces por semana"},{v:2,t:"Alguna vez al mes"},{v:1,t:"Casi nunca"}]},
+    {id:"apoyo",icon:"🤝",q:"¿Sientes que tienes a alguien con quien contar si necesitas ayuda?",ej:"Piensa: si te enfermas, te quedas varado o necesitas hablar de algo delicado a las 10 de la noche, ¿a quién llamarías? Cuenta cuántas personas te vienen a la mente.",ops:[{v:4,t:"Sí, varias personas"},{v:3,t:"Sí, una o dos"},{v:2,t:"No estoy seguro"},{v:1,t:"Casi nadie"}]},
+    {id:"soledad",icon:"🫂",q:"¿Con qué frecuencia te sentiste solo o aislado este mes?",ej:"Es la sensación, no el estar físicamente solo: se puede vivir acompañado y sentirse solo, o vivir solo y sentirse bien conectado.",ops:[{v:4,t:"Nunca"},{v:3,t:"Rara vez"},{v:2,t:"Algunas veces"},{v:1,t:"Muy seguido"}]},
+    {id:"animo",icon:"🌤️",q:"En general, ¿cómo estuvo tu ánimo este mes?",ej:"Piensa en cómo te sentiste la mayoría de los días: con energía y ganas, tranquilo, desanimado o sin motivación. No en un día puntual bueno o malo.",ops:[{v:4,t:"Muy bien"},{v:3,t:"Bien"},{v:2,t:"Regular"},{v:1,t:"Bajo"}]},
+    {id:"proposito",icon:"🎯",q:"¿Hiciste cosas que disfrutas o que te dan sentido (pasatiempos, aprender, ayudar a otros)?",ej:"Por ejemplo: tocar música, cocinar por gusto, tus proyectos, estudiar algo nuevo, jugar con los nietos, ayudar a un vecino, ir a misa o a un grupo, cuidar el jardín.",ops:[{v:4,t:"Sí, seguido"},{v:3,t:"A veces"},{v:2,t:"Muy poco"},{v:1,t:"Casi nada"}]},
+    {id:"fuerza",icon:"💪",q:"¿Hiciste ejercicios de fuerza (pesas, bandas, sentadillas, cargar peso)?",ej:"No necesitas gimnasio: cuenta sentadillas parándote de una silla, flexiones contra la pared, bandas elásticas, cargar el mercado, subir escaleras o levantar bultos en el trabajo. Caminar NO cuenta como fuerza.",ops:[{v:4,t:"2 o más veces/semana"},{v:3,t:"1 vez por semana"},{v:2,t:"Alguna vez al mes"},{v:1,t:"No"}]}
+  ];
+  const BIENESTAR_TXT={contacto:"contacto social",apoyo:"red de apoyo",soledad:"sensación de soledad (4=nunca)",animo:"ánimo general",proposito:"actividades con sentido",fuerza:"entrenamiento de fuerza"};
+  const guardarBienestar=async()=>{
+    const r=bienestarResp;
+    if(Object.keys(r).length<BIENESTAR_PREGUNTAS.length)return;
+    const hoyISO=isoHoy();
+    const fila={patient_id:user?user.id:null,fecha:hoyISO,contacto:r.contacto,apoyo:r.apoyo,soledad:r.soledad,animo:r.animo,proposito:r.proposito,fuerza:r.fuerza};
+    if(user&&token){
+      try{await fetch(`${SB_URL}/rest/v1/wellbeing_logs`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(fila)});}catch(_){}
+    }
+    setBienestarHist(prev=>[fila,...prev.filter(x=>x.fecha!==hoyISO)]);
+    try{localStorage.setItem(sk(perfil,"bienestar_"+new Date().toISOString().slice(0,7)),"1");}catch(_){}
+    const bajo=(r.soledad<=2)||(r.animo<=2)||(r.apoyo<=2);
+    setChequeoBienestar(null);setBienestarResp({});
+    if(bajo)setTimeout(()=>setAviso({t:"Gracias por responder con honestidad 💜",m:"Los vínculos y el ánimo pesan tanto como la comida en tu salud a largo plazo. Si estos días han estado difíciles, hablarlo con alguien de confianza —o con un profesional— es una muy buena decisión, y no tiene nada de malo."}),400);
+  };
   const guardarChequeoMensual=async()=>{
     const p=Number(pesoNuevo);
     if(!p||p<20||p>300)return;
@@ -2869,6 +2929,38 @@ function PatientApp({onLogout,user,token}){
           </div>
         </div>
       )}
+      {chequeoBienestar&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:20,padding:20,maxWidth:400,width:"100%",maxHeight:"88vh",overflowY:"auto",boxShadow:"0 10px 40px rgba(0,0,0,0.3)"}}>
+            <div style={{fontSize:38,marginBottom:6,textAlign:"center"}}>💜</div>
+            <div style={{fontSize:16,fontWeight:800,color:"#333",marginBottom:6,textAlign:"center"}}>Tu bienestar este mes</div>
+            <div style={{fontSize:12,color:"#888",marginBottom:16,lineHeight:1.5,textAlign:"center"}}>La OMS insiste en que la longevidad no es solo comer bien: los vínculos, el ánimo y la fuerza pesan igual. Son 6 preguntas rápidas y quedan solo para ti.</div>
+            {BIENESTAR_PREGUNTAS.map(p=>(
+              <div key={p.id} style={{marginBottom:14}}>
+                <div style={{fontSize:12.5,fontWeight:700,color:"#444",marginBottom:4,lineHeight:1.35}}>{p.icon} {p.q}</div>
+                {p.ej&&<div style={{fontSize:10.5,color:"#999",marginBottom:7,lineHeight:1.4,fontStyle:"italic"}}>{p.ej}</div>}
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {p.ops.map(o=>{
+                    const sel=bienestarResp[p.id]===o.v;
+                    return <button key={o.v} onClick={()=>setBienestarResp(prev=>({...prev,[p.id]:o.v}))} style={{padding:"7px 11px",borderRadius:20,border:`1.5px solid ${sel?"#6D5BD0":"#EFEDFC"}`,background:sel?"#6D5BD0":"#F8F7FE",color:sel?"#fff":"#666",fontSize:11.5,fontWeight:700,cursor:"pointer"}}>{o.t}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
+            <button onClick={guardarBienestar} disabled={Object.keys(bienestarResp).length<BIENESTAR_PREGUNTAS.length} style={{width:"100%",padding:"13px",borderRadius:14,border:"none",background:Object.keys(bienestarResp).length<BIENESTAR_PREGUNTAS.length?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:14,fontWeight:800,cursor:Object.keys(bienestarResp).length<BIENESTAR_PREGUNTAS.length?"not-allowed":"pointer",marginBottom:8,marginTop:4}}>Guardar ({Object.keys(bienestarResp).length}/{BIENESTAR_PREGUNTAS.length})</button>
+            <button onClick={()=>{if(chequeoBienestar.auto)localStorage.setItem(sk(perfil,"bienestar_"+new Date().toISOString().slice(0,7)),"1");setChequeoBienestar(null);setBienestarResp({});}} style={{width:"100%",padding:"10px",borderRadius:14,border:"none",background:"none",color:"#999",fontSize:13,fontWeight:700,cursor:"pointer"}}>{chequeoBienestar.auto?"Ahora no":"Cancelar"}</button>
+          </div>
+        </div>
+      )}
+      {aviso&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:210,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+          <div style={{background:"#fff",borderRadius:20,padding:22,maxWidth:380,width:"100%",boxShadow:"0 10px 40px rgba(0,0,0,0.3)",textAlign:"center"}}>
+            <div style={{fontSize:15,fontWeight:800,color:"#333",marginBottom:10}}>{aviso.t}</div>
+            <div style={{fontSize:13,color:"#666",lineHeight:1.55,marginBottom:16}}>{aviso.m}</div>
+            <button onClick={()=>setAviso(null)} style={{width:"100%",padding:"12px",borderRadius:14,border:"none",background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:13.5,fontWeight:800,cursor:"pointer"}}>Entendido</button>
+          </div>
+        </div>
+      )}
       {!(tab===0&&step===1)&&(<div style={{position:"fixed",left:14,right:14,bottom:82,zIndex:60,display:"flex",justifyContent:"flex-end",alignItems:"flex-end",pointerEvents:"none"}}>
         {(listening||voiceBusy||voiceResult||voicePending)&&(
           <div style={{flex:1,marginRight:10,background:"#fff",borderRadius:16,padding:14,boxShadow:"0 6px 24px rgba(0,0,0,0.22)",border:`2px solid ${listening?"#C1121F":"#EFEDFC"}`,pointerEvents:"auto"}}>
@@ -3066,6 +3158,7 @@ function PatientApp({onLogout,user,token}){
               </div>
             ))}
             <button onClick={()=>{setPesoNuevo((hp&&hp.peso)||"");setCinturaNueva((hp&&hp.cintura)||"");setCaderaNueva((hp&&hp.cadera)||"");setChequeoMensual({pesoAnterior:(hp&&hp.peso)?Number(hp.peso):null,manual:true});}} style={{width:"100%",marginTop:12,padding:"12px",borderRadius:12,border:"1.5px solid #6D5BD0",background:"#F8F7FE",color:"#6D5BD0",fontWeight:800,fontSize:13,cursor:"pointer"}}>📏 Actualizar peso y medidas</button>
+            <button onClick={()=>{const u=bienestarHist[0];setBienestarResp(u?{contacto:u.contacto,apoyo:u.apoyo,soledad:u.soledad,animo:u.animo,proposito:u.proposito,fuerza:u.fuerza}:{});setChequeoBienestar({auto:false});}} style={{width:"100%",marginTop:8,padding:"12px",borderRadius:12,border:"1.5px solid #6D5BD0",background:"#F8F7FE",color:"#6D5BD0",fontWeight:800,fontSize:13,cursor:"pointer"}}>💜 Chequeo de bienestar y vínculos</button>
           </div>
           <div style={{background:"#fff",borderRadius:16,padding:"16px",boxShadow:"0 2px 12px rgba(0,0,0,0.05)",marginBottom:14}}>
             <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:6}}>🔔 Notificaciones</div>
