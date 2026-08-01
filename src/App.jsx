@@ -329,6 +329,7 @@ async function analisisMes(datos,hp){
 ${guiaOMSCtx()}
 Esto es lo que el usuario registró durante ${datos.mes}:
 - Nutrición: ${datos.nutricion}
+- ALIMENTOS REALES que registró en el mes, con cuántas veces apareció cada uno: ${datos.alimentosTxt||"ninguno"}
 - Hidratación: ${datos.hidratacion}
 - Ejercicio: ${datos.ejercicio}
 - Sueño: ${datos.sueno}
@@ -336,10 +337,18 @@ Esto es lo que el usuario registró durante ${datos.mes}:
 - Índice cintura-cadera: ${datos.icc||"sin datos"}
 ${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
 
+${datos.totalComidas?`ANALIZA COMO NUTRICIONISTA, con los alimentos reales de la lista — esta es la parte más importante:
+1. Nombra alimentos CONCRETOS de su lista al elogiar y al señalar excesos (ej. "veo arroz en casi todos tus almuerzos", "el aguacate y la papaya suman muy bien"). Nada de frases genéricas tipo "mejora tu alimentación".
+2. Contrasta lo registrado contra las guías de la OMS: mínimo 400g (5 porciones) de frutas y verduras al día, preferir granos integrales sobre refinados, azúcares libres <10% de las calorías, sal <5g/día, priorizar proteínas magras y limitar carnes procesadas y frituras.
+3. Di qué GRUPOS le faltaron según lo registrado (verduras, legumbres/leguminosas, pescado, granos integrales, lácteos, frutas) y qué apareció en exceso (frituras, refinados, azúcar).
+4. Sugiere reemplazos y adiciones REALISTAS de la cocina colombiana y del mercado local, aprovechando lo que ya come (ej. cambiar arroz blanco por arroz integral, agregar fríjol o lenteja, sumar ensalada de tomate y cebolla al almuerzo, pescado 2 veces por semana).
+5. Recuerda que lo registrado es una muestra de lo que comió, no el 100% de su dieta: habla de patrones observados, no de certezas absolutas, y nunca diagnostiques.
+Las "faltantes" deben ser específicas de alimentos o grupos (ej. "Casi no aparecieron verduras en tus almuerzos"), no genéricas como "registrar tus comidas".`:`El usuario casi no registró datos este mes. Sé breve y amable, sin regañar, e invita a registrar al menos una comida al día para poder darle un análisis real el próximo mes.`}
+
 Resume cómo le fue ese mes en los 4 pilares, qué le faltó, y da 2-3 metas concretas y alcanzables para el mes que empieza. Si hay datos de peso de al menos 2 mediciones, comenta la tendencia con cautela (sin diagnosticar ni prometer resultados) — si el peso no se movió o falta un segundo dato, dilo con naturalidad e invita a registrar el peso seguido para poder verlo con claridad. Si hay medición de índice cintura-cadera, coméntala con la misma cautela usando los umbrales de referencia de la OMS (0.90 hombres, 0.85 mujeres) como orientación, nunca como diagnóstico. Si hay mejora respecto al mes anterior en cualquier pilar, celébrala explícitamente. Tono cercano, motivador, sin diagnósticos médicos.
 
 Responde SOLO JSON sin backticks:
-{"resumen":"2-3 oraciones sobre cómo estuvo el mes en general","faltantes":["cosas concretas que faltaron ese mes, máx 4"],"metas":["2-3 metas concretas y alcanzables para el próximo mes"]}`);
+{"resumen":"3-4 oraciones: cómo estuvo el mes y tu lectura nutricional concreta de lo que comió, mencionando alimentos suyos por nombre","faltantes":["qué faltó, específico en alimentos o grupos, máx 4"],"metas":["2-3 metas concretas y alcanzables para el próximo mes"]}`);
 }
 
 
@@ -1052,7 +1061,17 @@ function PatientApp({onLogout,user,token}){
     };
     const enMes=ds=>{const p=parseDs(ds);return p&&p.y===mes.y&&p.m===mes.m;};
     const comidas=history.filter(r=>enMes(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha));
-    const nutricion=comidas.length?`${comidas.length} comidas registradas, score promedio ${Math.round(comidas.reduce((a,r)=>a+(r.score_total||0),0)/comidas.length)}%`:"sin registros de comida";
+    const alimentosDe=r=>{let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}return (Array.isArray(f)?f:[]).map(x=>String(typeof x==="object"&&x?(x.name||""):x).trim().toLowerCase()).filter(Boolean);};
+    const freq={};comidas.forEach(r=>alimentosDe(r).forEach(a=>{freq[a]=(freq[a]||0)+1;}));
+    const topAlimentos=Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+    const diasConRegistro=[...new Set(comidas.map(r=>r.fecha))].length;
+    const porMomento={};comidas.forEach(r=>{const m=r.comida||"Otro";porMomento[m]=(porMomento[m]||0)+1;});
+    const nutricion=comidas.length
+      ?`${comidas.length} comidas registradas en ${diasConRegistro} días distintos, score promedio ${Math.round(comidas.reduce((a,r)=>a+(r.score_total||0),0)/comidas.length)}%. Por momento: ${Object.entries(porMomento).map(([k,v])=>`${k} ${v}`).join(", ")}`
+      :"sin registros de comida";
+    const alimentosTxt=topAlimentos.length
+      ?topAlimentos.slice(0,30).map(([a,n])=>`${a} (${n})`).join(", ")
+      :"ninguno";
     const diasAgua=Object.keys(waterHist).filter(enMes);
     const hidratacion=diasAgua.length?`meta cumplida ${diasAgua.filter(d=>waterHist[d]>=WATER_GOAL).length} de ${diasAgua.length} días registrados`:"sin registros de hidratación";
     const minsEj=exLog.filter(e=>enMes(e.date)).reduce((a,e)=>a+(e.min||0),0);
@@ -1077,13 +1096,15 @@ function PatientApp({onLogout,user,token}){
     }else if(hp&&hp.cintura&&hp.cadera&&Number(hp.cadera)>0){
       icc=`ICC actual del perfil: ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)} (sin nueva medición este mes)`;
     }
-    return {nutricion,hidratacion,ejercicio,sueno,peso,icc};
+    return {nutricion,alimentosTxt,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc};
   };
-  const generarAnalisisMes=async(key,mes,mesAnteriorTxt)=>{
-    if(monthAiBusyRef.current||monthAI[key])return;
+  const generarAnalisisMes=async(key,mes,mesAnteriorTxt,forzar)=>{
+    if(monthAiBusyRef.current||(monthAI[key]&&!forzar))return;
+    const dd=datosDelMes(mes);
+    // Si el historial aún no ha cargado desde Supabase, no generamos un informe "vacío" que quedaría cacheado
+    if(!dd.totalComidas&&!history.length&&!forzar)return;
     monthAiBusyRef.current=true;
     try{
-      const dd=datosDelMes(mes);
       const r=await analisisMes({mes:MESES_LARGO[mes.m],...dd,mesAnterior:mesAnteriorTxt},hpConDieta);
       setMonthAI(prev=>{const n={...prev,[key]:r};try{localStorage.setItem(sk(perfil,"month_ai"),JSON.stringify(n));}catch(_){}return n;});
     }catch(_){}
@@ -2196,6 +2217,7 @@ function PatientApp({onLogout,user,token}){
                     {(ai.metas||[]).map((s,i)=>(
                       <div key={i} style={{fontSize:12,color:"#5B49C0",background:"#EFEDFC",borderRadius:10,padding:"8px 10px",marginBottom:6,lineHeight:1.4}}>🎯 {s}</div>
                     ))}
+                    <button onClick={()=>generarAnalisisMes(key,mes,null,true)} style={{width:"100%",marginTop:8,padding:"9px",borderRadius:10,border:"1.5px solid #DDD",background:"#fff",color:"#888",fontWeight:700,fontSize:11,cursor:"pointer"}}>🔄 Volver a analizar {nombreMes}</button>
                   </div>
                 ):(
                   <div>
