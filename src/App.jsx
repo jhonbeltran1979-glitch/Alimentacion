@@ -2946,7 +2946,12 @@ function PatientApp({onLogout,user,token}){
               return dias.map(ds=>{
                 const items=map[ds];
                 const scores=items.map(r=>r.score_total).filter(v=>typeof v==="number");
-                const scoreProm=scores.length?Math.min(100,Math.round(scores.reduce((a,b)=>a+b,0)/3)):null;
+                const nutriPct=scores.length?Math.min(100,Math.round(scores.reduce((a,b)=>a+b,0)/3)):null;
+                const aguaVal=ds===today?water:(waterHist[ds]!=null?waterHist[ds]:0);
+                const aguaPct=Math.max(0,Math.min(100,Math.round(aguaVal/WATER_GOAL*100)));
+                const ejMin=exLog.filter(e=>e.date===ds).reduce((a,e)=>a+(e.min||0),0);
+                const ejPct=Math.max(0,Math.min(100,Math.round(ejMin/30*100)));
+                const scoreProm=nutriPct==null?null:Math.round(nutriPct*0.6+aguaPct*0.2+ejPct*0.2);
                 const label=ds===today?"Hoy":ds===ayerDs?"Ayer":nombreDia(ds);
                 const abierto=planDiaAbierto===ds;
                 const ai=dayAI[ds];
