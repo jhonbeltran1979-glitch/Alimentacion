@@ -154,22 +154,115 @@ function encodeWav16k(chunks,inRate){
   return btoa(bin);
 }
 
+// ── Motor de métricas: clasifica alimentos y CUENTA de verdad, para que la IA interprete datos, no adivine ──
+const _n=s=>String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").trim();
+const GRUPOS_ALIM={
+  verdura:["lechuga","tomate","cebolla","zanahoria","espinaca","acelga","brocoli","coliflor","pepino","cohombro","pimenton","ahuyama","habichuela","calabacin","apio","repollo","remolacha","berenjena","champinon","esparrago","aguacate","ensalada","verdura","vegetal","guascas","cilantro","arveja","alverja","pepino cohombro"],
+  fruta:["banano","manzana","pera","papaya","mango","piña","naranja","mandarina","fresa","mora","guayaba","guanabana","maracuya","lulo","curuba","melon","sandia","patilla","uva","kiwi","durazno","ciruela","granadilla","tomate de arbol","borojo","fruta","jugo de naranja","jugo de mandarina"],
+  leguminosa:["frijol","lenteja","garbanzo","haba","soya","blanquillo","cargamanto"],
+  integral:["integral","avena","quinua","quinoa","arroz integral","pan integral","salvado","cebada"],
+  refinado:["arroz","pan","pasta","espagueti","macarron","harina","arepa","galleta","tostada","pan blanco","sopa de pasta"],
+  frito:["frito","frita","fritos","fritas","empanada","papa a la francesa","chicharron","patacon","buñuelo","churro","pastel","papas fritas","apanado","apanada","broaster"],
+  ultraprocesado:["gaseosa","salchicha","salchichon","mortadela","jamon","embutido","nugget","hamburguesa","perro caliente","pizza","papas de paquete","chorizo","tocineta","enlatado","instantaneo","cereal de caja","doritos"],
+  azucar:["gaseosa","dulce","postre","torta","helado","chocolatina","panela","azucar","milo","chocolate","arequipe","bocadillo","mermelada","limonada","jugo azucarado","malteada","galleta dulce"],
+  proteina_magra:["pollo","pechuga","pescado","atun","tilapia","trucha","salmon","bagre","mojarra","huevo","clara","pavo","lomo","carne magra"],
+  carne_roja:["carne","res","cerdo","costilla","chuleta","punta de anca","sobrebarriga","lomo de cerdo"],
+  lacteo:["leche","yogur","yogurt","queso","kumis","cuajada"],
+  tuberculo:["papa","yuca","platano","name","arracacha","papa criolla","sagu","achira","batata"],
+  frutoseco:["nuez","almendra","mani","marañon","semilla","chia","linaza","ajonjoli"],
+  pescado:["pescado","atun","tilapia","trucha","salmon","bagre","mojarra","sardina"]
+};
+function clasificarAlimento(a){
+  const t=_n(a);if(!t)return [];
+  const g=[];
+  for(const [grupo,lista] of Object.entries(GRUPOS_ALIM)){
+    if(lista.some(k=>t.includes(_n(k))))g.push(grupo);
+  }
+  // "arroz integral" es integral, no refinado
+  if(g.includes("integral"))return g.filter(x=>x!=="refinado");
+  return g;
+}
+function metricasDeComidas(rows){
+  const m={comidas:rows.length,verdura:0,fruta:0,leguminosa:0,integral:0,refinado:0,frito:0,ultraprocesado:0,azucar:0,proteina_magra:0,carne_roja:0,pescado:0,lacteo:0,tuberculo:0,frutoseco:0,alimentos:0,dias:new Set()};
+  rows.forEach(r=>{
+    if(r.fecha)m.dias.add(r.fecha);
+    let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}
+    (Array.isArray(f)?f:[]).forEach(x=>{
+      const nom=String(typeof x==="object"&&x?(x.name||""):x);
+      if(!nom.trim())return;
+      m.alimentos++;
+      clasificarAlimento(nom).forEach(g=>{if(m[g]!==undefined)m[g]++;});
+    });
+  });
+  m.dias=m.dias.size;
+  m.fyv=m.fruta+m.verdura;
+  return m;
+}
+function metricasTxt(m,etiqueta){
+  if(!m.comidas)return `${etiqueta}: sin comidas registradas`;
+  const partes=[
+    `${m.comidas} comidas en ${m.dias} día(s)`,
+    `frutas+verduras: ${m.fyv} apariciones (frutas ${m.fruta}, verduras ${m.verdura})`,
+    `leguminosas: ${m.leguminosa}`,
+    `pescado: ${m.pescado}`,
+    `granos integrales: ${m.integral} vs refinados: ${m.refinado}`,
+    `frituras: ${m.frito}`,
+    `ultraprocesados: ${m.ultraprocesado}`,
+    `azúcares/dulces/bebidas azucaradas: ${m.azucar}`,
+    `proteína magra: ${m.proteina_magra} vs carne roja: ${m.carne_roja}`,
+    `tubérculos: ${m.tuberculo}`,
+    `frutos secos: ${m.frutoseco}`
+  ];
+  return `${etiqueta}: ${partes.join("; ")}`;
+}
+function compararMetricas(act,prev,etiqueta){
+  if(!act.comidas||!prev.comidas)return "";
+  const norm=(m,k)=>m.comidas?+(m[k]/m.comidas).toFixed(2):0;
+  const campos=[["fyv","frutas y verduras"],["leguminosa","leguminosas"],["integral","integrales"],["frito","frituras"],["azucar","azúcares"],["ultraprocesado","ultraprocesados"],["pescado","pescado"]];
+  const dif=campos.map(([k,n])=>{
+    const a=norm(act,k),p=norm(prev,k);
+    if(a===p)return null;
+    return `${n}: ${p} → ${a} por comida`;
+  }).filter(Boolean);
+  return dif.length?`${etiqueta} (por comida, para comparar periodos de distinto tamaño): ${dif.join("; ")}`:"";
+}
+
 let GUIA_OMS="";
 const guiaOMSCtx=()=>GUIA_OMS?`
 GUÍA OMS VIGENTE (resumen actualizado desde la web — si alguna cifra difiere de tu conocimiento previo, usa ESTAS cifras):
 ${GUIA_OMS}
 `:"";
 
-async function analizarTexto(alimentos,hp){
+async function analizarTexto(alimentos,hp,ctxDia,datos){
   const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
-  return iaText(`Eres nutricionista experto en gastronomía colombiana, basas tus recomendaciones en las guías de alimentación saludable de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, limitar sal a <5g/día, priorizar proteínas magras). ${ctx}
+  return iaText(`Eres nutricionista profesional con experiencia en educación nutricional y gastronomía colombiana. Tu meta es ayudar a esta persona a MEJORAR SUS HÁBITOS de forma sostenible, no a tener una comida perfecta. Te apoyas en las guías de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, sal <5g/día, grasas saturadas <10% de las calorías, priorizar proteínas magras y legumbres).${ctx}
 ${guiaOMSCtx()}
-Alimentos registrados: ${alimentos.join(", ")}.
+Alimentos registrados en esta comida: ${alimentos.join(", ")}.
+${ctxDia?`Otras comidas que ya registró HOY: ${ctxDia}. Analiza esta comida dentro del día completo.`:"No hay otras comidas registradas hoy (eso NO significa que no haya comido: puede que no las registrara)."}
+${datos&&datos.semana?`
+DATOS MEDIDOS POR LA APP (conteos reales de sus registros, no estimaciones tuyas — úsalos como haría un nutricionista con la historia del paciente):
+- ${datos.semana}
+${datos.comparacion?`- Cambio respecto a la semana anterior → ${datos.comparacion}`:""}
+Cuando un conteo respalde tu consejo, MENCIÓNALO con el número concreto (ej. "van 4 frituras en tus últimos 7 días"). Si el conteo muestra una MEJORA real frente a la semana anterior, celébrala explícitamente y con el dato: eso es lo que sostiene el hábito. Nunca inventes conteos que no estén en esta lista.`:""}
+${datos&&datos.previas?`
+CONSEJOS QUE YA LE DISTE ANTES (los más recientes): ${datos.previas}
+No repitas el mismo consejo con otras palabras. Si el patrón que señalaste persiste, hazle seguimiento con naturalidad y propón un paso más pequeño o distinto. Si ya lo corrigió, reconócelo.`:""}
 
-Da un consejo concreto y accionable citando cifras u orientaciones de la OMS cuando aplique (no solo "come más variado", di cuánto o qué tipo). Si la condición reportada del perfil es un valor de laboratorio (ej. "hemoglobina alta", "colesterol alto"), NO des instrucciones dietéticas específicas basadas en asumir la causa — esos valores pueden tener explicaciones normales (ej. en Bogotá y otras ciudades de altura, la hemoglobina alta suele ser una adaptación fisiológica normal, no una enfermedad). En esos casos da recomendaciones nutricionales generales y sugiere que consulte a su médico o nutricionista para interpretar ese valor correctamente, sin asumir tú la causa.
+CÓMO ANALIZAR:
+1. Empieza SIEMPRE reconociendo algo concreto que hizo bien en esta comida (un vegetal, una proteína, una fruta, una preparación). Si de verdad no hay nada rescatable, reconoce el hecho de estar registrando.
+2. Señala UNA sola oportunidad de mejora: la de mayor impacto real, no una lista. Prioriza lo estructural y repetido (ej. cambiar arroz/pasta/pan blanco por su versión integral) sobre lo puntual.
+3. Traduce las cifras a ACCIONES CON COMIDA. Nunca pidas "reduce las grasas saturadas al 10% de tus calorías"; di "una fritura menos por semana" o "alterna la fritura con horno o plancha".
+4. Las metas de la OMS son DIARIAS, no de una sola comida: no exijas que un plato solo cumpla los 400g de frutas y verduras, ni mandes agregar fruta "para cumplir la cuota". Si en el día ya hubo frutas o verduras, reconócelo en vez de volver a pedirlas.
+5. No inventes cantidades, calorías exactas ni métodos de preparación que el usuario no dijo. Si algo depende de la porción o de cómo se preparó, dilo en condicional ("si fue frita en bastante aceite...").
+6. No etiquetes alimentos como buenos o malos, no culpabilices, no prohíbas. Nada de dietas restrictivas ni mensajes extremos. Sugiere variar y alternar, no eliminar.
+7. No diagnostiques ni atribuyas enfermedades o deficiencias a partir de la comida. Si la condición reportada del perfil es un valor de laboratorio (ej. "hemoglobina alta", "colesterol alto"), NO des instrucciones dietéticas asumiendo la causa — esos valores pueden tener explicaciones normales (ej. en Bogotá y otras ciudades de altura la hemoglobina alta suele ser una adaptación fisiológica normal). Da orientación general y sugiere consultar a su médico o nutricionista.
+8. Usa el perfil (IMC, ICC, actividad, dieta, alergias) cuando aporte algo real al consejo, no como adorno.
+9. Habla claro, cálido y breve, sin tecnicismos ni sermones. Que al leerlo sepa qué hizo bien y cuál es el cambio más sencillo que puede hacer.
+
+"calorias_aprox" es solo un orden de magnitud sin cantidades declaradas: si no puedes estimarlo con sensatez, responde "aprox." sin número.
 
 Responde SOLO JSON sin backticks:
-{"recomendacion":"consejo concreto 2-3 oraciones, con referencia a una pauta de la OMS cuando aplique","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["nutrientes o grupos de alimentos faltantes según la pauta OMS del plato saludable"]}`);
+{"recomendacion":"2-3 oraciones: primero el acierto concreto, luego el único cambio sugerido en lenguaje de comida","semaforo":"verde|amarillo|rojo","calorias_aprox":"X kcal","faltantes":["grupos de alimentos que ayudarían a completar el DÍA según la OMS, máx 3; vacío si el día ya va bien"]}`);
 }
 
 async function analizarFoto(b64,type,hp){
@@ -330,6 +423,8 @@ ${guiaOMSCtx()}
 Esto es lo que el usuario registró durante ${datos.mes}:
 - Nutrición: ${datos.nutricion}
 - ALIMENTOS REALES que registró en el mes, con cuántas veces apareció cada uno: ${datos.alimentosTxt||"ninguno"}
+- CONTEOS MEDIDOS POR LA APP (reales, no los estimes tú): ${datos.metricasMes||"sin datos"}
+${datos.compMes?`- EVOLUCIÓN MEDIDA → ${datos.compMes}`:""}
 - Hidratación: ${datos.hidratacion}
 - Ejercicio: ${datos.ejercicio}
 - Sueño: ${datos.sueno}
@@ -347,6 +442,7 @@ ${datos.tieneBienestar?`LONGEVIDAD — analiza también esta dimensión, con el 
 Al menos una de las metas del mes debe ser social o de fuerza, no solo de alimentación.`:`El usuario aún no ha respondido el chequeo de bienestar, así que no opines sobre sus vínculos ni su ánimo. Invítalo una sola vez, con calidez, a responderlo desde su Perfil para que el próximo informe incluya la dimensión social, que la OMS considera clave para la longevidad.`}
 
 ${datos.totalComidas?`ANALIZA COMO NUTRICIONISTA, con los alimentos reales de la lista — esta es la parte más importante:
+0. Apóyate en los CONTEOS MEDIDOS y cita los números al opinar (ej. "solo 3 apariciones de leguminosas en todo el mes"). Si la EVOLUCIÓN MEDIDA muestra mejoras frente al mes anterior, ábrelo celebrándolas con el dato concreto: ver el cambio reflejado es lo que sostiene el hábito. Si empeoró, dilo sin dramatizar y propón un paso pequeño.
 1. Nombra alimentos CONCRETOS de su lista al elogiar y al señalar excesos (ej. "veo arroz en casi todos tus almuerzos", "el aguacate y la papaya suman muy bien"). Nada de frases genéricas tipo "mejora tu alimentación".
 2. Contrasta lo registrado contra las guías de la OMS: mínimo 400g (5 porciones) de frutas y verduras al día, preferir granos integrales sobre refinados, azúcares libres <10% de las calorías, sal <5g/día, priorizar proteínas magras y limitar carnes procesadas y frituras.
 3. Di qué GRUPOS le faltaron según lo registrado (verduras, legumbres/leguminosas, pescado, granos integrales, lácteos, frutas) y qué apareció en exceso (frituras, refinados, azúcar).
@@ -1116,10 +1212,16 @@ function PatientApp({onLogout,user,token}){
     }
     const bMes=bienestarHist.filter(b=>b.fecha&&enMes(b.fecha));
     const bUlt=bMes[0]||null;
+    const mMes=metricasDeComidas(comidas);
+    const metricasMes=metricasTxt(mMes,"Conteos medidos del mes");
+    const mesPrevD=new Date(mes.y,mes.m-1,1);
+    const enMesPrev=ds=>{const p=parseDs(ds);return p&&p.y===mesPrevD.getFullYear()&&p.m===mesPrevD.getMonth();};
+    const mPrevMes=metricasDeComidas(history.filter(r=>enMesPrev(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha)));
+    const compMes=compararMetricas(mMes,mPrevMes,"Comparación con el mes anterior");
     const bienestar=bUlt
       ?BIENESTAR_PREGUNTAS.map(p=>`${BIENESTAR_TXT[p.id]}: ${(p.ops.find(o=>o.v===bUlt[p.id])||{}).t||"sin dato"} (${bUlt[p.id]||"-"}/4)`).join("; ")
       :"el usuario no respondió el chequeo de bienestar este mes";
-    return {nutricion,alimentosTxt,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc,bienestar,tieneBienestar:!!bUlt};
+    return {nutricion,alimentosTxt,metricasMes,compMes,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc,bienestar,tieneBienestar:!!bUlt};
   };
   const generarAnalisisMes=async(key,mes,mesAnteriorTxt,forzar)=>{
     if(monthAiBusyRef.current||(monthAI[key]&&!forzar))return;
@@ -1322,7 +1424,7 @@ function PatientApp({onLogout,user,token}){
     if(all.length===0){setSavedMsg("⚠️ Selecciona al menos un alimento");setTimeout(()=>setSavedMsg(""),2500);return;}
     setSaving(true);setSavedMsg("Analizando nutrición...");
     let analisis=photoResult;
-    if(!analisis){try{const r=await analizarTexto(all,hpConDieta);analisis={ok:true,...r};setPhotoResult(analisis);}catch(_){}}
+    if(!analisis){try{const r=await analizarTexto(all,hpConDieta,ctxComidasHoy(MEALS[meal].label),datosNutri());analisis={ok:true,...r};guardarReco(r&&r.recomendacion);setPhotoResult(analisis);}catch(_){}}
     try{
       const ok=await syncMealLog({fecha:today,comida:MEALS[meal].label,alimentos:all,score_total:scores.total,score_inmunidad:scores.immunity,score_energia:scores.energy,score_concentracion:scores.focus,score_vitalidad:scores.vitality,semaforo:analisis?.semaforo,calorias_aprox:analisis?.calorias_aprox,notas:analisis?.recomendacion||""});
       if(ok){
@@ -1610,6 +1712,41 @@ function PatientApp({onLogout,user,token}){
       window.speechSynthesis.speak(u);
     }catch(_){if(onEnd)setTimeout(onEnd,300);}
   };
+  const rangoFechas=(desdeDiasAtras,hastaDiasAtras)=>{
+    const set=new Set();
+    for(let i=hastaDiasAtras;i<=desdeDiasAtras;i++){
+      const d=new Date();d.setDate(d.getDate()-i);
+      set.add(d.toLocaleDateString("es-CO"));
+    }
+    return set;
+  };
+  const datosNutri=()=>{
+    const s1=rangoFechas(6,0),s2=rangoFechas(13,7);
+    const mAct=metricasDeComidas(history.filter(r=>s1.has(r.fecha)));
+    const mPrev=metricasDeComidas(history.filter(r=>s2.has(r.fecha)));
+    let previas="";
+    try{
+      const arr=JSON.parse(localStorage.getItem(sk(perfil,"recos_previas"))||"[]");
+      previas=arr.slice(0,4).map(x=>`"${x}"`).join(" | ");
+    }catch(_){}
+    return {semana:metricasTxt(mAct,"Últimos 7 días"),comparacion:compararMetricas(mAct,mPrev,"Semana actual vs anterior"),previas};
+  };
+  const guardarReco=(txt)=>{
+    if(!txt)return;
+    try{
+      const arr=JSON.parse(localStorage.getItem(sk(perfil,"recos_previas"))||"[]");
+      localStorage.setItem(sk(perfil,"recos_previas"),JSON.stringify([txt,...arr].slice(0,8)));
+    }catch(_){}
+  };
+  const ctxComidasHoy=(excluir)=>{
+    const hoyRows=history.filter(r=>r.fecha===today&&(!excluir||r.comida!==excluir));
+    if(!hoyRows.length)return "";
+    return hoyRows.map(r=>{
+      let f=[];try{f=JSON.parse(typeof r.alimentos==="string"?r.alimentos:JSON.stringify(r.alimentos||[]));}catch(_){}
+      const lista=(Array.isArray(f)?f:[]).map(x=>String(typeof x==="object"&&x?(x.name||""):x)).filter(Boolean).join(", ");
+      return `${r.comida}: ${lista||"sin detalle"}`;
+    }).join(" | ");
+  };
   const VOICE_OK=/(^|\s)(listo|lista|guardar|guarda|gu[aá]rdalo|as[ií] est[aá] bien|est[aá] bien|correcto|perfecto|s[ií],? guarda)(\s|$|\.)/i;
   const VOICE_NO=/(^|\s)(cancela|cancelar|canc[eé]lalo|olv[ií]dalo|no guardes|borra todo|desc[aá]rtalo|descartar)(\s|$|\.)/i;
   const guardarPendiente=async(p)=>{
@@ -1618,7 +1755,7 @@ function PatientApp({onLogout,user,token}){
     applyVoz(p);
     let analisis=p.analisis||null;
     const foods=(p.comidas||[]).flatMap(c=>c.alimentos||[]);
-    if(!analisis&&foods.length){try{analisis=await analizarTexto(foods,hpConDieta);}catch(_){}}
+    if(!analisis&&foods.length){try{const mom=(p.comidas&&p.comidas[0]&&p.comidas[0].momento)||null;analisis=await analizarTexto(foods,hpConDieta,ctxComidasHoy(mom),datosNutri());guardarReco(analisis&&analisis.recomendacion);}catch(_){}}
     setVoicePending(null);
     setVoiceResult({respuesta:"¡Guardado! ✅",analisis});
     hablar("¡Listo, guardado!");
@@ -2206,6 +2343,40 @@ function PatientApp({onLogout,user,token}){
       )}
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
+          {(()=>{
+            const s1=rangoFechas(6,0),s2=rangoFechas(13,7);
+            const a=metricasDeComidas(history.filter(r=>s1.has(r.fecha)));
+            const b=metricasDeComidas(history.filter(r=>s2.has(r.fecha)));
+            if(!a.comidas&&!b.comidas)return null;
+            const filas=[
+              {k:"fyv",n:"🥗 Frutas y verduras",mejorSube:true},
+              {k:"leguminosa",n:"🫘 Leguminosas",mejorSube:true},
+              {k:"integral",n:"🌾 Granos integrales",mejorSube:true},
+              {k:"pescado",n:"🐟 Pescado",mejorSube:true},
+              {k:"frito",n:"🍟 Frituras",mejorSube:false},
+              {k:"azucar",n:"🍬 Azúcares y dulces",mejorSube:false}
+            ];
+            return (
+              <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:18,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+                <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>📊 Tu semana en números</div>
+                <div style={{fontSize:10.5,color:"#999",marginBottom:12}}>Veces que apareció cada grupo en tus registros · últimos 7 días vs. los 7 anteriores</div>
+                {filas.map(f=>{
+                  const va=a[f.k]||0,vb=b[f.k]||0,d=va-vb;
+                  const bueno=f.mejorSube?d>0:d<0;
+                  const color=d===0?"#999":(bueno?"#2E9E5B":"#E76F51");
+                  return (
+                    <div key={f.k} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #F5F5F5"}}>
+                      <span style={{fontSize:12,color:"#555"}}>{f.n}</span>
+                      <span style={{fontSize:12,fontWeight:800,color:"#333"}}>{va}
+                        <span style={{fontSize:11,fontWeight:700,color,marginLeft:7}}>{d===0?"=":(d>0?`▲ +${d}`:`▼ ${d}`)}</span>
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={{fontSize:10,color:"#bbb",marginTop:9,lineHeight:1.4}}>Cuenta apariciones en lo que registraste, no porciones exactas. Registrar más días hace estos números más fieles.</div>
+              </div>
+            );
+          })()}
           <div style={{marginBottom:18}}>
             <button onClick={analizarSemana} disabled={weeklyBusy} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:weeklyBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #6D5BD033"}}>{weeklyBusy?"🔍 Analizando tu semana…":"✨ Mi semana: energía y vitalidad"}</button>
             {weeklyAI&&(
