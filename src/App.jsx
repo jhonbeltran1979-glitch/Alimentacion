@@ -233,6 +233,49 @@ GUÍA OMS VIGENTE (resumen actualizado desde la web — si alguna cifra difiere 
 ${GUIA_OMS}
 `:"";
 
+async function llamarAgente(token,modo,pregunta){
+  const res=await fetch("https://xhplpwcfdtiarrpypyif.supabase.co/functions/v1/nutri-agent",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},
+    body:JSON.stringify({modo,pregunta})
+  });
+  const d=await res.json();
+  if(d.error)throw new Error(d.error);
+  return d;
+}
+
+const METRICAS_META={fyv:"frutas y verduras",verdura:"verduras",fruta:"frutas",leguminosa:"leguminosas (fríjol, lenteja, garbanzo)",integral:"granos integrales",refinado:"granos refinados",frito:"frituras",ultraprocesado:"ultraprocesados",azucar:"azúcares y bebidas azucaradas",proteina_magra:"proteínas magras",pescado:"pescado",frutoseco:"frutos secos y semillas",agua:"vasos de agua al día",ejercicio:"minutos de ejercicio a la semana"};
+
+async function planCuidado(hp,datos,metasActuales){
+  const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, ICC ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca proponer estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
+  return iaText(`Eres nutricionista profesional acompañando a un paciente en Colombia. No estás comentando una comida: estás definiendo o revisando su PLAN DE CUIDADO, como en una consulta de seguimiento. ${ctx}
+${guiaOMSCtx()}
+DATOS MEDIDOS POR LA APP (conteos reales de sus registros):
+${datos.semana}
+${datos.comparacion||""}
+${datos.mes?`Del mes: ${datos.mes}`:""}
+
+${metasActuales&&metasActuales.length?`PLAN ACTUAL Y SU AVANCE MEDIDO:
+${metasActuales.map(m=>`- "${m.titulo}" [metrica:${m.metrica}, objetivo semanal:${m.objetivo}, dirección:${m.direccion}] → va en ${m.valorActual} esta semana (${m.pct}% de la meta), lleva ${m.semanas} semana(s).`).join("\n")}
+
+Revisa cada meta con criterio clínico y decide su "accion":
+- "lograda" si ya la cumple de forma sostenida → felicítalo y propón una meta nueva que suba un escalón.
+- "mantener" si va en camino → anímalo, sin cambiar nada.
+- "ajustar" si lleva 2+ semanas lejos del objetivo → NO lo regañes: la meta era muy alta. Propón la misma métrica con un objetivo más pequeño y alcanzable.
+Devuelve además las metas nuevas que reemplacen a las logradas o ajustadas.`:`El paciente aún no tiene plan. Define 1 o 2 metas iniciales (nunca más de 2) partiendo de lo que los datos muestran como su mayor oportunidad.`}
+
+REGLAS DE LAS METAS:
+- Cada meta debe ser MEDIBLE con una de estas métricas exactas: ${Object.keys(METRICAS_META).join(", ")}.
+- "objetivo" es un número SEMANAL realista según lo que ya hace (si hoy come 1 leguminosa por semana, la meta es 2 o 3, no 7). Un cambio pequeño y sostenible vence a uno ambicioso que abandona.
+- "direccion": "subir" para lo que debe aumentar, "bajar" para lo que debe reducirse. Nunca propongas llegar a 0: reducir, no eliminar.
+- El título se le muestra al paciente: concreto, en lenguaje de comida y sin tecnicismos (ej. "Cambiar el arroz blanco por integral 3 veces por semana").
+- "porque" es una frase corta que explique el beneficio en términos que él entienda, apoyada en la OMS cuando aplique.
+- No propongas dietas restrictivas, ayunos, ni conteo de calorías. No diagnostiques.
+
+Responde SOLO JSON sin backticks:
+{"mensaje":"2-3 oraciones cálidas de nutricionista: cómo va, qué se reconoce y hacia dónde vamos","revisiones":[{"id":"id de la meta actual","accion":"lograda|mantener|ajustar","comentario":"una frase para el paciente"}],"nuevas":[{"titulo":"...","porque":"...","metrica":"integral","objetivo":3,"direccion":"subir"}]}`);
+}
+
 async function analizarTexto(alimentos,hp,ctxDia,datos){
   const ctx=hp?`Perfil: ${hp.edad} años${hp.sexo?`, sexo ${hp.sexo}`:""}${(hp.talla&&hp.peso)?`, IMC ${(Number(hp.peso)/((Number(hp.talla)/100)**2)).toFixed(1)}`:""}${(hp.cintura&&hp.cadera)?`, índice cintura-cadera ${(Number(hp.cintura)/Number(hp.cadera)).toFixed(2)}`:""}, actividad "${hp.ejercicio}", condición reportada "${hp.enfermedad}".${hp.tipo_dieta?` Dieta: ${hp.tipo_dieta}.`:""}${(hp.alergias&&hp.alergias.length)?` ALERGIAS (nunca recomendar estos alimentos): ${hp.alergias.join(", ")}.`:""}`:"";
   return iaText(`Eres nutricionista profesional con experiencia en educación nutricional y gastronomía colombiana. Tu meta es ayudar a esta persona a MEJORAR SUS HÁBITOS de forma sostenible, no a tener una comida perfecta. Te apoyas en las guías de la OMS (mínimo 400g/5 porciones de frutas y verduras al día, azúcares libres <10% de las calorías, preferir granos integrales sobre refinados, sal <5g/día, grasas saturadas <10% de las calorías, priorizar proteínas magras y legumbres).${ctx}
@@ -244,6 +287,9 @@ DATOS MEDIDOS POR LA APP (conteos reales de sus registros, no estimaciones tuyas
 - ${datos.semana}
 ${datos.comparacion?`- Cambio respecto a la semana anterior → ${datos.comparacion}`:""}
 Cuando un conteo respalde tu consejo, MENCIÓNALO con el número concreto (ej. "van 4 frituras en tus últimos 7 días"). Si el conteo muestra una MEJORA real frente a la semana anterior, celébrala explícitamente y con el dato: eso es lo que sostiene el hábito. Nunca inventes conteos que no estén en esta lista.`:""}
+${datos&&datos.metasTxt?`
+PLAN DE CUIDADO ACTIVO del paciente: ${datos.metasTxt}
+Si esta comida aporta a alguna meta, reconócelo con el avance concreto. Si la contradice, recuérdaselo con calidez y sin regaño. Alinea tu consejo con el plan en vez de abrir un frente nuevo.`:""}
 ${datos&&datos.previas?`
 CONSEJOS QUE YA LE DISTE ANTES (los más recientes): ${datos.previas}
 No repitas el mismo consejo con otras palabras. Si el patrón que señalaste persiste, hazle seguimiento con naturalidad y propón un paso más pequeño o distinto. Si ya lo corrigió, reconócelo.`:""}
@@ -432,6 +478,8 @@ ${datos.compMes?`- EVOLUCIÓN MEDIDA → ${datos.compMes}`:""}
 - Índice cintura-cadera: ${datos.icc||"sin datos"}
 - BIENESTAR Y VÍNCULOS (respuestas del usuario, escala 1 a 4 donde 4 es lo más favorable): ${datos.bienestar}
 ${datos.mesAnterior?`Comparación con el mes anterior: ${datos.mesAnterior}`:""}
+${datos.metasPlan?`- PLAN DE CUIDADO VIGENTE y su avance medido: ${datos.metasPlan}
+Evalúa el plan explícitamente: qué meta cumplió y qué le costó. Las metas del mes que propongas deben CONTINUAR este plan (subir un escalón lo logrado, o hacer más pequeño lo que no salió), no empezar de cero con temas nuevos.`:""}
 
 ${datos.tieneBienestar?`LONGEVIDAD — analiza también esta dimensión, con el mismo peso que la comida:
 - La OMS enmarca el envejecimiento saludable como mantener la CAPACIDAD FUNCIONAL (moverse, pensar y relacionarse con autonomía), no solo vivir más años; y recuerda que el entorno físico y social pesa más que la genética.
@@ -738,6 +786,12 @@ function PatientApp({onLogout,user,token}){
   const [caderaNueva,setCaderaNueva]=useState("");
   const [pesoHist,setPesoHist]=useState([]);
   const [bienestarHist,setBienestarHist]=useState([]);
+  const [metas,setMetas]=useState([]);
+  const [cuidadoBusy,setCuidadoBusy]=useState(false);
+  const [agenteBusy,setAgenteBusy]=useState(false);
+  const [agenteMsg,setAgenteMsg]=useState(null);
+  const [agentePregunta,setAgentePregunta]=useState("");
+  const [planMsg,setPlanMsg]=useState(null);
   const [chequeoBienestar,setChequeoBienestar]=useState(null);
   const [bienestarResp,setBienestarResp]=useState({});
   const [aviso,setAviso]=useState(null);
@@ -962,6 +1016,11 @@ function PatientApp({onLogout,user,token}){
         const rB=await fetch(`${SB_URL}/rest/v1/wellbeing_logs?patient_id=eq.${user.id}&select=*&order=fecha.desc&limit=24`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
         const bRows=await rB.json();
         if(Array.isArray(bRows))setBienestarHist(bRows);
+      }catch(_){}
+      try{
+        const rG=await fetch(`${SB_URL}/rest/v1/care_goals?patient_id=eq.${user.id}&estado=eq.activa&select=*&order=created_at.desc`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+        const gRows=await rG.json();
+        if(Array.isArray(gRows))setMetas(gRows);
       }catch(_){}
       try{
         const rP=await fetch(`${SB_URL}/rest/v1/preferences?user_id=eq.${user.id}&select=tipo_dieta,alergias,alimentos_no_gustan`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
@@ -1218,10 +1277,11 @@ function PatientApp({onLogout,user,token}){
     const enMesPrev=ds=>{const p=parseDs(ds);return p&&p.y===mesPrevD.getFullYear()&&p.m===mesPrevD.getMonth();};
     const mPrevMes=metricasDeComidas(history.filter(r=>enMesPrev(typeof r.fecha==="string"&&r.fecha.includes("T")?r.fecha.split("T")[0]:r.fecha)));
     const compMes=compararMetricas(mMes,mPrevMes,"Comparación con el mes anterior");
+    const metasPlan=metas.length?metas.map(m=>{const p=progresoMeta(m);return `"${m.titulo}" → va en ${p.valorActual}, meta ${m.direccion==="bajar"?"máx ":""}${m.objetivo}/semana (${p.pct}%)`;}).join(" | "):"";
     const bienestar=bUlt
       ?BIENESTAR_PREGUNTAS.map(p=>`${BIENESTAR_TXT[p.id]}: ${(p.ops.find(o=>o.v===bUlt[p.id])||{}).t||"sin dato"} (${bUlt[p.id]||"-"}/4)`).join("; ")
       :"el usuario no respondió el chequeo de bienestar este mes";
-    return {nutricion,alimentosTxt,metricasMes,compMes,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc,bienestar,tieneBienestar:!!bUlt};
+    return {nutricion,alimentosTxt,metricasMes,compMes,metasPlan,totalComidas:comidas.length,hidratacion,ejercicio,sueno,peso,icc,bienestar,tieneBienestar:!!bUlt};
   };
   const generarAnalisisMes=async(key,mes,mesAnteriorTxt,forzar)=>{
     if(monthAiBusyRef.current||(monthAI[key]&&!forzar))return;
@@ -1720,6 +1780,73 @@ function PatientApp({onLogout,user,token}){
     }
     return set;
   };
+  const progresoMeta=(m)=>{
+    const s1=rangoFechas(6,0);
+    let valor=0;
+    if(m.metrica==="agua"){
+      const vals=[...s1].map(ds=>ds===today?water:(waterHist[ds]!=null?waterHist[ds]:null)).filter(v=>v!=null);
+      valor=vals.length?+(vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1):0;
+    }else if(m.metrica==="ejercicio"){
+      valor=exLog.filter(e=>s1.has(e.date)).reduce((a,e)=>a+(e.min||0),0);
+    }else{
+      const mm=metricasDeComidas(history.filter(r=>s1.has(r.fecha)));
+      valor=mm[m.metrica]||0;
+    }
+    const obj=Number(m.objetivo)||1;
+    const pct=m.direccion==="bajar"
+      ?(valor<=obj?100:Math.max(0,Math.round(obj/Math.max(valor,0.1)*100)))
+      :Math.min(100,Math.round(valor/obj*100));
+    const semanas=m.inicio?Math.max(1,Math.ceil((Date.now()-new Date(m.inicio).getTime())/6048e5)):1;
+    return {valorActual:valor,pct,semanas};
+  };
+  const consultarAgente=async(modo,pregunta)=>{
+    if(agenteBusy||!token)return;
+    setAgenteBusy(true);setAgenteMsg(null);
+    try{
+      const d=await llamarAgente(token,modo,pregunta||"");
+      setAgenteMsg({texto:d.mensaje,tools:d.herramientas_usadas});
+      setAgentePregunta("");
+      if(user){
+        try{
+          const rG=await fetch(`${SB_URL}/rest/v1/care_goals?patient_id=eq.${user.id}&estado=eq.activa&select=*&order=created_at.desc`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+          const gRows=await rG.json();
+          if(Array.isArray(gRows))setMetas(gRows);
+        }catch(_){}
+      }
+    }catch(e){setAgenteMsg({texto:"No pude consultar a tu nutricionista ahora. Intenta en un momento."});}
+    setAgenteBusy(false);
+  };
+  const revisarPlan=async()=>{
+    if(cuidadoBusy)return;
+    setCuidadoBusy(true);setPlanMsg(null);
+    try{
+      const dn=datosNutri();
+      const actuales=metas.map(m=>({...m,...progresoMeta(m)}));
+      const r=await planCuidado(hpConDieta,dn,actuales);
+      const cerrar=[],nuevasSet=[];
+      (r.revisiones||[]).forEach(rev=>{
+        if(rev.accion==="lograda"||rev.accion==="ajustar")cerrar.push({id:rev.id,estado:rev.accion==="lograda"?"lograda":"ajustada"});
+      });
+      if(user&&token){
+        for(const c of cerrar){
+          try{await fetch(`${SB_URL}/rest/v1/care_goals?id=eq.${c.id}`,{method:"PATCH",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=minimal"},body:JSON.stringify({estado:c.estado})});}catch(_){}
+        }
+      }
+      const hoyISO=isoHoy();
+      const finISO=new Date(Date.now()+28*864e5).toISOString().slice(0,10);
+      for(const n of (r.nuevas||[]).slice(0,2)){
+        if(!n||!n.metrica||!METRICAS_META[n.metrica])continue;
+        const fila={patient_id:user?user.id:null,titulo:n.titulo,porque:n.porque||null,metrica:n.metrica,objetivo:Number(n.objetivo)||1,direccion:n.direccion==="bajar"?"bajar":"subir",inicio:hoyISO,fin:finISO,estado:"activa"};
+        if(user&&token){
+          try{const rr=await fetch(`${SB_URL}/rest/v1/care_goals`,{method:"POST",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`,"Content-Type":"application/json",Prefer:"return=representation"},body:JSON.stringify(fila)});const rows=await rr.json();nuevasSet.push(Array.isArray(rows)&&rows[0]?rows[0]:{...fila,id:"tmp"+Math.random()});}catch(_){nuevasSet.push({...fila,id:"tmp"+Math.random()});}
+        }else nuevasSet.push({...fila,id:"tmp"+Math.random()});
+      }
+      const cerradas=new Set(cerrar.map(c=>c.id));
+      setMetas(prev=>[...nuevasSet,...prev.filter(m=>!cerradas.has(m.id))]);
+      setPlanMsg({mensaje:r.mensaje||"",revisiones:r.revisiones||[]});
+    }catch(_){setPlanMsg({mensaje:"No pude revisar el plan ahora, intenta de nuevo en un momento.",revisiones:[]});}
+    setCuidadoBusy(false);
+  };
   const datosNutri=()=>{
     const s1=rangoFechas(6,0),s2=rangoFechas(13,7);
     const mAct=metricasDeComidas(history.filter(r=>s1.has(r.fecha)));
@@ -1729,7 +1856,8 @@ function PatientApp({onLogout,user,token}){
       const arr=JSON.parse(localStorage.getItem(sk(perfil,"recos_previas"))||"[]");
       previas=arr.slice(0,4).map(x=>`"${x}"`).join(" | ");
     }catch(_){}
-    return {semana:metricasTxt(mAct,"Últimos 7 días"),comparacion:compararMetricas(mAct,mPrev,"Semana actual vs anterior"),previas};
+    const metasTxt=metas.length?metas.map(m=>{const p=progresoMeta(m);return `${m.titulo} (${METRICAS_META[m.metrica]||m.metrica}: va en ${p.valorActual}, meta ${m.direccion==="bajar"?"máx ":""}${m.objetivo} por semana)`;}).join(" | "):"";
+    return {semana:metricasTxt(mAct,"Últimos 7 días"),comparacion:compararMetricas(mAct,mPrev,"Semana actual vs anterior"),previas,metasTxt};
   };
   const guardarReco=(txt)=>{
     if(!txt)return;
@@ -2343,6 +2471,50 @@ function PatientApp({onLogout,user,token}){
       )}
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
+          <div style={{background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 6px 22px #6D5BD044"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:3}}>🩺 Tu nutricionista</div>
+            <div style={{fontSize:10.5,color:"#EDE9FF",marginBottom:11,lineHeight:1.45}}>Revisa tus registros, tu plan y tus medidas antes de responderte. Pregúntale lo que quieras.</div>
+            <div style={{display:"flex",gap:7,marginBottom:9}}>
+              <input value={agentePregunta} onChange={e=>setAgentePregunta(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&agentePregunta.trim())consultarAgente("consulta",agentePregunta.trim());}} placeholder="Ej: ¿cómo voy con el arroz?" style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:11,border:"none",fontSize:12.5,outline:"none",boxSizing:"border-box"}}/>
+              <button onClick={()=>consultarAgente("consulta",agentePregunta.trim())} disabled={agenteBusy||!agentePregunta.trim()} style={{padding:"11px 15px",borderRadius:11,border:"none",background:agenteBusy||!agentePregunta.trim()?"#ffffff55":"#fff",color:"#6D5BD0",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Enviar</button>
+            </div>
+            <button onClick={()=>consultarAgente("revision","")} disabled={agenteBusy} style={{width:"100%",padding:"11px",borderRadius:11,border:"1.5px solid #ffffff88",background:"transparent",color:"#fff",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>{agenteBusy?"🔍 Revisando tus datos…":"📋 Revisión completa de mi caso"}</button>
+            {agenteMsg&&(
+              <div style={{background:"#fff",borderRadius:12,padding:"12px 13px",marginTop:11}}>
+                <div style={{fontSize:12.5,color:"#444",lineHeight:1.55,whiteSpace:"pre-wrap"}}>{agenteMsg.texto}</div>
+                {agenteMsg.tools?<div style={{fontSize:9.5,color:"#bbb",marginTop:8}}>Consultó {agenteMsg.tools} fuente(s) de tus datos</div>:null}
+              </div>
+            )}
+          </div>
+          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>🎯 Tu plan de cuidado</div>
+            <div style={{fontSize:10.5,color:"#999",marginBottom:12}}>Metas medibles que revisamos contigo cada 4 semanas</div>
+            {metas.length===0&&<div style={{fontSize:12,color:"#777",lineHeight:1.5,marginBottom:12}}>Aún no tienes metas. Con lo que ya registraste puedo proponerte 1 o 2 cambios pequeños y medibles para empezar.</div>}
+            {metas.map(m=>{
+              const p=progresoMeta(m);
+              const col=p.pct>=100?"#2E9E5B":(p.pct>=60?"#E8A33D":"#E76F51");
+              return (
+                <div key={m.id} style={{marginBottom:12,paddingBottom:11,borderBottom:"1px solid #F5F5F5"}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:"#444",lineHeight:1.35,marginBottom:3}}>{m.titulo}</div>
+                  {m.porque&&<div style={{fontSize:10.5,color:"#999",marginBottom:6,lineHeight:1.4}}>{m.porque}</div>}
+                  <div style={{height:7,background:"#F2F0FC",borderRadius:8,overflow:"hidden",marginBottom:4}}>
+                    <div style={{width:`${Math.min(100,p.pct)}%`,height:"100%",background:col,borderRadius:8,transition:"width .4s"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:"#888"}}>
+                    <span>Esta semana: <b style={{color:"#555"}}>{p.valorActual}</b> · meta {m.direccion==="bajar"?"máx ":""}{m.objetivo}</span>
+                    <span style={{color:col,fontWeight:800}}>{p.pct}%</span>
+                  </div>
+                </div>
+              );
+            })}
+            {planMsg&&planMsg.mensaje&&(
+              <div style={{fontSize:12,color:"#4A3B9E",background:"#F8F7FE",borderRadius:10,padding:"10px 12px",marginBottom:10,lineHeight:1.5}}>{planMsg.mensaje}</div>
+            )}
+            {planMsg&&(planMsg.revisiones||[]).map((r,i)=>r.comentario?(
+              <div key={i} style={{fontSize:11,color:"#666",marginBottom:5,lineHeight:1.4}}>• {r.comentario}</div>
+            ):null)}
+            <button onClick={revisarPlan} disabled={cuidadoBusy} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:cuidadoBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontWeight:800,fontSize:13,cursor:cuidadoBusy?"default":"pointer"}}>{cuidadoBusy?"🔍 Revisando tu plan…":(metas.length?"🔄 Revisar mi plan":"✨ Crear mi plan de cuidado")}</button>
+          </div>
           {(()=>{
             const s1=rangoFechas(6,0),s2=rangoFechas(13,7);
             const a=metricasDeComidas(history.filter(r=>s1.has(r.fecha)));
