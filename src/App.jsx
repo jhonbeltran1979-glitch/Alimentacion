@@ -2231,7 +2231,7 @@ function PatientApp({onLogout,user,token}){
   // Filtro de búsqueda
   const filteredCats = search ? FOOD_CATEGORIES.map(c=>({...c,items:c.items.filter(i=>i.toLowerCase().includes(search.toLowerCase()))})).filter(c=>c.items.length>0) : FOOD_CATEGORIES;
 
-  const TABS=[{icon:"🏠",label:"Inicio"},{icon:"📊",label:"Score"},{icon:"📅",label:"Historial"},{icon:"🏅",label:"Logros"},{icon:"💧",label:"Agua"},{icon:"😴",label:"Sueño"},{icon:"💪",label:"Ejercicio"}];
+  const TABS=[{icon:"🏠",label:"Inicio"},{icon:"❤️",label:"Mi salud"},{icon:"📅",label:"Historial"},{icon:"🏅",label:"Logros"},{icon:"💧",label:"Agua"},{icon:"😴",label:"Sueño"},{icon:"💪",label:"Ejercicio"}];
 
   return(
     <div style={{minHeight:"100vh",background:"#F8F7FE",fontFamily:"'Segoe UI',system-ui,sans-serif",color:"#1A1A1A",maxWidth:480,margin:"0 auto",paddingBottom:80}}>
@@ -2464,56 +2464,16 @@ function PatientApp({onLogout,user,token}){
       {/* ══ TAB 1: SCORE ══════════════════════════════════════════ */}
       {(tab===1||tab===2||tab===3)&&(
         <div style={{padding:"14px 14px 0",display:"flex",gap:8}}>
-          {[["📊","Score",1],["📅","Historial",2],["🏅","Logros",3]].map(([ic,lb,tb])=>(
+          {[["❤️","Mi salud",1],["📅","Historial",2],["🏅","Logros",3]].map(([ic,lb,tb])=>(
             <button key={tb} onClick={()=>setTab(tb)} style={{flex:1,padding:"10px 4px",borderRadius:12,border:"none",background:tab===tb?"#6D5BD0":"#fff",color:tab===tb?"#fff":"#888",fontWeight:800,fontSize:12,cursor:"pointer",boxShadow:"0 2px 8px rgba(0,0,0,0.05)"}}>{ic} {lb}</button>
           ))}
         </div>
       )}
       {tab===1&&(
         <div style={{padding:"16px 14px"}}>
-          <div style={{background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 6px 22px #6D5BD044"}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:3}}>🩺 Tu nutricionista</div>
-            <div style={{fontSize:10.5,color:"#EDE9FF",marginBottom:11,lineHeight:1.45}}>Revisa tus registros, tu plan y tus medidas antes de responderte. Pregúntale lo que quieras.</div>
-            <div style={{display:"flex",gap:7,marginBottom:9}}>
-              <input value={agentePregunta} onChange={e=>setAgentePregunta(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&agentePregunta.trim())consultarAgente("consulta",agentePregunta.trim());}} placeholder="Ej: ¿cómo voy con el arroz?" style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:11,border:"none",fontSize:12.5,outline:"none",boxSizing:"border-box"}}/>
-              <button onClick={()=>consultarAgente("consulta",agentePregunta.trim())} disabled={agenteBusy||!agentePregunta.trim()} style={{padding:"11px 15px",borderRadius:11,border:"none",background:agenteBusy||!agentePregunta.trim()?"#ffffff55":"#fff",color:"#6D5BD0",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Enviar</button>
-            </div>
-            <button onClick={()=>consultarAgente("revision","")} disabled={agenteBusy} style={{width:"100%",padding:"11px",borderRadius:11,border:"1.5px solid #ffffff88",background:"transparent",color:"#fff",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>{agenteBusy?"🔍 Revisando tus datos…":"📋 Revisión completa de mi caso"}</button>
-            {agenteMsg&&(
-              <div style={{background:"#fff",borderRadius:12,padding:"12px 13px",marginTop:11}}>
-                <div style={{fontSize:12.5,color:"#444",lineHeight:1.55,whiteSpace:"pre-wrap"}}>{agenteMsg.texto}</div>
-                {agenteMsg.tools?<div style={{fontSize:9.5,color:"#bbb",marginTop:8}}>Consultó {agenteMsg.tools} fuente(s) de tus datos</div>:null}
-              </div>
-            )}
-          </div>
-          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
-            <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>🎯 Tu plan de cuidado</div>
-            <div style={{fontSize:10.5,color:"#999",marginBottom:12}}>Metas medibles que revisamos contigo cada 4 semanas</div>
-            {metas.length===0&&<div style={{fontSize:12,color:"#777",lineHeight:1.5,marginBottom:12}}>Aún no tienes metas. Con lo que ya registraste puedo proponerte 1 o 2 cambios pequeños y medibles para empezar.</div>}
-            {metas.map(m=>{
-              const p=progresoMeta(m);
-              const col=p.pct>=100?"#2E9E5B":(p.pct>=60?"#E8A33D":"#E76F51");
-              return (
-                <div key={m.id} style={{marginBottom:12,paddingBottom:11,borderBottom:"1px solid #F5F5F5"}}>
-                  <div style={{fontSize:12.5,fontWeight:700,color:"#444",lineHeight:1.35,marginBottom:3}}>{m.titulo}</div>
-                  {m.porque&&<div style={{fontSize:10.5,color:"#999",marginBottom:6,lineHeight:1.4}}>{m.porque}</div>}
-                  <div style={{height:7,background:"#F2F0FC",borderRadius:8,overflow:"hidden",marginBottom:4}}>
-                    <div style={{width:`${Math.min(100,p.pct)}%`,height:"100%",background:col,borderRadius:8,transition:"width .4s"}}/>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:"#888"}}>
-                    <span>Esta semana: <b style={{color:"#555"}}>{p.valorActual}</b> · meta {m.direccion==="bajar"?"máx ":""}{m.objetivo}</span>
-                    <span style={{color:col,fontWeight:800}}>{p.pct}%</span>
-                  </div>
-                </div>
-              );
-            })}
-            {planMsg&&planMsg.mensaje&&(
-              <div style={{fontSize:12,color:"#4A3B9E",background:"#F8F7FE",borderRadius:10,padding:"10px 12px",marginBottom:10,lineHeight:1.5}}>{planMsg.mensaje}</div>
-            )}
-            {planMsg&&(planMsg.revisiones||[]).map((r,i)=>r.comentario?(
-              <div key={i} style={{fontSize:11,color:"#666",marginBottom:5,lineHeight:1.4}}>• {r.comentario}</div>
-            ):null)}
-            <button onClick={revisarPlan} disabled={cuidadoBusy} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:cuidadoBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontWeight:800,fontSize:13,cursor:cuidadoBusy?"default":"pointer"}}>{cuidadoBusy?"🔍 Revisando tu plan…":(metas.length?"🔄 Revisar mi plan":"✨ Crear mi plan de cuidado")}</button>
+          <div style={{marginBottom:14}}>
+            <div style={{fontSize:19,fontWeight:900,color:"#333"}}>❤️ Mi salud</div>
+            <div style={{fontSize:11.5,color:"#999",marginTop:2}}>Cómo vienes, tus metas y tu nutricionista — todo en un lugar.</div>
           </div>
           {(()=>{
             const s1=rangoFechas(6,0),s2=rangoFechas(13,7);
@@ -2549,6 +2509,50 @@ function PatientApp({onLogout,user,token}){
               </div>
             );
           })()}
+          <div style={{background:"#fff",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#6D5BD0",marginBottom:3}}>🎯 Tu plan de cuidado</div>
+            <div style={{fontSize:10.5,color:"#999",marginBottom:12}}>Metas medibles que revisamos contigo cada 4 semanas</div>
+            {metas.length===0&&<div style={{fontSize:12,color:"#777",lineHeight:1.5,marginBottom:12}}>Aún no tienes metas. Con lo que ya registraste puedo proponerte 1 o 2 cambios pequeños y medibles para empezar.</div>}
+            {metas.map(m=>{
+              const p=progresoMeta(m);
+              const col=p.pct>=100?"#2E9E5B":(p.pct>=60?"#E8A33D":"#E76F51");
+              return (
+                <div key={m.id} style={{marginBottom:12,paddingBottom:11,borderBottom:"1px solid #F5F5F5"}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:"#444",lineHeight:1.35,marginBottom:3}}>{m.titulo}</div>
+                  {m.porque&&<div style={{fontSize:10.5,color:"#999",marginBottom:6,lineHeight:1.4}}>{m.porque}</div>}
+                  <div style={{height:7,background:"#F2F0FC",borderRadius:8,overflow:"hidden",marginBottom:4}}>
+                    <div style={{width:`${Math.min(100,p.pct)}%`,height:"100%",background:col,borderRadius:8,transition:"width .4s"}}/>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:"#888"}}>
+                    <span>Esta semana: <b style={{color:"#555"}}>{p.valorActual}</b> · meta {m.direccion==="bajar"?"máx ":""}{m.objetivo}</span>
+                    <span style={{color:col,fontWeight:800}}>{p.pct}%</span>
+                  </div>
+                </div>
+              );
+            })}
+            {planMsg&&planMsg.mensaje&&(
+              <div style={{fontSize:12,color:"#4A3B9E",background:"#F8F7FE",borderRadius:10,padding:"10px 12px",marginBottom:10,lineHeight:1.5}}>{planMsg.mensaje}</div>
+            )}
+            {planMsg&&(planMsg.revisiones||[]).map((r,i)=>r.comentario?(
+              <div key={i} style={{fontSize:11,color:"#666",marginBottom:5,lineHeight:1.4}}>• {r.comentario}</div>
+            ):null)}
+            <button onClick={revisarPlan} disabled={cuidadoBusy} style={{width:"100%",padding:"12px",borderRadius:12,border:"none",background:cuidadoBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontWeight:800,fontSize:13,cursor:cuidadoBusy?"default":"pointer"}}>{cuidadoBusy?"🔍 Revisando tu plan…":(metas.length?"🔄 Revisar mi plan":"✨ Crear mi plan de cuidado")}</button>
+          </div>
+          <div style={{background:"linear-gradient(135deg,#6D5BD0,#8B7BE8)",borderRadius:16,padding:16,marginBottom:14,boxShadow:"0 6px 22px #6D5BD044"}}>
+            <div style={{fontSize:13,fontWeight:800,color:"#fff",marginBottom:3}}>🩺 Tu nutricionista</div>
+            <div style={{fontSize:10.5,color:"#EDE9FF",marginBottom:11,lineHeight:1.45}}>Revisa tus registros, tu plan y tus medidas antes de responderte. Pregúntale lo que quieras.</div>
+            <div style={{display:"flex",gap:7,marginBottom:9}}>
+              <input value={agentePregunta} onChange={e=>setAgentePregunta(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&agentePregunta.trim())consultarAgente("consulta",agentePregunta.trim());}} placeholder="Ej: ¿cómo voy con el arroz?" style={{flex:1,minWidth:0,padding:"11px 12px",borderRadius:11,border:"none",fontSize:12.5,outline:"none",boxSizing:"border-box"}}/>
+              <button onClick={()=>consultarAgente("consulta",agentePregunta.trim())} disabled={agenteBusy||!agentePregunta.trim()} style={{padding:"11px 15px",borderRadius:11,border:"none",background:agenteBusy||!agentePregunta.trim()?"#ffffff55":"#fff",color:"#6D5BD0",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>Enviar</button>
+            </div>
+            <button onClick={()=>consultarAgente("revision","")} disabled={agenteBusy} style={{width:"100%",padding:"11px",borderRadius:11,border:"1.5px solid #ffffff88",background:"transparent",color:"#fff",fontWeight:800,fontSize:12.5,cursor:"pointer"}}>{agenteBusy?"🔍 Revisando tus datos…":"📋 Revisión completa de mi caso"}</button>
+            {agenteMsg&&(
+              <div style={{background:"#fff",borderRadius:12,padding:"12px 13px",marginTop:11}}>
+                <div style={{fontSize:12.5,color:"#444",lineHeight:1.55,whiteSpace:"pre-wrap"}}>{agenteMsg.texto}</div>
+                {agenteMsg.tools?<div style={{fontSize:9.5,color:"#bbb",marginTop:8}}>Consultó {agenteMsg.tools} fuente(s) de tus datos</div>:null}
+              </div>
+            )}
+          </div>
           <div style={{marginBottom:18}}>
             <button onClick={analizarSemana} disabled={weeklyBusy} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:weeklyBusy?"#ccc":"linear-gradient(135deg,#6D5BD0,#8B7BE8)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 4px 16px #6D5BD033"}}>{weeklyBusy?"🔍 Analizando tu semana…":"✨ Mi semana: energía y vitalidad"}</button>
             {weeklyAI&&(
