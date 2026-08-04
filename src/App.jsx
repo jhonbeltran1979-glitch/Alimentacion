@@ -410,7 +410,7 @@ Responde SOLO JSON sin backticks:
 }
 
 async function interpretarVoz(texto,ctx){return iaText(promptVoz(`Texto dictado: "${texto}".`,ctx));}
-async function interpretarVozAudio(audioB64,mime,ctx){return iaAudio(promptVoz(`El dictado del usuario viene en el AUDIO adjunto (español con acento colombiano). Escúchalo con atención, transcríbelo fielmente e inclúyelo en el campo "transcripcion"; usa esa transcripción como el texto dictado.`,ctx),audioB64,mime);}
+async function interpretarVozAudio(audioB64,mime,ctx){return iaAudio(promptVoz(`El dictado del usuario viene en el AUDIO adjunto (español con acento colombiano). Escúchalo con atención, transcríbelo fielmente e inclúyelo en el campo "transcripcion"; usa esa transcripción como el texto dictado. IMPORTANTE: si el audio está en silencio, es solo ruido de fondo, o no contiene una frase clara de comida/ejercicio/agua dictada por una persona, NO inventes nada: devuelve comidas=[], ejercicio=null, agua_vasos=null y en "transcripcion" lo poco que hayas oído (o vacío). Nunca completes con alimentos plausibles que no se escuchen con claridad.`,ctx),audioB64,mime);}
 
 function promptCorregir(fuente,pend){
   return `El usuario está confirmando POR VOZ un registro de salud que aún NO se ha guardado. Registro pendiente: ${JSON.stringify({comidas:pend.comidas||[],ejercicio:pend.ejercicio||null,agua_vasos:pend.agua_vasos||null})}.
@@ -1750,10 +1750,34 @@ function PatientApp({onLogout,user,token}){
         const sc=calcScores(matched);
         nuevos.push({fecha:today,comida:momento,alimentos:JSON.stringify(all),score_total:sc.total,porVoz:true,_reemplazaExistente:!!existente});
         (async()=>{
-          if(existente&&user&&token){
+          let base=existente;
+          // Si history no tenía la comida, reléela desde Supabase para no perder lo ya guardado
+          if(!base&&user&&token){
+            try{
+              const rr=await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&fecha=eq.${isoHoy()}&momento=eq.${encodeURIComponent(momento)}&select=*`,{headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});
+              const rows=await rr.json();
+              if(Array.isArray(rows)&&rows.length){
+                let prev=[];
+                try{prev=JSON.parse(typeof rows[0].alimentos==="string"?rows[0].alimentos:JSON.stringify(rows[0].alimentos||[]));}catch(_){prev=[];}
+                const prevN=prev.map(x=>String(nombreDe(x)).toLowerCase());
+                const extras=nuevosAlimentos.filter(x=>!prevN.includes(String(nombreDe(x)).toLowerCase()));
+                all=[...prev,...extras];
+                base=true;
+              }
+            }catch(_){}
+          }
+          // Borra SIEMPRE lo que haya de ese día+momento antes de insertar la versión fusionada
+          if(user&&token){
             try{await fetch(`${SB_URL}/rest/v1/meals?patient_id=eq.${user.id}&fecha=eq.${isoHoy()}&momento=eq.${encodeURIComponent(momento)}`,{method:"DELETE",headers:{apikey:SB_ANON,Authorization:`Bearer ${token}`}});}catch(_){}
           }
-          syncMealLog({fecha:today,comida:momento,alimentos:all,score_total:sc.total,score_inmunidad:sc.immunity,score_energia:sc.energy,score_concentracion:sc.focus,score_vitalidad:sc.vitality,notas:""});
+          const matched2=FOOD_CATEGORIES.flatMap(cat=>cat.items).filter(f=>all.some(a=>f.toLowerCase().includes(String(nombreDe(a)).toLowerCase())||String(nombreDe(a)).toLowerCase().includes(f.toLowerCase())));
+          const sc2=calcScores(matched2);
+          syncMealLog({fecha:today,comida:momento,alimentos:all,score_total:sc2.total,score_inmunidad:sc2.immunity,score_energia:sc2.energy,score_concentracion:sc2.focus,score_vitalidad:sc2.vitality,notas:""});
+          // refleja el resultado final (por si hubo merge contra Supabase) en el estado local
+          setHistory(prev=>{
+            const otras=prev.filter(r=>!(r.fecha===today&&r.comida===momento));
+            return [{fecha:today,comida:momento,alimentos:JSON.stringify(all),score_total:sc2.total,porVoz:true},...otras];
+          });
         })();
       });
       setHistory(prev=>{
@@ -1901,11 +1925,11 @@ function PatientApp({onLogout,user,token}){
         const t=c.transcripcion||"";
         if(c.accion==="cancelar"||VOICE_NO.test(t)){descartarPendiente();}
         else if(c.accion==="guardar"||VOICE_OK.test(t)){await guardarPendiente(pend);}
-        else if(c.accion==="nada"){hablar(c.respuesta||"No te escuché bien, ¿me repites?",()=>{if(voicePendingRef.current)startVoice(true);});}
+        else if(c.accion==="nada"){hablar(c.respuesta||"No te escuché bien. Toca el micrófono para intentarlo de nuevo.");}
         else{
           const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null,correcciones:[]};
           setVoicePending(upd);
-          hablar((c.respuesta||"Actualizado.")+" ¿Guardo así? Di listo, o sigue corrigiendo.",()=>{if(voicePendingRef.current)startVoice(true);});
+          hablar((c.respuesta||"Actualizado.")+" Revisa abajo: toca ✓ Guardar, o el micrófono para corregir.");
         }
       }
       else{
@@ -1921,14 +1945,14 @@ function PatientApp({onLogout,user,token}){
         }
         else{
           setVoicePending({...p,analisis:null,textoDictado:p.transcripcion||""});
-          hablar((p.respuesta||"")+" ¿Falta algo? Dime qué agrego o quito, o di listo para guardar.",()=>{if(voicePendingRef.current)startVoice(true);});
+          hablar((p.respuesta||"")+" Revisa abajo y toca ✓ Guardar. ¿Falta algo? Toca el micrófono y dilo.");
         }
       }
     }
     catch(e){
       voiceFailsRef.current++;
       if(voicePendingRef.current){
-        if(voiceFailsRef.current<=2){hablar("No te escuché bien, ¿me repites?",()=>{if(voicePendingRef.current)startVoice(true);});}
+        if(voiceFailsRef.current<=2){hablar("No te escuché bien. Toca el micrófono para intentarlo de nuevo.");}
         else{setVoiceResult({respuesta:"No logro procesar el audio — usa los botones ✓ Guardar o Descartar."});hablar("No logro procesar el audio. Usa los botones para guardar o descartar.");}
       }
       else{setVoiceResult({respuesta:"No pude procesar el audio, intenta de nuevo."});hablar("No pude procesar el audio, intenta de nuevo.");}
@@ -1949,7 +1973,7 @@ function PatientApp({onLogout,user,token}){
           else{
             const upd={...pend,comidas:Array.isArray(c.comidas)?c.comidas:(pend.comidas||[]),ejercicio:c.ejercicio!==undefined?c.ejercicio:pend.ejercicio,agua_vasos:c.agua_vasos!==undefined?c.agua_vasos:pend.agua_vasos,respuesta:c.respuesta,analisis:null,correcciones:[]};
             setVoicePending(upd);
-            hablar((c.respuesta||"Actualizado.")+" ¿Guardo así? Di listo, o sigue corrigiendo.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
+            hablar((c.respuesta||"Actualizado.")+" Revisa abajo: toca ✓ Guardar, o el micrófono para corregir.");
           }
         }
       }
@@ -1964,7 +1988,7 @@ function PatientApp({onLogout,user,token}){
         }
         else{
           setVoicePending({...p,analisis:null,textoDictado:texto});
-          hablar((p.respuesta||"")+" ¿Falta algo? Dime qué agrego o quito, o di listo para guardar.",()=>{if(voicePendingRef.current&&!recRef.userStop)startVoice(true);});
+          hablar((p.respuesta||"")+" Revisa abajo y toca ✓ Guardar. ¿Falta algo? Toca el micrófono y dilo.");
         }
       }
     }
@@ -2030,6 +2054,15 @@ function PatientApp({onLogout,user,token}){
       setListening(false);
       const total=m.chunks.reduce((a,c)=>a+c.length,0);
       if(total<m.sampleRate*0.4){if(!voicePendingRef.current)setVoiceResult(null);return;}
+      // Filtro de silencio: si el audio no tiene voz real (RMS y pico muy bajos), no lo procesamos.
+      // Evita que ruido ambiente o el eco de la propia app generen comidas inventadas.
+      let sum=0,peak=0,cnt=0;
+      for(const c of m.chunks){for(let i=0;i<c.length;i++){const v=Math.abs(c[i]);sum+=v*v;if(v>peak)peak=v;cnt++;}}
+      const rms=cnt?Math.sqrt(sum/cnt):0;
+      if(rms<0.012||peak<0.06){
+        setVoiceResult({respuesta:"No te escuché bien. Toca el micrófono e inténtalo de nuevo."});
+        return;
+      }
       try{
         const wavB64=encodeWav16k(m.chunks,m.sampleRate);
         processVoiceAudio(wavB64,"audio/wav");
